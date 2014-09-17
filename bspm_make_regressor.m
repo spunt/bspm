@@ -25,6 +25,7 @@ function [X, X0] = bspm_make_regressor(nvols, TR, TRbin, ons, dur, pm, TRons, TD
 %
 %	$Revision Date: Aug_20_2014
 
+if nargin<8, TDtag = 0; end
 if nargin<7, TRons = 1; end
 if nargin<6, pm = []; end
 if nargin<5, error('USAGE: X = bspm_make_regressor(nvols, TR, TRbin, ons, dur, pm, TRons, TDtag)'); end

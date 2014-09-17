@@ -16,12 +16,10 @@ function bspm_checkreg(images, captions, xyz, title)
 
 % John Ashburner
 % $Id: spm_check_registration.m 4330 2011-05-23 18:04:16Z ged $
-
 if ~nargin
     [images, sts] = spm_select([1 15],'image','Select images');
     if ~sts, return; end
 end
-if ~iscell(images) & strfind(images,'*'); images = files(images); end
 if nargin < 2, captions = cellfun(@num2str, num2cell(1:length(images)), 'Unif', false); end
 if ischar(images), images = cellstr(images); end
 if iscell(images{1}), images = spm_vol(vertcat(images{:})); end

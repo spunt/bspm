@@ -24,6 +24,9 @@ function [data, hdr, info] = bspm_read_vol(in, varargin)
 if nargin < 1, error('USAGE: [data hdr info] = bspm_read_vols(in,option)'); end
 if nargin > 1, optional = 1; else optional = 0; end
 if iscell(in), in = char(in); end
+if any(cellfun(@iscell, varargin))
+    varargin{cellfun(@iscell, varargin)} = char(varargin{cellfun(@iscell, varargin)}); 
+end
 hdr = spm_vol(in);
 nvol = length(hdr);
 data = spm_read_vols(hdr);

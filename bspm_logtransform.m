@@ -20,7 +20,7 @@ if nargin<1, error('USAGE: bspm_logtransform(in,rescale)'); end
 if ischar(in), in = cellstr(in); end
 nv = length(in);
 fprintf('\nReading data for %d volumes', nv);
-[d h] = bspm_read_vol(in, 'reshape'); % read data
+[d, h] = bspm_read_vol(in, 'reshape'); % read data
 level = nanmean(d(d(:,1) > nanmean(d(:,1))/10)); % determine mean tissue signal
 level = level/exp(0.0001*32768/2); % 16-bit integer range at 0.01% signal change resolution
 if ~isempty(prefix)
@@ -42,9 +42,6 @@ for f = 1:nv
 end
 fprintf('\nDONE\n');
 
-
-
-% 
 % % read representative (i.e. first) image to assess scale
 % img = spm_read_vols(spm_vol(in{1}));
 % 

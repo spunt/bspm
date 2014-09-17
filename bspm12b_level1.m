@@ -3,34 +3,33 @@ function [] = bspm_level1(images, general_info, runs, contrasts)
 %
 %   ARGUMENTS:
 %
-%   images:            NRUNS x 1 cell array with functional image files
-% 
-%   general_info -     structure with the following fields:
-%       analysis:           path for the analysis
-%       TR:                 repetition time (in seconds)
-%       mt_res:             microtime resolution (number of time bins per scan)
-%       mt_onset:           microtime onset
-%       hpf:                high-pass filter cutoff to use (in seconds)
-%       hrf_derivs:         temporal(1) and/or dispersion(2), e.g. [1 1] = use both
-%       autocorrelation:    0=None, 1=AR(1), 2=Weighted Least Squares (WLS)
-%       nuisance_file:      txt file with nuisance regressors (leave empty for none)
-%       brainmask:          brainmask to use (leave empty for none)
-%       implicitmask:       0 = no implicit masking; 1 = yes (default)
-% 
-%   runs -              structure with the following fields
-%       conditions:
-%           name:   string naming the condition
-%           onsets:   onsets
-%           durations:   durations
-%           parameters:   for building parametric modulators (leave empty for none)
-%               name:   string naming the paramter
-%               values:   parameter values (assumed to be orthogonalized)
-% 
-%   contrasts -         structure with the following fields
-%       type:   'T' or 'F'
-%       name:   string naming the contrast
-%       weights:    vector of contrast weights
-%       repl_tag:   tag to replicate weights across sessions (default=1)
+%       images:   functional images
+%
+%       general_info -     structure with the following fields:
+%           analysis:           path for the analysis
+%           TR:                 repetition time (in seconds)
+%           mt_res:             microtime resolution (number of time bins per scan)
+%           mt_onset:           microtime onset
+%           hpf:                high-pass filter cutoff to use (in seconds)
+%           hrf_derivs:         temporal(1) and/or dispersion(2), e.g. [1 1] = use both
+%           autocorrelation:    0=None, 1=AR(1), 2=Weighted Least Squares (WLS)
+%           nuisance_file:      txt file with nuisance regressors (leave empty for none)
+%           brainmask:          brainmask to use (leave empty for none)
+%
+%       runs:   a structure with the following fields
+%           conditions:
+%               name:   string naming the condition
+%               onsets:   onsets
+%               durations:   durations
+%               parameters:   for building parametric modulators (leave empty for none)
+%                   name:   string naming the paramter
+%                   values:   parameter values (assumed to be orthogonalized)
+%
+%       contrasts:  a structure with the following fields
+%           type:   'T' or 'F'
+%           name:   string naming the contrast
+%           weights:    vector of contrast weights
+%           repl_tag:   tag to replicate weights across sessions (default=1)
 %
 
 % --------------------------------- Copyright (C) 2014 ---------------------------------
@@ -41,11 +40,13 @@ function [] = bspm_level1(images, general_info, runs, contrasts)
 %	$Revision Date: Aug_20_2014
 
 docon = 1; if nargin<4, docon = 0; end
-if nargin<3, error('Give me arguments! bspm_level1(images, general_info, runs, contrasts)'); end
+if nargin<3
+   disp('Give me arguments! bspm_level1(images, general_info, runs, contrasts)');
+   return
+end
 if ~isfield(general_info, 'mt_res'), general_info.mt_res = 16; end
 if ~isfield(general_info, 'mt_onset'), general_info.mt_onset = 1; end
 if ~isfield(general_info, 'hrf_derivs'), general_info.hrf_derivs = [0 0]; end
-if ~isfield(general_info, 'implicitmask'), general_info.implicitmask = 1; end
 
 % session Non-Specific Parameters
 mkdir(general_info.analysis);
@@ -140,13 +141,27 @@ end
 
 % run job
 spm('defaults','fmri'); spm_jobman('initcfg');
-if ~general_info.implicitmask
-    global defaults; defaults.mask.thresh = -Inf;
-end
 spm_jobman('run',matlabbatch);
 
 end
 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  

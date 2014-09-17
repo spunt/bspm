@@ -34,7 +34,7 @@ TPMimg = [spm_dir filesep 'toolbox/Seg/TPM.nii'];
 matlabbatch{1}.spm.tools.preproc8.channel.vols = in;  % cell array containing paths to all images
 matlabbatch{1}.spm.tools.preproc8.channel.biasreg = 0.0001;
 matlabbatch{1}.spm.tools.preproc8.channel.biasfwhm = 60;
-matlabbatch{1}.spm.tools.preproc8.channel.write = [0 0]; % save [bias_corrected bias_field]
+matlabbatch{1}.spm.tools.preproc8.channel.write = [0 0]; % save [bias_field bias_corrected]
 matlabbatch{1}.spm.tools.preproc8.tissue(1).tpm = {[TPMimg ',1']}; % grey matter
 matlabbatch{1}.spm.tools.preproc8.tissue(1).ngaus = 2;
 matlabbatch{1}.spm.tools.preproc8.tissue(1).native = [0 1];   % [native_space DARTEL_Imported]
@@ -45,19 +45,19 @@ matlabbatch{1}.spm.tools.preproc8.tissue(2).native = [0 1];  % [native_space DAR
 matlabbatch{1}.spm.tools.preproc8.tissue(2).warped = [0 0];
 matlabbatch{1}.spm.tools.preproc8.tissue(3).tpm = {[TPMimg ',3']}; % cerebro-spinal fluid (CSF)
 matlabbatch{1}.spm.tools.preproc8.tissue(3).ngaus = 2;
-matlabbatch{1}.spm.tools.preproc8.tissue(3).native = [0 1];  % [native_space DARTEL_Imported]
+matlabbatch{1}.spm.tools.preproc8.tissue(3).native = [0 0];  % [native_space DARTEL_Imported]
 matlabbatch{1}.spm.tools.preproc8.tissue(3).warped = [0 0];
 matlabbatch{1}.spm.tools.preproc8.tissue(4).tpm = {[TPMimg ',4']}; % bone 
 matlabbatch{1}.spm.tools.preproc8.tissue(4).ngaus = 3;
-matlabbatch{1}.spm.tools.preproc8.tissue(4).native = [0 1];  % [native_space DARTEL_Imported]
+matlabbatch{1}.spm.tools.preproc8.tissue(4).native = [0 0];  % [native_space DARTEL_Imported]
 matlabbatch{1}.spm.tools.preproc8.tissue(4).warped = [0 0];
 matlabbatch{1}.spm.tools.preproc8.tissue(5).tpm = {[TPMimg ',5']}; % soft tissue
 matlabbatch{1}.spm.tools.preproc8.tissue(5).ngaus = 4;
-matlabbatch{1}.spm.tools.preproc8.tissue(5).native = [0 1];  % [native_space DARTEL_Imported]
+matlabbatch{1}.spm.tools.preproc8.tissue(5).native = [0 0];  % [native_space DARTEL_Imported]
 matlabbatch{1}.spm.tools.preproc8.tissue(5).warped = [0 0];
 matlabbatch{1}.spm.tools.preproc8.tissue(6).tpm = {[TPMimg ',6']}; % air/background
 matlabbatch{1}.spm.tools.preproc8.tissue(6).ngaus = 2;
-matlabbatch{1}.spm.tools.preproc8.tissue(6).native = [0 1];  % [native_space DARTEL_Imported]
+matlabbatch{1}.spm.tools.preproc8.tissue(6).native = [0 0];  % [native_space DARTEL_Imported]
 matlabbatch{1}.spm.tools.preproc8.tissue(6).warped = [0 0];
 matlabbatch{1}.spm.tools.preproc8.warp.mrf = 0; % MRF parameter (cleanup) (default = 0)
 matlabbatch{1}.spm.tools.preproc8.warp.reg = 4;
@@ -66,8 +66,7 @@ matlabbatch{1}.spm.tools.preproc8.warp.samp = 3; % sampling distance
 matlabbatch{1}.spm.tools.preproc8.warp.write = [0 1];  % [inverse_deformation forward_deformation]
 
 % run job
-spm('defaults','fmri'); spm_jobman('initcfg');         
-spm_jobman('run',matlabbatch);
+spm('defaults','fmri'); spm_jobman('run',matlabbatch);
 
 end
 
