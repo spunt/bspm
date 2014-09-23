@@ -17,7 +17,7 @@ function [] = bspm_Fcontrasts(analysis_dirs, weights, delete_tag)
 %	$Revision Date: Sep_23_2014
 if nargin<2, error('USAGE: bspm_Fcontrasts(analysis_dirs, weights, delete_tag)'); end
 if nargin<3, delete_tag = 0; end
-if ischar(analysis_dirs), cellstr(analysis_dirs); end
+if ischar(analysis_dirs), analysis_dirs = cellstr(analysis_dirs); end
 for s = 1:length(analysis_dirs)
 
     spmmat = [analysis_dirs{s} filesep 'SPM.mat'];
