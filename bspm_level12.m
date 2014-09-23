@@ -52,7 +52,7 @@ if ~isfield(general_info, 'mt_onset'), general_info.mt_onset = 1; end
 if ~isfield(general_info, 'hrf_derivs'), general_info.hrf_derivs = [0 0]; end
 
 % Session Non-Specific Parameters
-mkdir(general_info.analysis);
+if ~exist(general_info.analysis, 'dir'), mkdir(general_info.analysis); end
 matlabbatch{1}.spm.tools.rwls.fmri_rwls_spec.dir{1} = general_info.analysis;
 matlabbatch{1}.spm.tools.rwls.fmri_rwls_spec.timing.units = 'secs';
 matlabbatch{1}.spm.tools.rwls.fmri_rwls_spec.timing.RT = general_info.TR;

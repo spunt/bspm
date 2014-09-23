@@ -94,9 +94,14 @@ if TDtag
     X2 = X;
     X02 = X0;
     X = zeros(size([X1 X2]));
+    nc = size(X1, 2)*2;
+    idx = zeros(nc/2, 2);
+    idx(:,1) = 1:2:nc; 
+    idx(:,2) = 2:2:nc; 
+    for i = 1:(nc/2)
+        X(:,idx(i,:)) = spm_orth([X1(:,i) X2(:,i)]); 
+    end
     X0 = zeros(size([X01 X02]));
-    X(:,1:2:end) = X1;
-    X(:,2:2:end) = X2;
     X0(:,1:2:end) = X01;
     X0(:,2:2:end) = X02;
     

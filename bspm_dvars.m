@@ -1,7 +1,7 @@
-function TS = bspm_get_global(epifiles, rpfile, maskfile, plotit)
-% BSPM_GET_GLOBAL  
+function TS = bspm_dvars(epi, cutoff, maskfn, nosave)
+% BSPM_DVARS
 %
-% USAGE: TS = bspm_get_global(epifiles, rpfile, maskfile, plotit)
+% USAGE: TS = bspm_dvars(epi, cutoff, maskfn, nosave)
 %       
 %
 
@@ -11,34 +11,53 @@ function TS = bspm_get_global(epifiles, rpfile, maskfile, plotit)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, error('TS = bspm_get_global(epifiles, rpfile, maskfile)'); end
-if ischar(epifiles), epifiles = cellstr(epifiles); end
-if nargin<2 || isempty(rpfile)
-    tmp = fileparts(epifiles{1});
-    rpfile = files(fullfile(tmp, 'rp*txt')); 
-    if isempty(rpfile), error('TS = bspm_get_global(epifiles, rpfile, maskfile)'); end
-end
-if nargin<3, maskfile = []; maskfile = 'none'; end
-if nargin<4, plotit = 0; end
-if iscell(rpfile), rpfile = char(rpfile); end
-if iscell(maskfile), maskfile = char(maskfile); end
-rp          = load(rpfile);
+
+%% CHECK INPUTS
+if nargin<1, error('TS = bspm_dvars(epi, cutoff, maskfn, nosave)'); end
+if ischar(epi), epi = cellstr(epi); end
+if nargin<2, cutoff = 3; end
+if nargin<3, maskfn = []; maskfn = 'none'; end
+if nargin<4, nosave = 0; end
+if iscell(maskfn), maskfn = char(maskfn); end
+
+%% FIND RP FILE
+epidir = fileparts(epi{1});
+rpfn = files(fullfile(epidir, 'rp*txt')); 
+if isempty(rpfn), error('Could not located RP filename'); end
+if iscell(rpfn), rpfn = char(rpfn); end
+
+%% READ IN DATA
+fprintf('Realignment Parameter File: %s\n', rpfn);
+rp          = load(rpfn);
 rp(:,4:6)   = rp(:,4:6)*57.3;
 TS.rp       = rp; 
-hdr         = spm_vol(char(epifiles));
+fprintf('Processing %d functional volumes in %s\n', length(epi), fileparts(epi{1})); 
+hdr         = spm_vol(char(epi));
 data        = spm_read_vols(hdr);
 datadim     = size(data); 
-fprintf('Realignment parameter file: %s\n', rpfile);
-fprintf('Processing %d functional volumes...\n', size(data,4));
-if ~isempty(maskfile), cfg.mask = bob_reslice(maskfile, epifiles{1}, 1, 1); end
+fprintf('Mask File: %s\n', maskfn);
+if exist(maskfn, 'file'), cfg.mask = bob_reslice(maskfn, epi{1}, 1, 1); end
 cfg.vol     = data; 
-cfg.plot    = plotit; 
+cfg.plot    = 0; 
+fprintf('Running BRAMILA_DVARS...\n', length(epi), fileparts(epi{1})); 
 TS.dvars    = bramila_dvars(cfg);
 TS.zdvars   = abs(oneoutzscore(TS.dvars));
-TS.global   = nanmean(reshape(data, prod(datadim(1:3)), datadim(4)))';
-TS.zdglobal = abs([0; diff(oneoutzscore(TS.global))]);
-TS.maskfile = maskfile;
+TS.maskfile = maskfn;
+TS.nuisidx  = find(TS.zdvars > cutoff); 
+TS.pctbad   = 100*(length(TS.nuisidx)/length(epi));
+fprintf('Identified %d bad timepoints (%2.2f%% of all timepoints)\n', length(TS.nuisidx), TS.pctbad); 
+TS.nuisance = zeros(length(epi),length(TS.nuisidx));
+for i = 1:length(TS.nuisidx)
+    TS.nuisance(TS.nuisidx(i), i) = 1;
+end
+nuisance = [rp TS.nuisance];
+if ~nosave
+    outname = sprintf('nuisance_%dSDcut_%s.txt',cutoff*100,bob_timestamp);
+    save(fullfile(epidir, outname), 'nuisance', '-ascii'); 
+    fprintf('Output filename: %s\n\n', outname); 
+end
 
+    
 end
 % =========================================================================
 % SUBFUNCTIONS

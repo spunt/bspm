@@ -1,4 +1,4 @@
-function bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag)
+function bspm_contrasts2(input)
 % BSPM_CONTRASTS
 %
 %   USAGE: bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag)
@@ -16,17 +16,18 @@ function bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<4, repl_tag = 1; end
-if nargin<3, delete_tag = 0; end
-if nargin<2
-   disp('USAGE: bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag)');
-   return
-end
-
+if nargin < 1, error('No input!'); end
+if ~isfield(input, 'delete_tag'), input.delete_tag = 0; end
+if ~isfield(input, 'repl_tag'), input.repl_tag = 1; end
+fn = {'analysis_dir' 'weights' 'delete_tag' 'repl_tag'};
+[status, msg] = checkfields(input, fn);
+if ~status, error(msg); end
+analysis_dir = input.analysis_dir; 
+weights = input.weights; 
+repl_tag = input.repl_tag; 
+delete_tag = input.delete_tag; 
 if ischar(analysis_dir), analysis_dir = cellstr(analysis_dir); end
 if repl_tag, repl_choice = 'repl'; else repl_choice = 'none'; end
-
 
 for s = 1:length(analysis_dir)
 

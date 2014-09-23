@@ -26,8 +26,8 @@ if nargin < 1, error('USAGE: bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag
 %% MAPS
 if ischar(maps), maps = cellstr(maps); end
 all = bspm_read_vol(char(maps), 'reshape', 'implicitmask', 'mask', mask);
-nmaps = length(maps);
-nvox = sum(mask(:) > 0);
+% nmaps = length(maps);
+% nvox = sum(mask(:) > 0);
 % all = zeros(nvox, nmaps);
 % for i = 1:nmaps
 %     d = bspm_read_vol(maps{i});
@@ -39,7 +39,7 @@ all(find(sum(all'==0)),:) = [];
 all(nanmean(isnan(all),2)>0,:) = [];
 
 %% MDS
-rho = corr(all);
+rho = corr(all, 'rows', 'pairwise');
 D = 1 - rho;
 [Y,eigvals] = cmdscale(D);
 if eigenplot
