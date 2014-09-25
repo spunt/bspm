@@ -42,24 +42,21 @@ nsubs = length(images);
 % --------------------------------------------------------
 matlabbatch{1}.spm.tools.dartel.mni_norm.template = cellstr(template);
 for s = 1:nsubs
-    
-    % grab and fix filename for this subject's images
     cim = images{s};
     for i = 1:length(cim)
         cim(i) = cellstr([cim{i} ',1']);
     end
-    
     matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).flowfield = flowfields(s);
-    matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).images = cim;
-    
+    matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).images = cim;   
 end                     
 matlabbatch{1}.spm.tools.dartel.mni_norm.vox = voxsize;
 matlabbatch{1}.spm.tools.dartel.mni_norm.bb = [-78 -112 -50; 78 76 85];
 matlabbatch{1}.spm.tools.dartel.mni_norm.preserve = 0;
 matlabbatch{1}.spm.tools.dartel.mni_norm.fwhm = fwhm;
-global defaults
-spm_get_defaults('normalise.write.prefix',sprintf('w%d',voxsize*100));
-spm_get_defaults('smooth.prefix',sprintf('s%d',fwhm));
+spm_jobman('initcfg');   
+global defaults; 
+defaults.smooth.prefix = sprintf('s%d',fwhm(1));
+defaults.normalise.write.prefix = sprintf('w%d', voxsize(1)); 
 spm_jobman('run',matlabbatch);
 
 end

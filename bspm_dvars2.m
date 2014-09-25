@@ -2,6 +2,7 @@ function TS = bspm_dvars2(input)
 % BSPM_DVARS
 %
 %   input.epipat
+%   input.maskfn
 %       
 
 % ------------------------ Copyright (C) 2014 ------------------------
@@ -10,13 +11,14 @@ function TS = bspm_dvars2(input)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
 if nargin < 1, error('No input!'); end
-
+fn = {'epipat' 'maskfn'};
+[status, msg] = checkfields(input, fn);
+if ~status, error(msg); end
 %% DEFAULTS
-maskfn = 'none';
 cutoff = 2.5; 
 nosave = 0; 
+maskfn = input.maskfn; 
 epi = files(input.epipat); 
 if isempty(epi), error('No EPI volumes found!'); end
 if ischar(epi), epi = cellstr(epi); end
@@ -53,7 +55,9 @@ for i = 1:length(TS.nuisidx)
 end
 nuisance = [rp TS.nuisance];
 if ~nosave
-    outname = sprintf('nuisance_%dSDcut_%s.txt',cutoff*100,bob_timestamp);
+    [mp, maskstr] = fileparts(maskfn); 
+    maskstr = regexprep(maskstr, ' ', '');
+    outname = sprintf('nuisance_%dSDcut_%sMask_%s.txt',cutoff*100,maskstr,bob_timestamp);
     save(fullfile(epidir, outname), 'nuisance', '-ascii'); 
     fprintf('Output filename: %s\n\n', outname); 
 end

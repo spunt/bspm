@@ -43,9 +43,9 @@ matlabbatch{1}.spm.tools.dartel.mni_norm.bb = [-78 -112 -50; 78 76 85];
 matlabbatch{1}.spm.tools.dartel.mni_norm.preserve = 0;
 matlabbatch{1}.spm.tools.dartel.mni_norm.fwhm = fwhm;
 spm_jobman('initcfg');    
-global defaults
-spm_get_defaults('normalise.write.prefix',sprintf('w%d',voxsize*100));
-spm_get_defaults('smooth.prefix',sprintf('s%d',fwhm));
+global defaults; 
+defaults.smooth.prefix = sprintf('s%d',fwhm(1));
+defaults.normalise.write.prefix = sprintf('w%d', voxsize(1)); 
 spm_jobman('run',matlabbatch);
 
 end
