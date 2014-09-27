@@ -1,11 +1,12 @@
 function bspm_checkreg_gui(in, titles)
-% BSPM_CHECKREG_BATCH Wrapper for Checking Registration
+% BSPM_CHECKREG_GUI
 %
-% USAGE: bspm_checkreg_batch(in)
+% USAGE: bspm_checkreg_batch(in, titles)
 %
 % ARGUMENTS
 %   in: an array of cells, with each cell containing paths for images
 %   to loop over
+%   titles: for each cell
 %
 
 % ------------------------ Copyright (C) 2014 ------------------------
@@ -16,7 +17,7 @@ function bspm_checkreg_gui(in, titles)
 %	$Revision Date: Aug_20_2014
 
 % CHECK ARGS
-if nargin<1, error('USAGE: bspm_checkreg_batch(in)'); end
+if nargin<1, error('USAGE: bspm_checkreg_batch(in, titles)'); end
 if ~iscell(in), in = cellstr(in); end
 % GUI
 S.fig = spm_figure('Create','Graphics', 'Check Reg GUI', 'off');
@@ -27,16 +28,15 @@ end
 checkreg(S.fig, in{1}, [0 0 0]', titles{1});
 data = guihandles(S.fig);
 data.titles = titles; 
-data.in = in; 
+data.in = in;
+data.ngroup = length(in); 
 data.count = 1;
-data.xyz = [0 0 0]'; 
-S.count = uimenu('Parent', S.fig, 'Label', sprintf('Group %d of %d', data.count, length(data.in))); 
-guidata(S.fig, data);
+data.xyz = [0 0 0]';
+S.count = uimenu('Parent', S.fig, 'Tag', 'Count', 'Label', sprintf('Group %d of %d', data.count, length(data.in)));
 pos.next        = [.900 .965 .09 .03];
 pos.prev        = [.010 .965 .09 .03];
 pos.save        = [.405 .965 .09 .03];
 pos.which       = [.505 .965 .09 .03];
-
 S.prev = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ...
         'Style', 'Push', ...
         'Position', pos.prev, ...
@@ -46,7 +46,8 @@ S.prev = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ..
         'FontWeight', 'Bold', ...  
         'String', '<<', ...
         'Enable', 'off', ...
-        'Callback', {@cb_prev, S}); 
+        'Callback', {@cb_prev, S});
+if data.ngroup > 1, enablestr = 'on'; else, enablestr = 'off'; end
 S.next = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ...
         'Style', 'Push', ...
         'Position', pos.next, ...
@@ -55,7 +56,7 @@ S.next = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ..
         'FontSize', .90, ...
         'FontWeight', 'Bold', ...  
         'String', '>>', ...
-        'Enable', 'on', ...
+        'Enable', enablestr, ...
         'Callback', {@cb_next, S});
 S.which = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ...
         'Style', 'Push', ...
@@ -76,49 +77,68 @@ S.save = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ..
         'FontWeight', 'norm', ...  
         'String', 'Save', ...
         'Enable', 'on', ...
-        'Callback', {@cb_save, S}); 
+        'Callback', {@cb_save, S});
+S.ax    = findobj(S.fig, 'type', 'axes');
+S.xlab  = arrayget(S.ax, 'xlabel'); 
+set(S.xlab, 'fontname', 'arial', 'fontsize', ceil(44/length(data.in{1})));
+guidata(S.fig, data);
 set(S.fig, 'Visible', 'on');
+
 end
 %% CALLBACKS
 function cb_next(varargin)
     action = varargin{1}; 
     parent = varargin{3};
+    h = gethandles(parent.fig); 
     data = guidata(parent.fig);
     data.xyz = spm_orthviews('pos'); 
     data.count = data.count + 1; 
     set(parent.count, 'Label', sprintf('Group %d of %d', data.count, length(data.in))); 
     if data.count==length(data.in)
-        set(action, 'Enable', 'off'); 
+        set(h.next, 'Enable', 'off'); 
     end
     set(parent.fig, 'Visible', 'off');
-    if data.count==2
-        set(parent.prev, 'Enable', 'on');
+    if data.count > 1
+        set(h.prev, 'Enable', 'on');
     end
     checkreg(parent.fig, data.in{data.count}, data.xyz, data.titles{data.count});
+    h = gethandles(parent.fig); 
+    set(h.xlab, 'fontsize', ceil(44/length(data.in{data.count}))); 
     set(parent.fig, 'Visible', 'on');
     guidata(parent.fig, data);
 end
 function cb_prev(varargin)
     action = varargin{1}; 
     parent = varargin{3};
+    h = gethandles(parent.fig); 
     data = guidata(parent.fig);
     data.xyz = spm_orthviews('pos'); 
     data.count = data.count - 1; 
     set(parent.count, 'Label', sprintf('Group %d of %d', data.count, length(data.in))); 
     if data.count==1
-        set(action, 'Enable', 'off'); 
+        set(h.prev, 'Enable', 'off'); 
     end
+    set(h.next, 'Enable', 'on'); 
     set(parent.fig, 'Visible', 'off');
     checkreg(parent.fig, data.in{data.count}, data.xyz, data.titles{data.count});
+    h = gethandles(parent.fig); 
+    set(h.xlab, 'fontsize', ceil(44/length(data.in{data.count}))); 
     set(parent.fig, 'Visible', 'on');
     guidata(parent.fig, data);
 end
 function cb_save(varargin)
     parent = varargin{3};
+    parent.save = varargin{1}; 
     data = guidata(parent.fig);
+    toggle_uivisibility([parent.prev parent.next parent.save parent.which], 'off')
     outname = fullfile(pwd, sprintf('CheckReg_%s_x=%d_y=%d_z=%d.pdf', regexprep(data.titles{data.count}, ' ', '_'), round(data.xyz(:)))); 
-    saveas(parent.fig, outname, 'pdf');
-    disp(['Saved to: ' outname]); 
+    if exist('export_fig.m', 'file')==2
+        export_fig(outname, parent.fig); 
+    else
+        saveas(parent.fig, outname, 'pdf');
+    end
+    disp(['Saved to: ' outname]);
+    toggle_uivisibility([parent.prev parent.next parent.save parent.which], 'on')
 end
 function cb_which(varargin)
     parent = varargin{3};
@@ -135,6 +155,18 @@ function cb_close(varargin)
     delete(h); % Bye-bye figure
 end
 %% SUBFUNCTIONS
+function h = gethandles(figh)
+h.ax    = findobj(figh, 'type', 'axes');
+h.xlab  = arrayget(h.ax, 'xlabel');
+h.save  = findobj(figh, 'String', 'Save');
+h.which = findobj(figh, 'String', 'Which'); 
+h.prev  = findobj(figh, 'String', '<<'); 
+h.next  = findobj(figh, 'String', '>>');
+h.count = findobj(figh, 'Tag', 'Count'); 
+end
+function toggle_uivisibility(harray, opt)
+arrayset(harray, 'visible', opt); 
+end
 function gui_cellshow(in, title)
 % CELLSHOW Show cell array
 %

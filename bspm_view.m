@@ -1,4 +1,4 @@
-function bspm_view(ol)
+function S = bspm_view(ol)
 close all; 
 % =========================================================================
 % DEFAULTS
@@ -75,7 +75,7 @@ end
 % =========================================================================
 % INITIALIZE SPM REGISTRY & ORTHVIEWS
 % =========================================================================
-try
+% try
 %% REGISTRY OBJECT (HREG)
 hReg = uipanel('Parent',S.hFig,'Units','Norm','Position',[0 0 1 1],...
         'BorderType', 'none', 'BackgroundColor',color.bg);
@@ -110,9 +110,9 @@ position_axes;
 position_colorbar;
 addxyz; 
 menu_axes;
-catch err
-    rethrow(err)
-end
+% catch err
+%     rethrow(err)
+% end
 % =========================================================================
 % UPPER BUTTON PANEL
 % =========================================================================
@@ -136,7 +136,7 @@ S.contrasttitle = uicontrol('Parent', S.uppan, 'Units', 'Normal', 'FontUnits', '
         'String', st.ol.descrip, ...
         'FontUnits', 'norm', ...
         'FontName', 'Arial', ...
-        'FontSize', .60, ...
+        'FontSize', .45, ...
         'Enable', 'Inactive', ...
         'Tag', 'ContrastName', ...
         'FontWeight', 'Normal');
@@ -282,7 +282,7 @@ switch tag
 end
 updatethreshinfo(T);
 [X,Y,Z]     = ndgrid(1:st.ol.DIM(1),1:st.ol.DIM(2),1:st.ol.DIM(3));
-st.ol.XYZ         = [X(:)';Y(:)';Z(:)'];
+st.ol.XYZ   = [X(:)';Y(:)';Z(:)'];
 RCP         = st.ol.XYZ; 
 RCP(4,:)    = 1;
 st.ol.XYZmm       = st.ol.M(1:3,:)*RCP;
@@ -294,33 +294,13 @@ else
     st.ol.XYZmm       = st.ol.XYZmm(:,st.ol.Y(:)>=T.thresh);
     st.ol.XYZ         = st.ol.XYZ(:,st.ol.Y(:)>=T.thresh);
     st.ol.Z           = st.ol.Y(st.ol.Y(:)>=T.thresh);
-end    
-bspm_orthviews('RemoveBlobs', st.ho);
-bspm_orthviews('MaxBB');
-bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
-position_axes;
-updatecontrastname; 
-position_colorbar;
-function cb_pslider(varargin)   
-global st
-T = getthreshinfo;
-T.pval = get(varargin{1}, 'value'); 
-T.thresh = bob_p2t(T.pval, T.df); 
-updatethreshinfo(T);
-[X,Y,Z]     = ndgrid(1:st.ol.DIM(1),1:st.ol.DIM(2),1:st.ol.DIM(3));
-st.ol.XYZ         = [X(:)';Y(:)';Z(:)'];
-RCP         = st.ol.XYZ; 
-RCP(4,:)    = 1;
-st.ol.XYZmm       = st.ol.M(1:3,:)*RCP;
-if strcmpi('both', T.direct)
-    st.ol.XYZmm       = st.ol.XYZmm(:,abs(st.ol.Y(:))>=T.thresh);
-    st.ol.XYZ         = st.ol.XYZ(:,abs(st.ol.Y(:))>=T.thresh);
-    st.ol.Z           = st.ol.Y(abs(st.ol.Y(:))>=T.thresh);
-else
-    st.ol.XYZmm       = st.ol.XYZmm(:,st.ol.Y(:)>=T.thresh);
-    st.ol.XYZ         = st.ol.XYZ(:,st.ol.Y(:)>=T.thresh);
-    st.ol.Z           = st.ol.Y(st.ol.Y(:)>=T.thresh);
-end    
+end
+cl_index   = spm_clusters(st.ol.XYZ);
+cl_bin     = repmat(1:max(cl_index), length(cl_index), 1)==repmat(cl_index', 1, max(cl_index));
+nopassidx  = ismember(cl_index, find(sum(cl_bin) < T.extent));  
+st.ol.Z(nopassidx,:) = []; 
+st.ol.XYZ(:,nopassidx) = []; 
+st.ol.XYZmm(:,nopassidx) = []; 
 bspm_orthviews('RemoveBlobs', st.ho);
 bspm_orthviews('MaxBB');
 bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
@@ -332,6 +312,55 @@ position_colorbar;
 % * SUBFUNCTIONS
 % *
 % =========================================================================
+function OL = read_overlay(fname, pval, k, direct)
+    if nargin<4, direct = 'both'; end
+    if nargin<3, k = 20; end
+    if nargin<2, pval = .001; end
+    [od, oh] = bspm_read_vol(fname);
+    tmp = oh.descrip;
+    idx1 = regexp(tmp,'[','ONCE');
+    idx2 = regexp(tmp,']','ONCE');
+    df = str2num(tmp(idx1+1:idx2-1));
+    u = bob_p2t(pval, df);
+    if strcmpi('neg', direct), od = od*-1; end
+    
+    M           = oh.mat;         %-voxels to mm matrix
+    DIM         = oh.dim';
+    VOX         = abs(diag(M(:,1:3))); 
+    [X,Y,Z]     = ndgrid(1:DIM(1),1:DIM(2),1:DIM(3));
+    XYZ         = [X(:)';Y(:)';Z(:)'];
+    RCP         = XYZ; 
+    RCP(4,:)    = 1;
+    XYZmm       = M(1:3,:)*RCP;
+    if strcmpi('both', direct)
+        XYZmm       = XYZmm(:,abs(od(:))>=u);
+        XYZ         = XYZ(:,abs(od(:))>=u);
+        Z           = od(abs(od(:))>=u);
+    else
+        XYZmm       = XYZmm(:,od(:)>=u);
+        XYZ         = XYZ(:,od(:)>=u);
+        Z           = od(od(:)>=u);
+    end
+    cl_index    = spm_clusters(XYZ);
+    cl_bin      = repmat(1:max(cl_index), length(cl_index), 1)==repmat(cl_index', 1, max(cl_index));
+    nopassidx  = ismember(cl_index, find(sum(cl_bin) < k));  
+    Z(nopassidx,:) = []; 
+    XYZ(:,nopassidx) = []; 
+    XYZmm(:,nopassidx) = []; 
+    OL          = struct( ...
+                'fname',    fname,...
+                'descrip',  oh.descrip, ...
+                'DF',       df, ...
+                'U',        u, ...
+                'P',        pval, ...
+                'K',        k, ...
+                'Y',        od, ...
+                'M',        M,...
+                'Z',        Z,...
+                'XYZmm',    XYZmm,...
+                'XYZ',      XYZ,...
+                'DIM',      DIM,...
+                'VOX',      VOX);   
 function T = getthreshinfo
 global st
 T.extent = str2num(get(findobj(st.fig, 'Tag', 'Extent'), 'String')); 
@@ -488,48 +517,6 @@ function pos = default_positions
     pos.pval           = [.500 .200 .275 .125];
     pos.df             = [.800 .200 .175 .125];
     pos.pslider        = [.050 .025 .900 .150];
-function OL = read_overlay(fname, pval, k, direct)
-    if nargin<4, direct = 'both'; end
-    if nargin<3, k = 20; end
-    if nargin<2, pval = .001; end
-    [od, oh] = bspm_read_vol(fname);
-    tmp = oh.descrip;
-    idx1 = regexp(tmp,'[','ONCE');
-    idx2 = regexp(tmp,']','ONCE');
-    df = str2num(tmp(idx1+1:idx2-1));
-    u = bob_p2t(pval, df);
-    if strcmpi('neg', direct), od = od*-1; end
-    M           = oh.mat;         %-voxels to mm matrix
-    DIM         = oh.dim';
-    VOX         = abs(diag(M(:,1:3))); 
-    [X,Y,Z]     = ndgrid(1:DIM(1),1:DIM(2),1:DIM(3));
-    XYZ         = [X(:)';Y(:)';Z(:)'];
-    RCP         = XYZ; 
-    RCP(4,:)    = 1;
-    XYZmm       = M(1:3,:)*RCP;
-    if strcmpi('both', direct)
-        XYZmm       = XYZmm(:,abs(od(:))>=u);
-        XYZ         = XYZ(:,abs(od(:))>=u);
-        Z           = od(abs(od(:))>=u);
-    else
-        XYZmm       = XYZmm(:,od(:)>=u);
-        XYZ         = XYZ(:,od(:)>=u);
-        Z           = od(od(:)>=u);
-    end
-    OL          = struct( ...
-                'fname',    fname,...
-                'descrip',  oh.descrip, ...
-                'DF',       df, ...
-                'U',        u, ...
-                'P',        pval, ...
-                'K',        k, ...
-                'Y',        od, ...
-                'M',        M,...
-                'Z',        Z,...
-                'XYZmm',    XYZmm,...
-                'XYZ',      XYZ,...
-                'DIM',      DIM,...
-                'VOX',      VOX);   
 function OL = thresh_overlay(in, u, k, direct)
     % THRESH_OVERLAY
     %
