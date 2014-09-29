@@ -1,7 +1,7 @@
-function S = bspm_view(ol, ul)
-% BSPM_VIEW Program for viewing fMRI statistical maps
+function S = bspmview(ol, ul)
+% BSPMVIEW Program for viewing fMRI statistical maps
 %
-%  USAGE: bspm_view(ol*, ul*)	*optional input
+%  USAGE: bspmview(ol*, ul*)	*optional input
 %
 %  Requires that Statistical Parametric Mapping (SPM; Wellcome Trust Centre
 %  for Neuroimaging; www.fil.ion.ucl.ac.uk/spm/) be in your MATLAB search
@@ -14,9 +14,9 @@ function S = bspm_view(ol, ul)
 %
 % _________________________________________________________________________
 %  EXAMPLES
-%   >> bspm_view('spmT_0001.img', 'T1.nii')  
-%   >> bspm_view('spmT_0001.img')   % uses default underlay
-%	>> bspm_view                    % opens dialogue for selecting overlay
+%   >> bspmview('spmT_0001.img', 'T1.nii')  
+%   >> bspmview('spmT_0001.img')   % uses default underlay
+%	>> bspmview                    % opens dialogue for selecting overlay
 %   
 % _________________________________________________________________________
 %  CREDITS
@@ -34,21 +34,34 @@ function S = bspm_view(ol, ul)
 %	Email:    spunt@caltech.edu
 % _________________________________________________________________________
 close all; 
+
+% | TEMPORARY
+% | =======================================================================
+imopt = {...
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/glmflex/0001_T_Why_Hand_-_How_Hand.nii'
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/spm1/spmT_0001.img'                    
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/spm2/spmT_0001.img'
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/roi.nii'     
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/underlay.nii'};
+ol = read_overlay(imopt{2}, .001, 20, 'both');
+ul = char(imopt{5});
+
 % | CHECK INPUTS
 % | =======================================================================
-if nargin < 1 
-    fname = uigetvol('Select an Image File for Overlay', 0);
-    if isempty(fname), disp('Must select an overlay!'); return; end
-    ol = read_overlay(fname, .001, 20, 'both');
-else
-    if iscell(ol), ol = char(ol); end
-    ol = read_overlay(ol, .001, 20, 'both');
-end
-if nargin < 2
-    ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
-else
-    if iscell(ul), ul = char(ul); end
-end
+% if nargin < 1 
+%     fname = uigetvol('Select an Image File for Overlay', 0);
+%     if isempty(fname), disp('Must select an overlay!'); return; end
+%     ol = read_overlay(fname, .001, 20, 'both');
+% else
+%     if iscell(ol), ol = char(ol); end
+%     ol = read_overlay(ol, .001, 20, 'both');
+% end
+% if nargin < 2
+%     ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
+% else
+%     if iscell(ul), ul = char(ul); end
+% end
+
 % | GUI FIGURE
 % | =======================================================================
 try
@@ -245,7 +258,7 @@ TEXT2    = {'parent',S.infopane, 'style','text', 'units','norm', 'clip','off', '
 %     end
 % end
 S.peakvalue = uicontrol(EDIT2{:}, pos.peakvalue, 'tag', 'peak', 'str', 'Intensity', 'enable', 'inactive');
-S.xyz = uicontrol(EDIT2{:}, pos.xyz, 'tag', 'xyz', 'str', 'Coordinate', 'callback', @cb_changexyz); 
+S.xyz = uicontrol(EDIT2{:}, pos.xyz, 'tag', 'xyz', 'str', 'Coordinate', 'callback', @cb_changexyz);
 S.clustersize = uicontrol(EDIT2{:}, pos.clustersize, 'tag', 'clustersize', 'str', 'Cluster Size', 'value', 1, 'enable', 'inactive'); 
 
 catch lasterr
@@ -536,7 +549,6 @@ function addxyz
     xyzstr(1,:) = [];
     set(h.ax, 'YAxislocation', 'right'); 
     axidx = [3 2 1];
-    
     for a = 1:length(axidx)
         yh = get(h.ax(axidx(a)), 'YLabel');
         st.vols{1}.ax{axidx(a)}.xyz = yh;
@@ -2008,6 +2020,8 @@ switch lower(action)
         xyzstr(1,:) = [];
         
         axidx = [3 2 1];
+        set(findobj(st.fig, 'tag', 'xyz'), 'string', sprintf('%d, %d, %d', round(xyz)));
+        
         for a = 1:length(axidx)
             yh = st.vols{1}.ax{axidx(a)}.xyz;
             set(yh, 'string', xyzstr(a,:));
