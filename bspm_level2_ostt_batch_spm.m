@@ -26,7 +26,7 @@ if nargin<3, mask = bspm_greymask; end
 if nargin<2, disp('USAGE: bspm_level2_ostt_batch(analysispat, name, mask, implicitTAG, conidx, conpat)'); return; end
 condirs = files(condirpat);
 if isempty(condirs), bob_display_message('No directories found! Check working dir and contrast dir pattern'); return; end
-[cpath,conlist] = files([condirs{1} filesep conpat], 'filename');
+[cpath,conlist] = files([condirs{1} filesep conpat]);
 if conidx, conlist = conlist(conidx); end
 for c = 1:length(conlist)
     cons = files([condirpat filesep conlist{c}]);

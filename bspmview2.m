@@ -33,20 +33,34 @@ function S = bspmview(ol, ul)
 %	Created:  2014-09-27
 %	Email:    spunt@caltech.edu
 % _________________________________________________________________________
+close all; 
 
-| CHECK INPUTS
-| =======================================================================
-if nargin < 1 
-    fname = uigetvol('Select an Image File for Overlay', 0);
-    if isempty(fname), disp('Must select an overlay!'); return; end
-else
-    if iscell(ol), ol = char(ol); end
-end
-if nargin < 2
-    ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
-else
-    if iscell(ul), ul = char(ul); end
-end
+% | FOR TESTING (TEMPORARY)
+% | ====================================================================
+imopt = {...
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/glmflex/0001_T_Why_Hand_-_How_Hand.nii'
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/spm1/spmT_0001.img'                    
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/spm2/spmT_0001.img'
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/roi.nii'     
+'/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/toydata/underlay.nii'};
+ol = read_overlay(imopt{2}, .001, 20, 'both');
+ul = char(imopt{5});
+
+% % | CHECK INPUTS
+% % | =======================================================================
+% if nargin < 1 
+%     fname = uigetvol('Select an Image File for Overlay', 0);
+%     if isempty(fname), disp('Must select an overlay!'); return; end
+%     ol = read_overlay(fname, .001, 20, 'both');
+% else
+%     if iscell(ol), ol = char(ol); end
+%     ol = read_overlay(ol, .001, 20, 'both');
+% end
+% if nargin < 2
+%     ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
+% else
+%     if iscell(ul), ul = char(ul); end
+% end
 
 % | GUI FIGURE
 % | =======================================================================
@@ -120,10 +134,11 @@ try
 % | REGISTRY OBJECT (HREG)
 hReg = uipanel('Parent',S.hFig,'Units','Norm','Position',[0 0 1 1],...
         'BorderType', 'none', 'BackgroundColor',color.bg);
-global st prevsect
-prevsect    = ul;
+    
 % | CREATE GLOBAL VARIABLE ST, PREVSECT
 bspm_orthviews('Reset');
+global st prevsect
+prevsect    = ul;
 st          = struct( ...
             'fig',          S.hFig,...
             'n',            0,...
@@ -140,77 +155,31 @@ st          = struct( ...
             'direct',       'both',...
             'snap',         []);
 st.vols     = cell(24,1);
-st.ol       = load_overlay(ol, .001, 5);
+st.ol       = ol; 
 spm_XYZreg('InitReg',hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
 st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
 bspm_orthviews('MaxBB');
+bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
 bspm_orthviews('Register', hReg);
-setthresh(st.ol.C0(3,:));
-setcolormap; 
-setposition_axes; 
-put_axesxyz; 
-put_axesmenu;
-put_upperpane; 
-put_lowerpane; 
+position_axes; 
+addxyz; 
+menu_axes;
 catch lasterr
     rethrow(lasterr)
 end
+put_upperpane; 
+put_lowerpane; 
 % =========================================================================
 % *
 % * SUBFUNCTIONS
 % *
 % =========================================================================
 
-% | GUI DEFAULTS
-% =========================================================================
-function color  = default_colors 
-    color.bg        = [20/255 23/255 24/255];
-    color.fg        = [248/255 248/255 248/255];
-    color.border    = [023/255 024/255 020/255]*2;
-    color.xhair     = [0.7020    0.8039    0.8902];
-    color.panel     = [.01 .22 .34];
-    color.blues = brewermap(40, 'Blues'); 
-function pos    = default_positions 
-    screensize      = get(0, 'ScreenSize');
-    pos.ss          = screensize(3:4);
-    pos.gui         = [pos.ss(1:2)*.5 pos.ss(2)*.55 pos.ss(2)*.5];
-    pos.aspratio    = pos.gui(3)/pos.gui(4);
-    
-    pos.peakvalue      = [.050 .050 .250 .50];
-    pos.xyz            = [.325 .050 .325 .50];
-    pos.clustersize    = [.675 .050 .250 .50];
-
-    pos.pos            = [.100 .050 .250 .85];
-    pos.neg            = [.400 .050 .250 .85];
-    pos.posneg         = [.700 .050 .250 .85];
-    
-    pos.k              = [.025 .050 .200 .50];
-    pos.tval           = [.250 .050 .225 .50];
-    pos.pval           = [.500 .050 .275 .50];
-    pos.df             = [.800 .050 .175 .50];
-    
-    pos.pslider        = [.050 .025 .900 .150];
-function prop   = default_properties(varargin)
-global st
-prop.darkbg     = {'units', 'norm', 'visible','on', 'clip', 'off', 'backg', st.color.bg, 'foreg', st.color.fg};
-prop.lightbg    = {'units', 'norm', 'visible','on', 'clip', 'off', 'backg', st.color.fg, 'foreg', [0 0 0]};
-if ~isempty(varargin), prop.darkbg = [varargin{:} prop.darkbg]; prop.lightbg = [varargin{:} prop.lightbg]; end
-prop.panel      = [prop.darkbg {'bordertype', 'none', 'titlepos', 'centertop', 'fontw', 'bold'}]; 
-prop.edit       = [prop.lightbg {'style', 'edit', 'horiz', 'center'}];
-prop.text       = [prop.darkbg {'style', 'text', 'horiz', 'center'}]; 
-prop.popup      = [prop.lightbg {'style', 'popup'}]; 
-prop.slider     = [prop.darkbg {'style', 'slide', 'min', 1.0000e-20, 'max', 1, 'sliderstep', [1 5], 'value', st.ol.P}];
-prop.push       = [prop.darkbg {'style', 'push', 'horiz', 'center'}]; 
-prop.radio      = [prop.darkbg {'style', 'radio', 'horiz', 'center'}];
-prop.toggle     = [prop.darkbg {'style', 'toggle'}]; 
-prop.checkbox   = [prop.darkbg {'style', 'check'}]; 
-prop.listbox    = [prop.darkbg {'style', 'list'}]; 
-
-% | GUI COMPONENTS
+% | GUI SETUP
 % =========================================================================
 function panelh = put_upperpane(varargin)
 global st
-[h,axpos] = gethandles_axes;
+[h,axpos] = get_axes_handles;
 uppos = axpos(2,:);
 uppos(2) = sum(uppos([2 4])) + .01; 
 uppos(3) = 1 - 2*uppos(1);
@@ -226,7 +195,7 @@ global st
 prop = default_properties('fontn', 'arial', 'fonts', 20);  
 
 % | Positioning
-[h,axpos] = gethandles_axes;
+[h,axpos] = get_axes_handles;
 lowpos = axpos(1,:);
 lowpos(1) = axpos(3, 1); 
 lowpos(3) = 1 - lowpos(1) - axpos(1,2);
@@ -264,19 +233,25 @@ S.pos2 = uicontrol(prop.radio{:}, 'pos', st.pos.neg, 'tag', 'direct', 'str', 'ne
 S.pos3 = uicontrol(prop.radio{:}, 'pos', st.pos.posneg, 'tag', 'direct', 'str', 'pos/neg', 'value', 1, 'enable', 'inactive', 'callback', @cb_directmenu); 
 
 % | Uicontrols for Current Voxel Panel
+ppos = {st.pos.peakvalue st.pos.xyz st.pos.clustersize};
+hname = {'peakvalue', 'xyz', 'clustersize'}; 
+pstr = {'Intensity' 'Coordinate' 'Cluster Size'};
+[voxint, clsize] = voxval2str; 
 prop = default_properties('parent', S.infopane, 'fonts', 18);
-S.peakvalue = uicontrol(prop.edit{:}, 'pos', st.pos.peakvalue, 'tag', 'voxval', 'enable', 'inactive');
+
+S.peakvalue = uicontrol(prop.edit{:}, 'pos', st.pos.peakvalue, 'tag', 'voxval', 'str', sprintf('%d, %d, %d', round(st.centre)), 'enable', 'inactive');
 txpos = st.pos.peakvalue; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = txpos(4)*.55; 
 S.peakvaluetx = uicontrol(prop.text{:}, 'pos',  txpos, 'str', 'Value');
-S.xyz = uicontrol(prop.edit{:}, 'pos', st.pos.xyz, 'tag', 'xyz', 'callback', @cb_changexyz);
+
+S.xyz = uicontrol(prop.edit{:}, 'pos', st.pos.xyz, 'tag', 'xyz', 'str', sprintf('%d, %d, %d', round(st.centre)), 'callback', @cb_changexyz);
 txpos = st.pos.xyz; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = txpos(4)*.55; 
 S.xyztx = uicontrol(prop.text{:}, 'pos', txpos, 'str', 'Coordinate');
-S.xyz = uicontrol(prop.edit{:}, 'pos', st.pos.clustersize, 'tag', 'clustersize', 'enable', 'inactive');
+
+S.xyz = uicontrol(prop.edit{:}, 'pos', st.pos.clustersize, 'tag', 'clustersize', 'str', clsize);
 txpos = st.pos.clustersize; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = txpos(4)*.55; 
 S.xyztx = uicontrol(prop.text{:}, 'pos', txpos, 'str', 'Cluster Size');
-setvoxelinfo; 
-function put_axesmenu
-    [h,axpos] = gethandles_axes;
+function menu_axes
+    [h,axpos] = get_axes_handles;
     cmenu = uicontextmenu;
     ctmax = uimenu(cmenu, 'Label', 'Go to global max', 'callback', @cb_minmax);
     ctmin = uimenu(cmenu, 'Label', 'Go to global min', 'callback', @cb_minmax);
@@ -286,14 +261,57 @@ function put_axesmenu
     for a = 1:3
         set(h.ax(a), 'uicontextmenu', cmenu); 
     end
-function put_axesxyz
+function color = default_colors 
+    color.bg        = [20/255 23/255 24/255];
+    color.fg        = [248/255 248/255 248/255];
+    color.border    = [023/255 024/255 020/255]*2;
+    color.xhair     = [0.7020    0.8039    0.8902];
+    color.panel     = [.01 .22 .34];
+    color.blues = brewermap(40, 'Blues'); 
+function pos = default_positions 
+    screensize      = get(0, 'ScreenSize');
+    pos.ss          = screensize(3:4);
+    pos.gui         = [pos.ss(1:2)*.5 pos.ss(2)*.55 pos.ss(2)*.5];
+    pos.aspratio    = pos.gui(3)/pos.gui(4);
+    
+    pos.peakvalue      = [.050 .050 .250 .50];
+    pos.xyz            = [.325 .050 .325 .50];
+    pos.clustersize    = [.675 .050 .250 .50];
+
+    pos.pos            = [.100 .050 .250 .85];
+    pos.neg            = [.400 .050 .250 .85];
+    pos.posneg         = [.700 .050 .250 .85];
+    
+    pos.k              = [.025 .050 .200 .50];
+    pos.tval           = [.250 .050 .225 .50];
+    pos.pval           = [.500 .050 .275 .50];
+    pos.df             = [.800 .050 .175 .50];
+    
+    pos.pslider        = [.050 .025 .900 .150];
+function prop = default_properties(varargin)
+global st
+prop.darkbg     = {'units', 'norm', 'visible','on', 'clip', 'off', 'backg', st.color.bg, 'foreg', st.color.fg};
+prop.lightbg    = {'units', 'norm', 'visible','on', 'clip', 'off', 'backg', st.color.fg, 'foreg', [0 0 0]};
+if ~isempty(varargin), prop.darkbg = [varargin{:} prop.darkbg]; prop.lightbg = [varargin{:} prop.lightbg]; end
+prop.panel      = [prop.darkbg {'bordertype', 'none', 'titlepos', 'centertop', 'fontw', 'bold'}]; 
+prop.edit       = [prop.lightbg {'style', 'edit', 'horiz', 'center'}];
+prop.text       = [prop.darkbg {'style', 'text', 'horiz', 'center'}]; 
+prop.popup      = [prop.lightbg {'style', 'popup'}]; 
+prop.slider     = [prop.darkbg {'style', 'slide', 'min', 1.0000e-20, 'max', 1, 'sliderstep', [1 5], 'value', st.ol.P}];
+prop.push       = [prop.darkbg {'style', 'push', 'horiz', 'center'}]; 
+prop.radio      = [prop.darkbg {'style', 'radio', 'horiz', 'center'}];
+prop.toggle     = [prop.darkbg {'style', 'toggle'}]; 
+prop.checkbox   = [prop.darkbg {'style', 'check'}]; 
+prop.listbox    = [prop.darkbg {'style', 'list'}]; 
+function addxyz
     global st
-    h = gethandles_axes;
+    h = get_axes_handles;
     xyz = round(spm_XYZreg('GetCoords',st.registry.hReg));
     xyzstr = num2str([-99; xyz]); 
     xyzstr(1,:) = [];
     set(h.ax, 'YAxislocation', 'right'); 
-    axidx = [3 2 1]; 
+    axidx = [3 2 1];
+    
     for a = 1:length(axidx)
         yh = get(h.ax(axidx(a)), 'YLabel');
         st.vols{1}.ax{axidx(a)}.xyz = yh;
@@ -310,57 +328,69 @@ function put_axesxyz
         end
     end
 
-% | GUI CALLBACKS
+% | CALLBACKS
 % =========================================================================
 function cb_updateoverlay(varargin)
-    global st
-    T0 = getthresh;
-    T = T0; 
-    tag = get(varargin{1}, 'tag');
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct); 
-    switch tag
-        case {'Thresh'}
-            T.pval = bob_t2p(T.thresh, T.df);
-        case {'P-Value'}
-            T.thresh = bob_p2t(T.pval, T.df); 
-        case {'DF'}
-            T.thresh = bob_p2t(T.pval, T.df); 
-            T.pval = bob_t2p(T.thresh, T.df);
-        case {'Extent'}
-            if sum(st.ol.C0(di,st.ol.C0(di,:)>=T.extent))==0
-                headsup('No clusters survived. Defaulting to largest cluster at this voxelwise threshold.');
-                T.extent = max(st.ol.C0(di,:));
-            end
-    end
-    st.ol.C0 = getclustidx(st.ol.Y, T.thresh, T.extent);
-    C = st.ol.C0(di,:); 
-    if sum(C(C>=T.extent))==0
-        T0.thresh = st.ol.U; 
-        setthreshinfo(T0);
-        headsup('No voxels survived. Try a different threshold.'); 
-        return
-    end
-    setthresh(C, find(di)); 
-    setthreshinfo(T);  
+global st
+T0 = getthresh;
+T = T0; 
+tag = get(varargin{1}, 'tag');
+switch tag
+    case {'Thresh'}
+        T.pval = bob_t2p(T.thresh, T.df);
+    case {'P-Value'}
+        T.thresh = bob_p2t(T.pval, T.df); 
+    case {'DF'}
+        T.thresh = bob_p2t(T.pval, T.df); 
+        T.pval = bob_t2p(T.thresh, T.df);
+    case {'Extent'}
+end
+%% CHECK THRESH
+[pos, neg, C] = get_thresh_idx(st.ol.Y, T.thresh, T.extent);
+if sum(C)==0
+    T0.thresh = st.ol.U; 
+    updatethreshinfo(T0);
+    headsup('No suprathreshold voxels. Try a different threshold.'); 
+    return
+end
+updatethreshinfo(T);
+[X,Y,Z]     = ndgrid(1:st.ol.DIM(1),1:st.ol.DIM(2),1:st.ol.DIM(3));
+st.ol.XYZ   = [X(:)';Y(:)';Z(:)'];
+RCP         = st.ol.XYZ; 
+RCP(4,:)    = 1;
+st.ol.XYZmm       = st.ol.M(1:3,:)*RCP;
+st.ol.C           = C; 
+if strcmpi('both', T.direct)
+    st.ol.XYZmm       = st.ol.XYZmm(:,abs(st.ol.Y(:))>=T.thresh);
+    st.ol.XYZ         = st.ol.XYZ(:,abs(st.ol.Y(:))>=T.thresh);
+    st.ol.Z           = st.ol.Y(abs(st.ol.Y(:))>=T.thresh);
+else
+    st.ol.XYZmm       = st.ol.XYZmm(:,st.ol.Y(:)>=T.thresh);
+    st.ol.XYZ         = st.ol.XYZ(:,st.ol.Y(:)>=T.thresh);
+    st.ol.Z           = st.ol.Y(st.ol.Y(:)>=T.thresh);
+end
+st.ol.Z(C==0) = []; 
+st.ol.XYZ(:,C==0)    = []; 
+st.ol.XYZmm(:,C==0)  = [];
+st.ol.C(C==0) = []; 
+bspm_orthviews('RemoveBlobs', st.ho);
+bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
+position_axes;
+updatecontrastname; 
+bspm_orthviews('Reposition');
 function cb_loadol(varargin)
     global st
     fname = uigetvol('Select an Image File for Overlay', 0);
     T = getthresh; 
-    st.ol = load_overlay(fname, T.pval, T.extent);
-    
-    
-%     if strcmpi(T.direct
-%     
-%     passidx = st.ol.C0
-%     
-%         if strcmpi(T.direct, 'positive'), direc = 'positive'; 
-%     elseif strcmpi(T.direct, 'negative'), direc = 'negative';
-%     else direc = 'both'; end
-    
-
+    if strcmpi(T.direct, 'positive'), direc = 'positive'; 
+    elseif strcmpi(T.direct, 'negative'), direc = 'negative';
+    else direc = 'both'; end
+    st.ol = read_overlay(fname, T.pval, T.extent, direc);
+    bspm_orthviews('RemoveBlobs', st.ho); 
+    bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
     bspm_orthviews('Register', st.registry.hReg);
-    setposition_axes;
-    setcontrastname; 
+    position_axes;
+    updatecontrastname; 
 function cb_loadul(varargin)
     global st
     ul = uigetvol('Select an Image File for Underlay', 0);
@@ -369,9 +399,9 @@ function cb_loadul(varargin)
     bspm_orthviews('MaxBB');
     bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
     bspm_orthviews('Register', st.registry.hReg);
-    setposition_axes; 
-    put_axesxyz;
-    put_axesmenu;
+    position_axes; 
+    addxyz;
+    menu_axes;
 function cb_minmax(varargin)
 global st
 lab = get(varargin{1}, 'label');
@@ -386,25 +416,25 @@ xyz = str2num(get(varargin{1}, 'string'));
 bspm_orthviews('reposition', xyz'); 
 function cb_directmenu(varargin)
     global st
+    cbh     = varargin{1};
     str     = get(varargin{1}, 'string');
     allh = findobj(st.fig, 'Tag', 'direct'); 
     allhstr = get(allh, 'String');
     set(allh(strcmp(allhstr, str)), 'Value', 1, 'Enable', 'inactive'); 
     set(allh(~strcmp(allhstr, str)), 'Value', 0, 'Enable', 'on');
     T = getthresh;
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct);
-    st.ol.C0 = getclustidx(st.ol.Y, T.thresh, T.extent);
-    C = st.ol.C0(di,:);
-    if sum(C>0)==0 
-        headsup('Nothing survives at this threshold. Showing unthresholded image.');
-        T.thresh = 0; 
-        T.pval = bob_t2p(T.thresh, T.df);
-        T.extent = 1; 
-        st.ol.C0 = getclustidx(st.ol.Y, T.thresh, T.extent);
-        C = st.ol.C0(di,:);
-        setthreshinfo(T); 
+    if strcmp(str, 'pos/neg')
+        changecolormap(jet(64)); 
+        st.ol = read_overlay(st.ol.fname, T.pval, T.extent, 'both'); 
+    else
+        changecolormap(hot(64)); 
+        st.ol = read_overlay(st.ol.fname, T.pval, T.extent, str);
     end
-    setthresh(C, find(di));    
+    bspm_orthviews('RemoveBlobs', st.ho); 
+    bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
+    bspm_orthviews('Register', st.registry.hReg);
+    position_axes;    
+    bspm_orthviews('Reposition'); 
 function cb_opencode(varargin)
     open(mfilename('fullpath'));
 function cb_closegui(varargin)
@@ -429,23 +459,33 @@ function cb_resizegui(varargin)
     pos     = default_positions;
     cpos    = get(varargin{1}, 'pos');
     set(varargin{1}, 'pos', [cpos(1:2) cpos(4)*pos.aspratio cpos(4)]);
-    put_axesxyz; 
+    addxyz; 
 
-% | SETTERS
+% | UPDATERS
 % =========================================================================
-function setcontrastname
+function updatethreshinfo(T)
+global st
+Tval = [T.extent T.thresh T.pval T.df]; 
+Tstr = {'Extent' 'Thresh' 'P-Value' 'DF'};
+Tstrform = {'%d' '%2.3f' '%d' '%d'}; 
+for i = 1:length(Tstr)
+    set(findobj(st.fig, 'Tag', Tstr{i}), 'String', sprintf(Tstrform{i}, Tval(i)));
+end
+
+
+
+function updatecontrastname
 global st
 connamh = findobj(st.fig, 'Tag', 'ContrastName'); 
 set(connamh, 'String', st.ol.descrip); 
-function setcolormap(newmap, interval)
+function changecolormap(newmap)
 global st
-if nargin < 1, newmap = jet(64); end
-if nargin < 2, interval = [st.vols{1}.blobs{1}.min st.vols{1}.blobs{1}.max]; end
-cbh = st.vols{1}.blobs{1}.cbar; 
-cmap = [gray(64); newmap];
-set(findobj(cbh, 'type', 'image'), 'CData', (65:128)', 'CdataMapping', 'direct');
+cmap = [gray(64); newmap]; 
 set(st.fig,'Colormap', cmap);
-function setposition_axes
+
+% | SET POSITIONS
+% =========================================================================
+function position_axes
     global st
     %% Handles for axes
     % 1 - transverse
@@ -455,7 +495,7 @@ function setposition_axes
     % st.vols{1}.ax{1}.d    - image
     % st.vols{1}.ax{1}.lx   - crosshair (x)
     % st.vols{1}.ax{1}.ly   - crosshair (y)
-    [h,axpos] = gethandles_axes;
+    [h,axpos] = get_axes_handles;
     MARG    = .01; 
     RAT     = 1.1990; 
     SZ1     = .405; 
@@ -472,47 +512,27 @@ function setposition_axes
     set(h.lx, 'color', st.color.xhair); 
     set(h.ly, 'color', st.color.xhair);
     bspm_orthviews('Redraw');
-function setthreshinfo(T)
-    global st
-    Tval = [T.extent T.thresh T.pval T.df]; 
-    Tstr = {'Extent' 'Thresh' 'P-Value' 'DF'};
-    Tstrform = {'%d' '%2.3f' '%d' '%d'}; 
-    for i = 1:length(Tstr)
-        set(findobj(st.fig, 'Tag', Tstr{i}), 'String', sprintf(Tstrform{i}, Tval(i)));
-    end
-function setthresh(C, di)
-    global st
-    if nargin==1, di = 3; end
-    idx = find(C > 0); 
-    st.ol.XYZ   = st.ol.XYZ0(:,idx);
-    st.ol.XYZmm = st.ol.XYZmm0(:,idx);
-    st.ol.C     = C(idx); 
-    st.ol.Z     = st.ol.Y(idx); 
-    if di~=3, st.ol.Z = abs(st.ol.Y(idx)); end
-    bspm_orthviews('RemoveBlobs', st.ho);
-    bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
-    bspm_orthviews('Register', st.registry.hReg);
-    setposition_axes;
-    setcontrastname;
-    if di==3, setcolormap(jet(64)); else setcolormap(hot(64)); end
-    bspm_orthviews('Reposition');
-function [voxval, clsize] = setvoxelinfo
-global st
-[nxyz,voxidx,d] = spm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm); 
-if d > min(st.ol.VOX)
-    voxval = 'n/a'; 
-    clsize = 'n/a';
-else
-    voxval = sprintf('%2.3f', st.ol.Z(voxidx));
-    clsize = sprintf('%d', st.ol.C(voxidx));
-end
-set(findobj(st.fig, 'tag', 'xyz'), 'string', sprintf('%d, %d, %d', round(st.centre)));
-set(findobj(st.fig, 'tag', 'voxval'), 'string', voxval); 
-set(findobj(st.fig, 'tag', 'clustersize'), 'string', clsize); 
-
-% | GETTERS
+ 
+% | GET DATA/HANDLES
 % =========================================================================
-function [h, axpos] = gethandles_axes(varargin)
+function setthresh(T)
+global st
+
+
+function T = getthresh
+global st
+T.extent = str2num(get(findobj(st.fig, 'Tag', 'Extent'), 'String')); 
+T.thresh = str2num(get(findobj(st.fig, 'Tag', 'Thresh'), 'String'));
+T.pval = str2num(get(findobj(st.fig, 'Tag', 'P-Value'), 'String'));
+T.df = str2num(get(findobj(st.fig, 'Tag', 'DF'), 'String'));
+tmph = findobj(st.fig, 'Tag', 'direct'); 
+opt = get(tmph, 'String');
+T.direct = opt(find(cell2mat(get(tmph, 'Value'))));
+if strcmp(T.direct, 'pos/neg'), T.direct = 'both'; end
+
+% | GET DATA/HANDLES
+% =========================================================================
+function [h, axpos] = get_axes_handles(varargin)
     global st
     axpos = zeros(3,4);
     for a = 1:3
@@ -523,54 +543,20 @@ function [h, axpos] = gethandles_axes(varargin)
         h.ly(a) = tmp.ly;
         axpos(a,:) = get(h.ax(a), 'position');
     end
-function T = getthresh
-    global st
-    T.extent = str2num(get(findobj(st.fig, 'Tag', 'Extent'), 'String')); 
-    T.thresh = str2num(get(findobj(st.fig, 'Tag', 'Thresh'), 'String'));
-    T.pval = str2num(get(findobj(st.fig, 'Tag', 'P-Value'), 'String'));
-    T.df = str2num(get(findobj(st.fig, 'Tag', 'DF'), 'String'));
-    tmph = findobj(st.fig, 'Tag', 'direct'); 
-    opt = get(tmph, 'String');
-    T.direct = opt(find(cell2mat(get(tmph, 'Value'))));
-    if strcmp(T.direct, 'pos/neg'), T.direct = 'both'; end
-function clustsize = getclustidx(rawol, u, k)
-    % raw data to XYZ
-    
-    DIM         = size(rawol); 
-    [X,Y,Z]     = ndgrid(1:DIM(1),1:DIM(2),1:DIM(3));
-    XYZ         = [X(:)';Y(:)';Z(:)'];
-    pos  = zeros(1, size(XYZ, 2)); 
-    neg  = pos; 
-    % positive
-    supra = (rawol(:)>=u)';    
-    if sum(supra)
-        clidx      = spm_clusters(XYZ(:, supra));
-        clbin      = repmat(1:max(clidx), length(clidx), 1)==repmat(clidx', 1, max(clidx));
-        pos(supra) = sum(repmat(sum(clbin), size(clidx, 2), 1) .* clbin, 2)'; 
-    end
-    pos(pos < k) = 0; 
-    % negative
-    rawol = rawol*-1; 
-    supra = (rawol(:)>=u)';    
-    if sum(supra)
-        clidx      = spm_clusters(XYZ(:, supra));
-        clbin      = repmat(1:max(clidx), length(clidx), 1)==repmat(clidx', 1, max(clidx));
-        neg(supra) = sum(repmat(sum(clbin), size(clidx, 2), 1) .* clbin, 2)';
-    end
-    neg(neg < k) = 0; 
-    % both
-    clustsize = [pos; neg]; 
-    clustsize(3,:) = sum(clustsize); 
+function [voxstr, clsizestr] = voxval2str
+global st
+[nxyz,voxidx,d] = spm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm); 
+if d > min(st.ol.VOX), voxstr = 'n/a'; clsizestr = 'n/a'; return; end
+voxstr = sprintf('%2.3f', st.ol.Z(voxidx));
+clsizestr = sprintf('%d', st.ol.C(voxidx));
 
 % | IMAGE MANIPULATION UTILITIES
 % =========================================================================
-function OL = load_overlay(fname, pval, k)
-    global st
-    if nargin<3, k = 5; end
+function OL = read_overlay(fname, pval, k, direct)
+    if nargin<4, direct = 'both'; end
+    if nargin<3, k = 20; end
     if nargin<2, pval = .001; end
-    oh = spm_vol(fname); 
-    od = spm_read_vols(oh);
-    od(isnan(od)) = 0; 
+    [od, oh] = bspm_read_vol(fname);
     %% DEGREES OF FREEDOM
     try
         tmp = oh.descrip;
@@ -584,67 +570,140 @@ function OL = load_overlay(fname, pval, k)
         k = 1;
         df = Inf;
     end
-    C = getclustidx(od, u, k);
-    if ~any(C(:))
+    if strcmpi('negative', direct), od = od*-1; end
+
+    %% CHECK THRESH
+    [pos, neg, C0] = get_thresh_idx(od, u, k);
+    yesidx = [any(pos) any(neg)];
+	if ~yesidx(1)
         headsup('No suprathreshold voxels! Showing unthresholded image.')
         u = 0; 
-        pval = bob_t2p(u, df);
-        k = 1; 
-        C = getclustidx(od, u, k); 
+        pval = bob_t2p(u, df); 
     end
     M           = oh.mat;         %-voxels to mm matrix
     DIM         = oh.dim';
     VOX         = abs(diag(M(:,1:3))); 
     [X,Y,Z]     = ndgrid(1:DIM(1),1:DIM(2),1:DIM(3));
-    XYZ        = [X(:)';Y(:)';Z(:)'];
+    XYZ         = [X(:)';Y(:)';Z(:)'];
     RCP         = XYZ; 
     RCP(4,:)    = 1;
-    XYZmm      = M(1:3,:)*RCP;
+    XYZmm       = M(1:3,:)*RCP;
+    if strcmpi('both', direct)
+        XYZmm       = XYZmm0(:,abs(od(:))>=u);
+        XYZ         = XYZ0(:,abs(od(:))>=u);
+        Z           = od(abs(od(:))>=u);
+        C           = C0(abs(od(:))>=u); 
+    else
+        XYZmm       = XYZmm0(:,od(:)>=u);
+        XYZ         = XYZ0(:,od(:)>=u);
+        Z           = od(od(:)>=u);
+        C           = C0(od(:)>=u); 
+    end
+    Z(C < k)  = []; 
+    XYZ(:, C < k)    = []; 
+    XYZmm(:, C < k)  = [];
+    C(:, C < k)         = []; 
     OL          = struct( ...
                 'fname',    fname,...
                 'descrip',  oh.descrip, ...
                 'DF',       df, ...
                 'U',        u, ...
                 'P',        pval, ...
+                'C',        C, ...
                 'K',        k, ...
                 'Y',        od, ...
                 'M',        M,...
+                'Z',        Z,...
+                'XYZmm',    XYZmm,...
+                'XYZ',      XYZ,...
                 'DIM',      DIM,...
-                'VOX',      VOX, ...
-                'C0',        C, ...
-                'XYZmm0',    XYZmm,...
-                'XYZ0',      XYZ);   
-function t = bob_p2t(alpha, df)
-% BOB_P2T Get t-value from p-value + df
-%
-%   USAGE: t = bob_p2t(alpha, df)
-%       
-%   OUTPUT
-%       t = crtical t-value
-%
-%   ARGUMENTS
-%       alpha = p-value
-%       df = degrees of freedom
-%
-% =========================================
-if nargin<2, disp('USAGE: bob_p2t(p, df)'); return, end
-t = tinv(1-alpha, df);
-function p = bob_t2p(t, df)
-% BOB_T2P Get p-value from t-value + df
-%
-%   USAGE: p = bob_t2p(t, df)
-%       
-%   OUTPUT
-%       p = p-value
-%
-%   ARGUMENTS
-%       t = t-value
-%       df = degrees of freedom
-%
-% =========================================
-if nargin<2, disp('USAGE: bob_t2p(p, df)'); return, end
-p = tcdf(t, df);
-p = 1 - p;
+                'VOX',      VOX);   
+
+
+
+function [pos, neg, both] = get_thresh_idx(rawol, u, k)
+
+% raw data to XYZ
+DIM         = size(rawol); 
+[X,Y,Z]     = ndgrid(1:DIM(1),1:DIM(2),1:DIM(3));
+XYZ         = [X(:)';Y(:)';Z(:)'];
+pos  = zeros(1, size(XYZ, 2)); 
+neg  = pos; 
+% positive
+supra = (rawol(:)>=u)';    
+if sum(supra)
+    clidx      = spm_clusters(XYZ(:, supra));
+    clbin      = repmat(1:max(clidx), length(clidx), 1)==repmat(clidx', 1, max(clidx));
+    pos(supra) = sum(repmat(sum(clbin), size(clidx, 2), 1) .* clbin, 2)'; 
+end
+pos(pos < k) = 0; 
+% negative
+if nargout > 1
+supra = (rawol(:)<=-u)';    
+if sum(supra)
+    clidx      = spm_clusters(XYZ(:, supra));
+    clbin      = repmat(1:max(clidx), length(clidx), 1)==repmat(clidx', 1, max(clidx));
+    neg(supra) = sum(repmat(sum(clbin), size(clidx, 2), 1) .* clbin, 2)';
+end
+neg(neg < k) = 0; 
+end
+% both
+if nargout==3
+both = sum([pos; neg]); 
+end
+function OL = thresh_overlay(in, u, k, direct)
+    % THRESH_OVERLAY
+    %
+    % USAGE: out = thresh_overlay(in, u, k)
+    %
+    %   ARGUMENTS
+    %       in:     3D matrix to threshold
+    %       u:      height threshold
+    %       k:      extent threshold
+    %       direct: direction, 'pos', 'neg', or 'both' (default = 'both')
+    %       
+   
+    if strcmpi('neg', direct), in = in*-1; end
+    imdims = size(in);
+    global st
+    imdims = size(in);
+    % if necessary, calculate critical t
+    if ismember(u,[.10 .05 .01 .005 .001 .0005 .0001]);
+        tmp = in_hdr.descrip;
+        idx1 = regexp(tmp,'[','ONCE');
+        idx2 = regexp(tmp,']','ONCE');
+        df = str2num(tmp(idx1+1:idx2-1));
+        u = bob_p2t(u, df);
+    end
+    in(in<u) = NaN;
+    in(in==0)=NaN;
+
+    % grab voxels
+    % ------------------------------------------------------
+    [X Y Z] = ind2sub(size(in), find(in > 0));
+    voxels = sortrows([X Y Z])';
+
+    % get cluster indices of voxels
+    % ------------------------------------------------------
+    cl_index = spm_clusters(voxels);
+
+    % find index of clusters of sufficient size
+    % ------------------------------------------------------
+    for i = 1:max(cl_index)
+        a(cl_index == i) = sum(cl_index == i);
+    end
+    which_vox = (a >= k);
+    cl_vox = voxels(:,which_vox);
+    cl_vox = cl_vox';
+    roi_mask = zeros(imdims);
+    for i = 1:size(cl_vox,1)
+        roi_mask(cl_vox(i,1),cl_vox(i,2),cl_vox(i,3)) = in(cl_vox(i,1),cl_vox(i,2),cl_vox(i,3));
+    end
+    out = double(roi_mask);
+    out(out==0) = NaN;
+    st.ol.tY    = out;
+    st.ol.Z     = out(~isnan(out(:)));
+    st.ol.XYZ   = cl_vox; 
 function [extent, info] = cluster_correct(im,u,alpha,range)
 % BOB_SPM_CLUSTER_CORRECT Computer extent for cluster-level correction
 %
@@ -877,6 +936,35 @@ info.extent = k;
 info.alpha = alpha;
 info.u = u;
 info.Pc = Pc;
+function matlab_fslview(over, under)
+% matlab_fslview Call fslview from MATLAB
+% fslview [-m 3d|ortho|lightbox] <baseimage> [-l lutname] [-b low,hi]
+% 	[ <overlay> [-l lutname] [-b low,hi] ] ...
+% fslview -m ortho,lightbox filtered_func_data thresh_zstat1 -t 0.5 thresh_zstat2 -l "Cool" -t 0.5
+% 
+% Optional arguments (You may optionally specify one or more of):
+% 	-V,--verbose	switch on diagnostic messages
+% 	-h,--help	display this message
+% 	-m,--mode	Initial viewer mode. Comma separated list of: 3d; single, ortho; lightbox
+% 
+% 
+% Per-image options
+% 
+% Usage:
+% image [-l GreyScale] [-t 0.1] [-b 2.3,6]
+% 	-l,--lut	Lookup table name. As per GUI, one of: Greyscale;
+% 			"Red-Yellow"; "Blue-Lightblue"; Red; Green;
+% 			Blue; Yellow; Pink; Hot; Cool; Copper, etc.
+% 	-b,--bricon	Initial bricon range, e.g., 2.3,6
+% 	-t,--trans	Initial transparency, e.g., 0.2
+        % -----------------------------------------------------
+    if iscell(over), over = char(over); end
+    if iscell(under), under = char(under); end
+    htmp = spm_vol(under); dtmp = spm_read_vols(htmp);
+    dtmp = dtmp(:); 
+    dtmp(dtmp < nanmean(dtmp)/10) = [];
+    command = sprintf('fslview -m ortho %s -l "Greyscale" -b %2.3f,%2.3f %s -l "Blue" -t .15 &', under, min(dtmp), max(dtmp), over);
+    system(command);
 function success = bob_spm_save_rois_cluster(in, heightThresh, sizeThresh, mask)
 % BOB_SPM_SAVE_CLUSTER
 %
@@ -1047,9 +1135,48 @@ if ~nowrite
     OutHead.fname = [p filesep newname];
     spm_write_vol(OutHead,out);
 end
+function t = bob_p2t(alpha, df)
+% BOB_P2T Get t-value from p-value + df
+%
+%   USAGE: t = bob_p2t(alpha, df)
+%       
+%   OUTPUT
+%       t = crtical t-value
+%
+%   ARGUMENTS
+%       alpha = p-value
+%       df = degrees of freedom
+%
+% =========================================
+if nargin<2, disp('USAGE: bob_p2t(p, df)'); return, end
+t = tinv(1-alpha, df);
+function p = bob_t2p(t, df)
+% BOB_T2P Get p-value from t-value + df
+%
+%   USAGE: p = bob_t2p(t, df)
+%       
+%   OUTPUT
+%       p = p-value
+%
+%   ARGUMENTS
+%       t = t-value
+%       df = degrees of freedom
+%
+% =========================================
+if nargin<2, disp('USAGE: bob_t2p(p, df)'); return, end
+p = tcdf(t, df);
+p = 1 - p;
 
 % | MISC UTILITIES
 % =========================================================================
+function bpos = position_row(buttonw, buttonh, lowerh, nbutton)
+    bm = .02;
+    for i = 1:nbutton
+        bpos(i,:) = [(i*bm)+(i-1)*buttonw lowerh buttonw buttonh]; 
+    end
+    lm = bpos(1,1);
+    rm = 1 - sum(bpos(nbutton,[1 3])); 
+    bpos(:,1) = bpos(:,1) + (rm+lm)*.75; 
 function vol = uigetvol(message, multitag)
 % UIGETVOL Dialogue for selecting image volume file
 %
@@ -1987,10 +2114,10 @@ switch lower(action)
         xyzstr = num2str([-99; round(xyz)]); 
         xyzstr(1,:) = [];
         axidx = [3 2 1];
-        setvoxelinfo; 
-%         set(findobj(st.fig, 'tag', 'xyz'), 'string', sprintf('%d, %d, %d', round(xyz)));
-%         set(findobj(st.fig, 'tag', 'voxval'), 'string', voxval); 
-%         set(findobj(st.fig, 'tag', 'clustersize'), 'string', clsize); 
+        [voxval, clsize] = voxval2str; 
+        set(findobj(st.fig, 'tag', 'xyz'), 'string', sprintf('%d, %d, %d', round(xyz)));
+        set(findobj(st.fig, 'tag', 'voxval'), 'string', voxval); 
+        set(findobj(st.fig, 'tag', 'clustersize'), 'string', clsize); 
         for a = 1:length(axidx)
             yh = st.vols{1}.ax{axidx(a)}.xyz;
             set(yh, 'string', xyzstr(a,:));
@@ -2361,8 +2488,7 @@ cbpos(1) = cbpos(1) + (cbpos(3)/4);
 if ndims(cdata)==3 && max(cdata(:))>1
     cdata=cdata./max(cdata(:));
 end
-% yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max]; 
-yl = interval; 
+yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max]; 
 image([0 1],interval,cdata,'Parent',st.vols{vh}.blobs{bh}.cbar);
 set(st.vols{vh}.blobs{bh}.cbar, 'ycolor', st.color.fg, ...
     'position', cbpos, 'YAxisLocation', 'right', ...
@@ -2799,7 +2925,7 @@ for i = valid_handles(arg1)
 
                 cmap = get(st.fig,'Colormap');
                 if size(cmap,1)~=128
-                    setcolormap(jet(64));
+                    changecolormap(jet(64));
 %                     spm_figure('Colormap','gray-hot')
                 end
                 figure(st.fig)

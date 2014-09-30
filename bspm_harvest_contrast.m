@@ -1,7 +1,7 @@
 function [data connam roinam] = bspm_harvest_contrast(analysisdirs, rois, conidx, conpat, plotflag)
 % BSPM_HARVEST_CONTRAST
 %
-%   USAGE: [data connam roinam] = bspm_harvest_contrast(analysisdirs, rois, conidx, plotflag)
+%   USAGE: [data connam roinam] = bspm_harvest_contrast(analysisdirs, rois, conidx, conpat, plotflag)
 %
 %   ARGUMENTS
 %       analysisdirs: analysis directory containing contrast images
@@ -28,7 +28,7 @@ function [data connam roinam] = bspm_harvest_contrast(analysisdirs, rois, conidx
 if nargin<5, plotflag = 0; end
 if nargin<4, conpat = 'con*img'; end
 if nargin<3, conidx = []; end
-if nargin<2, error('USAGE: bspm_harvest_contrast(analysisdirs, rois, conidx, plotflag)'); end
+if nargin<2, error('USAGE: bspm_harvest_contrast(analysisdirs, rois, conidx, conpat, plotflag)'); end
 
 if ischar(rois), rois = cellstr(rois); end
 nroi = length(rois);
