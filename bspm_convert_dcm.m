@@ -27,8 +27,9 @@ nsubs = length(subs);
 for sub = 1:nsubs
     
     subDIR = subs{sub};
-    [p subnam e] = fileparts(subDIR);
-    tmp = files([subDIR filesep '*']);
+    [p, subnam, e] = fileparts(subDIR);
+    tmp = files([subDIR filesep '*'], 'dironly', 1);
+    
     if ~force
         if length(tmp)~=1
             fprintf('\n%s looks strange... skipping\n', subnam);

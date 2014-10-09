@@ -159,9 +159,9 @@ function color  = default_colors
 function fonts  = default_fonts
     fonts.name      = 'Arial'; 
     fonts.sz1       = 24;
-    fonts.sz2       = 18; 
+    fonts.sz2       = 20; 
     fonts.sz3       = 16; 
-    fonts.sz4       = 14; 
+    fonts.sz4       = 12; 
 function pos    = default_positions 
     %% GENERAL
     screensize      = get(0, 'ScreenSize');
@@ -199,44 +199,21 @@ function pos    = default_positions
     pos.df             = [.800 .050 .175 .55];
     
     pos.pslider        = [.050 .025 .900 .150];
-function prop   = buipanel_defaults 
-    global st
-    prop = { ...
-        'panelbackcolor',   st.color.bg, ...
-        'editbackcolor',    st.color.fg, ...
-        'labelbackcolor',   st.color.bg, ...
-        'panelforecolor',   st.color.fg, ...
-        'editforecolor',    [0 0 0], ...
-        'labelforecolor',   st.color.fg, ...
-        'panelfontname',    st.fonts.name, ...
-        'editfontname',     'fixed-width', ...
-        'labelfontname',    st.fonts.name, ...
-        'panelfontsize',    st.fonts.sz2, ...
-        'editfontsize',     st.fonts.sz3, ...
-        'labelfontsize',    st.fonts.sz3, ...
-        'panelborder',      'none', ...
-        'paneltitleposition', 'centertop', ...
-        'panelfontweight',  'bold', ...
-        'labelfontweight',  'normal', ...
-        'relheight',        [6 7], ...
-        'marginsep',        .025, ...
-        'uicontrolsep',     .010
-        };
 function prop   = default_properties(varargin)
-    global st
-    prop.darkbg     = {'visible','on', 'clip', 'off', 'backg', st.color.bg, 'foreg', st.color.fg};
-    prop.lightbg    = {'visible','on', 'clip', 'off', 'backg', st.color.fg, 'foreg', [0 0 0]};
-    if ~isempty(varargin), prop.darkbg = [varargin{:} prop.darkbg]; prop.lightbg = [varargin{:} prop.lightbg]; end
-    prop.panel      = [prop.darkbg {'bordertype', 'none', 'titlepos', 'centertop', 'fontw', 'bold'}]; 
-    prop.edit       = [prop.lightbg {'style', 'edit', 'horiz', 'center'}];
-    prop.text       = [prop.darkbg {'style', 'text', 'horiz', 'center'}]; 
-    prop.popup      = [prop.lightbg {'style', 'popup'}]; 
-    prop.slider     = [prop.darkbg {'style', 'slide', 'min', 1.0000e-20, 'max', 1, 'sliderstep', [1 5], 'value', st.ol.P}];
-    prop.push       = [prop.darkbg {'style', 'push', 'horiz', 'center'}]; 
-    prop.radio      = [prop.darkbg {'style', 'radio', 'horiz', 'center'}];
-    prop.toggle     = [prop.darkbg {'style', 'toggle'}]; 
-    prop.checkbox   = [prop.darkbg {'style', 'check'}]; 
-    prop.listbox    = [prop.darkbg {'style', 'list'}]; 
+global st
+prop.darkbg     = {'visible','on', 'clip', 'off', 'backg', st.color.bg, 'foreg', st.color.fg};
+prop.lightbg    = {'visible','on', 'clip', 'off', 'backg', st.color.fg, 'foreg', [0 0 0]};
+if ~isempty(varargin), prop.darkbg = [varargin{:} prop.darkbg]; prop.lightbg = [varargin{:} prop.lightbg]; end
+prop.panel      = [prop.darkbg {'bordertype', 'none', 'titlepos', 'centertop', 'fontw', 'bold'}]; 
+prop.edit       = [prop.lightbg {'style', 'edit', 'horiz', 'center'}];
+prop.text       = [prop.darkbg {'style', 'text', 'horiz', 'center'}]; 
+prop.popup      = [prop.lightbg {'style', 'popup'}]; 
+prop.slider     = [prop.darkbg {'style', 'slide', 'min', 1.0000e-20, 'max', 1, 'sliderstep', [1 5], 'value', st.ol.P}];
+prop.push       = [prop.darkbg {'style', 'push', 'horiz', 'center'}]; 
+prop.radio      = [prop.darkbg {'style', 'radio', 'horiz', 'center'}];
+prop.toggle     = [prop.darkbg {'style', 'toggle'}]; 
+prop.checkbox   = [prop.darkbg {'style', 'check'}]; 
+prop.listbox    = [prop.darkbg {'style', 'list'}]; 
 
 % | GUI COMPONENTS
 % =========================================================================
@@ -250,38 +227,68 @@ function put_upperpane(varargin)
 function put_lowerpane(varargin)
 global st
 
-% | Create the total panel
+% | Default properties
 prop = default_properties('units', 'norm', 'fontn', 'arial', 'fonts', 19);  
+
+% | Positioning
 [h,axpos] = gethandles_axes;
 lowpos = axpos(1,:);
 lowpos(1) = axpos(3, 1); 
 lowpos(3) = 1 - lowpos(1) - axpos(1,2);
-panelh = uipanel('parent', st.figax, prop.panel{:}, 'pos',lowpos, 'tag', 'lowerpanel');
+
+% | Create the total panel
+panelh = uipanel('parent', st.figax, prop.panel{:}, 'pos',lowpos, 'tag', 'lowerpanel'); 
 
 % | Create each subpanel 
-prop            = buipanel_defaults; 
-panepos         = getpositions(1, [3 4 4 4], .025, .025);
-panepos(:,1:2)  = [];
-panename        = {'Effect to Display' 'Color Map' 'Thresholding Options' 'Current Voxel'};
-panelabel{1}    = {{'Positive' 'Negative' 'Both'}, {'Radio' 'Radio' 'Radio'}}; 
-panelabel{2}    = {{'Set Max' 'Set Map'}, {'Edit' 'List'}};  
-panelabel{3}    = {{'Extent' 'Thresh' 'P-Value' 'DF'}, {'Edit' 'Edit' 'Edit' 'Edit'}}; 
-panelabel{4}    = {{'Value' 'Coordinate' 'Cluster Size'}, {'Edit' 'Edit' 'Edit'}}; 
-relwidth        = {[6 6 5] [2 2] [4 4 4 3] [3 5 3]};
-tag             = {{'direct' 'direct' 'direct'}, {'maxval' 'colormaplist'}, panelabel{3}{1}, {'voxval' 'xyz' 'clustersize'}};  
-for i = 1:length(panename)
-    ph{i} = buipanel(panelh, panelabel{i}{1}, panelabel{i}{2}, relwidth{i}, 'paneltitle', panename{i}, 'panelposition', panepos(i,:), 'tag', tag{i}); 
+tpanepos = [.025 .500 .950 .225];
+dpanepos = [.025 .025 .950 .200];
+ipanepos = [.025 .750 .950 .225];
+cpanepos = [.025 .250 .950 .225];
+S.infopane   = uipanel('parent', panelh, prop.panel{:},'pos',ipanepos, 'title', 'Current Voxel');
+S.threshpane = uipanel('parent', panelh, prop.panel{:},'pos',tpanepos,'title','Thresholding Options'); 
+S.directpane = uipanel('parent', panelh, prop.panel{:},'pos',dpanepos,'title','Effect to Display'); 
+S.cmappane  = uipanel('parent', panelh, prop.panel{:},'pos',cpanepos,'title','Color Map'); 
+
+% | Uicontrols for Thresh Panel
+Tpos = {st.pos.k st.pos.tval st.pos.pval st.pos.df};
+Tstr = {'Extent' 'Thresh' 'P-Value' 'DF'};
+Tdefvalues = [st.ol.K st.ol.U st.ol.P st.ol.DF];
+Tstrform = {'%d' '%2.3f' '%d' '%d'}; 
+Ecallback   = {@cb_updateoverlay, @cb_updateoverlay, @cb_updateoverlay, @cb_updateoverlay};
+prop = default_properties('parent', S.threshpane, 'units', 'norm','fonts', 17);
+prop2 = default_properties('parent', S.threshpane,'units', 'norm', 'fonts', 17);
+for i = 1:length(Tstr)
+    txpos = Tpos{i};
+    txpos(2) = sum(txpos([2 4]))+.05;
+    txpos(4) = .60*(1-txpos(4));  
+    S.tx(i) = uicontrol(prop2.text{:}, 'pos', txpos, 'string', Tstr{i});
+    S.ed(i) = uicontrol(prop.edit{:}, 'pos', Tpos{i}, 'string', sprintf(Tstrform{i}, Tdefvalues(i)), 'Tag', Tstr{i}, 'callback', Ecallback{i}); 
 end
-arrayset(ph{3}.edit, 'Callback', @cb_updateoverlay); 
-arrayset(ph{1}.edit, 'Callback', @cb_directmenu);
-arrayset(ph{4}.edit([1 3]), 'enable', 'inactive'); 
-set(ph{4}.edit(2), 'callback', @cb_changexyz); 
-set(ph{1}.edit(3), 'value', 1, 'enable', 'inactive'); 
-set(ph{2}.edit(1), 'str', sprintf('%2.3f',max(st.ol.Z)), 'callback', @cb_maxval); 
-Tdefvalues  = [st.ol.K st.ol.U st.ol.P st.ol.DF];
-Tstrform    = {'%d' '%2.3f' '%d' '%d'}; 
-for i = 1:length(Tdefvalues), set(ph{3}.edit(i), 'str', sprintf(Tstrform{i}, Tdefvalues(i))); end
+
+% | Uicontrols for Effects to Display Panel
+prop = default_properties('parent', S.directpane, 'units', 'norm','fonts', 17); 
+S.pos1 = uicontrol(prop.radio{:}, 'pos', st.pos.pos, 'tag', 'direct', 'str', 'positive', 'callback', @cb_directmenu);
+S.pos2 = uicontrol(prop.radio{:}, 'pos', st.pos.neg, 'tag', 'direct', 'str', 'negative', 'callback', @cb_directmenu); 
+S.pos3 = uicontrol(prop.radio{:}, 'pos', st.pos.posneg, 'tag', 'direct', 'str', 'pos/neg', 'value', 1, 'enable', 'inactive', 'callback', @cb_directmenu); 
+
+% | Uicontrols for Current Voxel Panel
+prop = default_properties('parent', S.infopane, 'units', 'norm','fonts', 17);
+prop2 = default_properties('parent', S.infopane, 'units', 'norm','fonts', 17);
+S.peakvalue = uicontrol(prop.edit{:}, 'pos', st.pos.peakvalue, 'tag', 'voxval', 'enable', 'inactive');
+txpos = st.pos.peakvalue; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = .60*(1-txpos(4));  
+S.peakvaluetx = uicontrol(prop2.text{:}, 'pos',  txpos, 'str', 'Value');
+S.xyz = uicontrol(prop.edit{:}, 'pos', st.pos.xyz, 'tag', 'xyz', 'callback', @cb_changexyz);
+txpos = st.pos.xyz; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = .60*(1-txpos(4));  
+S.xyztx = uicontrol(prop2.text{:}, 'pos', txpos, 'str', 'Coordinate');
+S.xyz = uicontrol(prop.edit{:}, 'pos', st.pos.clustersize, 'tag', 'clustersize', 'enable', 'inactive');
+txpos = st.pos.clustersize; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = .60*(1-txpos(4));  
+S.xyztx = uicontrol(prop2.text{:}, 'pos', txpos, 'str', 'Cluster Size');
 setvoxelinfo; 
+
+prop = default_properties('parent', S.cmappane, 'units', 'norm','fonts', 17);
+S.maxval = uicontrol(prop.edit{:}, 'pos', st.pos.maxval, 'str', sprintf('%2.3f',max(st.ol.Z)), 'tag', 'maxval', 'callback', @cb_maxval);
+txpos = st.pos.maxval; txpos(2) = sum(txpos([2 4]))+.05; txpos(4) = .60*(1-txpos(4));  
+S.peakvaluetx = uicontrol(prop.text{:}, 'pos',  txpos, 'str', 'Color Max');
 function put_figmenu
     global st
     %% Main Menu
@@ -1297,21 +1304,6 @@ end
 
 % | MISC UTILITIES
 % =========================================================================
-function arrayset(harray, propname, propvalue) 
-% ARRAYGET Set property values for array of handles
-%
-% USAGE: arrayset(harray, propname, propvalue) 
-%
-% ==============================================
-if nargin<2, error('USAGE: arrayset(harray, propname, propvalue) '); end
-if size(harray, 1)==1, harray = harray'; end
-if ~iscell(propvalue)
-    arrayfun(@set, harray, repmat({propname}, length(harray), 1), ...
-            repmat({propvalue}, length(harray), 1)); 
-else
-    if size(propvalue, 1)==1, propvalue = propvalue'; end
-    arrayfun(@set, harray, repmat({propname}, length(harray), 1), propvalue); 
-end
 function vol = uigetvol(message, multitag)
 % UIGETVOL Dialogue for selecting image volume file
 %
@@ -1394,6 +1386,196 @@ handles(3) = uicontrol('parent', handles(1), 'units', 'norm', 'style', 'push', '
 if wait4resp, uiwait(handles(1)); end
 function cb_ok(varargin)
 delete(varargin{:}); % Bye-bye figure
+function [h, hCap] = layControl(parent,varargin)
+%LAYCONTROL creates uicontrols within a figure's region or uipanel.
+%
+%% Description:
+% Function LCONTROL creates diferent uicontrols un a figure's
+% region or a uipanel, it starts filling the region with consecutive calls
+% of the function using a left-to-right and top-to-bottom algorithm to
+% ensure that all the uicontrols created are contained in the region or
+% panel.
+%
+%% Use examples:
+%
+%           h = layControl(hParent,'align','Center','tall',20, ...
+%                'width',100, 'separation',2, 'region',[.5 0.5  0.5 0.5]);
+%
+%           h = layControl(hparent,'panel',[0.5 0.5 0.35 0.35],...
+%               'title','My panel', 'BackGroundColor',[.5 .5 .5]);
+%
+%   [h, hCap] = layControl(hParent,'nextLine','caption','Type here', ...
+%               'BackGroundColor','b',...
+%               'Style','Edit','String','Edit here');
+%
+%           h = layControl(hParent,'goBack',3,'Style','togglebutton');
+%
+%           h = layControl(hParent,'style','popupmenu',...
+%               'string',{'One','Two'},...
+%               'Callback',@changeSelection);
+%
+% *IMPORTANT INFORMATION:*
+%    when creating a panel the function also creates a 'region' for 
+%    creating new objects in there, but if you want thos objects to be 
+%    aligned properly and actualy BE in the panel, you'll have to pass
+%    the panel's handle as the 'parent' parameter to the function.
+%
+%    The diference between a 'caption' clause and a 'style','text' one is
+%    that the 'caption' argument ensures that another object of at least
+%    the same width of the caption can be placed in the same line, this
+%    object can be any standard uicontrol, the handles of captions are
+%    returned in the second output argument, while the 'Style','text' does
+%    not ensures this and the handle is returned in the first output
+%    argument.
+%    
+%
+%
+%% Input arguments:
+%
+% Following arguments MUST be specified first (at least once):
+%
+%      align: Especifies the default alignment of 'text' style uicontrol
+%       tall: Default vertical size of the objects 
+%      width: Default horizontal size of the objects
+% separation: Separation betewen objects
+%   nextLine: Jumps to the next line
+%     goBack: Go back 'n' number of lines whithout reseting the 'x' coord.
+%   dontWalk: Plots next object in the same 'x' coord.
+% 
+% Following arguments must be followed by the position:
+%
+%     region: creates a 'virtual' region and no objetc is created 
+%      panel: creates a uipanel object in the region specified
+%    
+% Following arguments specify the object being created:
+%
+%      Style: the uicontrol 'Style' property e.g. 'edit' or 'popupmenu'
+%    caption: creates a 'text' uicontrol but using the default alingment.
+%
+%% Output arguments:
+%    h : the handle of object being created, 0 (zero) for argument 'region'
+% hCap : the handle of captions being created.
+%
+%% Aditional information
+%     Author: Roberto Cifuentes
+%    Created: 2014-04-27
+%Last Update: 2014-05-06
+
+    persistent xMax yMax xMin  ultX ultY tall width separation align 
+    if isempty(align)
+        align = 'left' ;
+    end
+    dontWalk = false;
+    k = 0 ;h = 0 ; hCap = 0 ; lastCap = false;
+    while k < numel(varargin)
+        k = k + 1 ;
+        switch lower(varargin{k})
+            case 'dontwalk' % Flag for not adding or restoring the default x coord
+                dontWalk = true;
+            case 'tall' % Default height for objects               
+                k = k+1 ;
+                tall = varargin{k}; 
+            case 'width' % default width of objects
+                k = k+1 ;
+                width = varargin{k} ; 
+            case 'separation' % Default spacer for objects
+                k = k+1;
+                separation = varargin{k} ;
+            case 'nextline' % moves to next line with/without restoring the x coord.
+                   if ~dontWalk
+                        ultX = xMin + separation ;
+                    end
+                    ultY = ultY - tall - separation ;
+            case 'goback' % Moves back N lines without restoring the x coord
+                k = k+1 ;
+                ultY = ultY+ (tall +separation)*varargin{k} ;
+            case 'align' % default alignment for 'Caption's
+                k = k+1 ;
+                align =  varargin{k} ;               
+            case 'region' % Creates a region normali the parent is a figure!!
+                separatorFromPanelsTop = 25 ;% modify depending on figure's menu bar configuration
+                k = k+1 ;
+                curPos = varargin{k};
+                regPos = get(parent,'Position') ;
+                
+                xMin = curPos(1) * regPos(3)+ separation;
+                xMax = xMin + curPos(3)*regPos(3) - separation;   
+                yMax = curPos(2)*regPos(4) + curPos(4)* regPos(4) - separatorFromPanelsTop ;
+                
+                ultX = xMin + separation ; 
+                ultY = yMax - separation ;                
+            case 'panel'
+                separatorFromPanelsTop = 40 ;% modify depending on figure's menu bar configuration
+                k = k+1 ;
+                curPos = varargin{k};
+                h(end+1,1) = uipanel(parent,'Position',curPos,'Title','');                
+                regPos = get(parent,'Position') ;
+                
+                xMin = separation;
+                xMax = curPos(3)*regPos(3) - separation;   
+                yMax = curPos(4)*regPos(4) - separatorFromPanelsTop ;
+                
+                ultX = xMin + separation ; 
+                ultY = yMax - separation ;                
+
+            case 'caption'
+                lastCap = true;
+                k = k+1 ;
+                if ultX+separation+2*width >= xMax
+                    if ~dontWalk
+                        ultX = xMin + separation ;
+                    end
+                    ultY = ultY - tall - separation ;
+                end
+                posicion = [ ultX+separation, ultY, width, tall];
+                if ~dontWalk
+                    ultX = posicion(1) + width ;
+                end
+                hCap(end+1,1) = uicontrol(parent,'Style','text', ...
+                    'String',varargin{k}, ...
+                    'HorizontalAlignment',align, ...
+                    'Position', posicion ...
+                    ) ;
+                dontWalk = false ;
+            case 'style'
+                lastCap = false;
+                k = k+1 ;
+        
+                if ultX+separation+width >= xMax
+                   if ~dontWalk
+                        ultX = xMin + separation ;
+                   end                    
+                    ultY = ultY - tall - separation ;
+                end
+                posicion = [ultX+separation ultY width tall];
+                if ~dontWalk
+                    ultX = posicion(1) + width ;
+                end
+                h(end+1,1) = uicontrol(parent,'Style',varargin{k}, ...
+                    'Position',posicion);
+                switch lower(varargin{k})
+                    case {'edit','listbox','popupmenu'}
+                        set(h(end,1),'BackGroundColor','w');
+                end
+                 dontWalk = false;
+            otherwise
+               if lastCap
+                   set(hCap(end,1),varargin{k},varargin{k+1});
+               else
+                   set(h(end,1),varargin{k},varargin{k+1});
+               end
+                k = k+1 ;
+        end
+
+%         fprintf('\n xMin: %6.2f  ultX: %6.2f ultY: %6.2f ',xMin,ultX,ultY);
+    end
+    
+    if numel(h)>1
+        h = h(2:end,1) ;
+    end
+    if numel(hCap)>1
+        hCap = hCap(2:end,1);
+    end
 
 % | MAXIMUM INTENSITY PROJECTION (MIP; FROM SPM8)
 % =========================================================================
@@ -5451,260 +5633,4 @@ function imclipboard(imgData)
     
     % Set clipboard content to the image
     cb.setContents(imSelection, []);
-    
-% | layControl (file exchange) & wrapper 
-% ========================================================================= 
-function s = easydefaults(varargin)
-% easydefaults  Set many default arguments quick and easy.
-%
-%   - For input arguments x1,x2,x3, set default values x1def,x2def,x3def
-%     using easydefaults as parameter-value pairs:
-%       easydefaults('x1',x1def,'x2',x2def,'x3',x3def);
-%   
-%   - Defaults can be set for any input argument, whether explicit or as 
-%     part of a parameter-value pair:
-%       function dummy_function(x,varargin)
-%           easydefaults('x',1,'y',2);
-%           ...   
-%       end
-%
-%   - easydefaults and easyparse can in principle be used in either order, 
-%     but it is usually better to parse first and fill in defaults after:
-%       function dummy_function(x,varargin)
-%           easyparse(varargin,'y')
-%           easydefaults('x',1,'y',2);
-%           ...   
-%       end
-%
-%   CAVEAT UTILITOR: this function relies on evals and assignin statements.
-%   Input checking is performed to limit potential damage, but use at your 
-%   own risk.
-%
-%   Author: Jared Schwede 
-%   Last update: Jan 14, 2013
 
-    % Check that all inputs come in parameter-value pairs.
-    if mod(length(varargin),2)
-        error('Default arguments must be specified in pairs!');
-    end
-    
-    for i=1:2:length(varargin)
-        if ~ischar(varargin{i})
-            error('Variables to easydefaults must be written as strings!');
-        end
-        
-        % We'll check that the varargin is a valid variable name. This
-        % should hopefully avoid any nasty code...
-        if ~isvarname(varargin{i})
-            error('Invalid variable name!');
-        end
-        
-        if exist(varargin{i},'builtin') || (exist(varargin{i},'file') == 2) || exist(varargin{i},'class')
-            warning('MATLAB:defined_function',['''' varargin{i} ''' conflicts with the name of a function, m-file, or class along the MATLAB path and will be ignored by easydefaults.' ...
-                                        ' Please rename the variable, or use a temporary variable with easydefaults and explicitly define ''' varargin{i} ...
-                                        ''' within your function.']);
-        else
-            if ~evalin('caller',['exist(''' varargin{i} ''',''var'')'])
-                % We assign the arguments to a struct, s, which allows us to
-                % check that the evalin statement will not either throw an 
-                % error or execute some nasty code.
-                s.(varargin{i}) = varargin{i+1};
-                assignin('caller',varargin{i},varargin{i+1});
-            end
-        end
-    end
-function s = easyparse(caller_varargin,allowed_names)
-% easyparse    Parse parameter-value pairs without using inputParser
-%   easyparse is called by a function which takes parameter value pairs and
-%   creates individual variables in that function. It can also be used to
-%   generate a struct like inputParser.
-%
-%   - To create variables in the function workspace according to the
-%     varargin of parameter-value pairs, use this syntax in your function:
-%       easyparse(varargin)
-%
-%   - To create only variables with allowed_names, create a cell array of
-%     allowed names and use this syntax:
-%       easyparse(varargin, allowed_names);
-%
-%   - To create a struct with fields specified by the names in varargin,
-%     (similar to the output of inputParser) ask for an output argument:
-%       s = easyparse(...);
-%  
-%   CAVEAT UTILITOR: this function relies on assignin statements. Input
-%   checking is performed to limit potential damage, but use at your own 
-%   risk.
-%
-%   Author: Jared Schwede
-%   Last update: January 14, 2013
-
-    % We assume all inputs come in parameter-value pairs. We'll also assume
-    % that there aren't enough of them to justify using a containers.Map. 
-    for i=1:2:length(caller_varargin)
-        if nargin == 2 && ~any(strcmp(caller_varargin{i},allowed_names))
-            error(['Unknown input argument: ' caller_varargin{i}]);
-        end
-        
-        if ~isvarname(caller_varargin{i})
-            error('Invalid variable name!');
-        end
-        
-        
-        % We assign the arguments to the struct, s, which allows us to
-        % check that the assignin statement will not either throw an error 
-        % or execute some nasty code.
-        s.(caller_varargin{i}) = caller_varargin{i+1};
-        % ... but if we ask for the struct, don't write all of the
-        % variables to the function as well.
-        if ~nargout
-            if exist(caller_varargin{i},'builtin') || (exist(caller_varargin{i},'file') == 2) || exist(caller_varargin{i},'class')
-                warning('MATLAB:defined_function',['''' caller_varargin{i} ''' conflicts with the name of a function, m-file, or class along the MATLAB path and will be ignored by easyparse.' ...
-                                            ' Please rename the variable, or use a temporary variable with easyparse and explicitly define ''' caller_varargin{i} ...
-                                            ''' within your function.']);
-            else
-                assignin('caller',caller_varargin{i},caller_varargin{i+1});
-            end
-        end
-    end
-function h = buipanel(parent, uilabels, uistyles, relwidth, varargin)
-% BUIPANEL Create a panel and populate it with uicontrols
-%
-%  USAGE: h = buipanel(parent, uilabels, uistyles, uiwidths, varargin)
-% __________________________________________________________________________
-%  INPUTS 
-%
-
-% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
-%	Created:  2014-10-08
-%	Email:    spunt@caltech.edu
-% __________________________________________________________________________
-global st
-easyparse(varargin, ... 
-            { ...
-            'panelposition', ...
-            'paneltitleposition', ...
-            'paneltitle', ...
-            'panelborder', ... 
-            'panelbackcolor',  ...
-            'panelforecolor', ...
-            'panelfontsize',  ...
-            'panelfontname' ...
-            'panelfontweight', ...
-            'editbackcolor',  ...
-            'editforecolor', ...
-            'editfontsize',  ...
-            'editfontname', ...
-            'labelbackcolor',  ...
-            'labelforecolor', ...
-            'labelfontsize',  ...
-            'labelfontname', ...
-            'labelfontweight', ...
-            'relheight', ...
-            'marginsep', ...
-            'uicontrolsep', ...
-            'str', ...
-            'tag', ...
-            'callback', ...
-            'enable', ...
-            'value', ...
-            }); 
-defaults = easydefaults(...
-            'paneltitleposition', 'centertop', ...
-            'panelborder', 'none', ... 
-            'panelbackcolor',   st.color.bg, ...
-            'editbackcolor',    st.color.fg, ...
-            'labelbackcolor',   st.color.bg, ...
-            'panelforecolor',   st.color.fg, ...
-            'editforecolor',    [0 0 0], ...
-            'labelforecolor',   st.color.fg, ...
-            'panelfontname',    st.fonts.name, ...
-            'editfontname',     'fixed-width', ...
-            'labelfontname',    st.fonts.name, ...
-            'panelfontsize',    st.fonts.sz2, ...
-            'editfontsize',     st.fonts.sz3, ...
-            'labelfontsize',    st.fonts.sz3, ...
-            'panelfontweight',  'bold', ...
-            'labelfontweight',  'bold', ...
-            'relheight', [6 7], ...
-            'marginsep', .025, ...
-            'uicontrolsep', .010);
-if nargin==0, mfile_showhelp; disp(defaults); return; end
-
-% | UNITS
-unit0 = get(parent, 'units'); 
-        
-% | PANEL
-P           = uipanel(parent, 'units', 'norm', 'pos', panelposition, 'title', paneltitle, ...
-            'backg', panelbackcolor, 'foreg', panelforecolor, 'fontsize', panelfontsize, ...
-            'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
-labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight}; 
-editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname', editfontname, 'foreg', editforecolor, 'backg', editbackcolor}; 
-propadd = {'tag','callback','enable','value','str'};
-
-% | UICONTROLS
-pos = getpositions(relwidth, relheight, marginsep, uicontrolsep);
-editpos = pos(pos(:,1)==1,3:6); 
-labelpos = pos(pos(:,1)==2, 3:6); 
-hc = zeros(length(uilabels), 1); 
-he = zeros(length(uilabels), 1); 
-for i = 1:length(uilabels)
-    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox'}, uistyles{i}));
-    if sum(ctag)==1
-        hc(i) = uibutton(labelprop{:}, 'pos', labelpos(i,:), 'str', uilabels{i}); 
-        he(i) = uicontrol(editprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:));  
-    else
-        editpos(i,4) = 1 - marginsep*2; 
-        he(i) = uicontrol(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i});  
-    end
-    for ii = 1:length(propadd)
-       if exist(propadd{ii}, 'var')
-            tmp = eval(sprintf('%s', propadd{ii})); 
-            set(he(i), propadd{ii}, tmp{i}); 
-       end
-    end
-end
-
-% | HANDLES
-h.panel = P;
-h.label = hc; 
-h.edit  = he;  
-set(parent, 'units', unit0);
-function pos = getpositions(relwidth, relheight, marginsep, uicontrolsep)
-if nargin<2, relheight = [6 7]; end
-if nargin<3, marginsep = .025; end
-if nargin<4, uicontrolsep = .01; end
-ncol = length(relwidth);
-nrow = length(relheight); 
-
-% width
-rowwidth    = 1-(marginsep*2)-(uicontrolsep*(ncol-1));  
-uiwidths    = (relwidth/sum(relwidth))*rowwidth;
-allsep      = [marginsep repmat(uicontrolsep, 1, ncol-1)];
-uilefts     = ([0 cumsum(uiwidths(1:end-1))]) + cumsum(allsep); 
-
-% height
-colheight   = 1-(marginsep*2)-(uicontrolsep*(nrow-1));
-uiheights   = (relheight/sum(relheight))*colheight;
-allsep      = [marginsep repmat(uicontrolsep, 1, nrow-1)];
-uibottoms   = ([0 cumsum(uiheights(1:end-1))]) + cumsum(allsep);
-
-% combine
-pos = zeros(ncol, 4, nrow);
-pos(:,1,:)  = repmat(uilefts', 1, nrow); 
-pos(:,2,:)  = repmat(uibottoms, ncol, 1);
-pos(:,3,:)  = repmat(uiwidths', 1, nrow);
-pos(:,4,:)  = repmat(uiheights, ncol, 1);
-
-% test
-pos = zeros(ncol*nrow, 6);
-pos(:,1) = reshape(repmat(1:nrow, ncol, 1), size(pos,1), 1);
-pos(:,2) = reshape(repmat(1:ncol, 1, nrow), size(pos,1), 1);
-pos(:,3) = uilefts(pos(:,2)); 
-pos(:,4) = uibottoms(pos(:,1)); 
-pos(:,5) = uiwidths(pos(:,2)); 
-pos(:,6) = uiheights(pos(:,1)); 
-
-
-
-
-    

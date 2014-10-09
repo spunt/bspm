@@ -1,60 +1,67 @@
 function [h1 hh1] = bspm_render(im, cmapflag, medialflag)
-% BSPM_RENDER
+% BSPM_RENDER Render 3D intensity map using Aaron Schultz's SurfPlot
 %
-% ARGUMENTS
-%   im        - images
-%   name      - name for output movie
+%  USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input
+% __________________________________________________________________________
+%  INPUTS
+%	im:  image filename
+%	cmapflag: flag to include colormap (default = 1)
+%	medialflag:  flag to include medial sections (default = 1)
 %
-% -----------------------------------------------------
-if nargin < 3, medialflag = 0; end
+
+% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
+%	Created:  2014-10-07
+%	Email:    spunt@caltech.edu
+% __________________________________________________________________________
+if nargin < 1, disp('USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input'); return; end
 if nargin < 2, cmapflag = 1; end
-if nargin < 1, error('USAGE: bspm_render(im, name)'); end
-[d h] = bspm_read_vol(im);
-obj.colorlims = round([min(d(:)) max(d(:))]);
-% obj.input.m = threshold_image(d, [-100 100], 100);
+if nargin < 3, medialflag = 1; end
+
+[d, h] = bspm_read_vol(im);
+d(d==0) = NaN;
+obj.colorlims = [ceil(min(d(d>0))) floor(max(d(:)))];
 obj.medialflag = medialflag; 
 obj.input.m = d;
 obj.input.he = h; 
 obj.cmapflag = cmapflag; 
 obj.figno = 1; % Figure number for output plot
 obj.newfig = 1; 
-obj.overlaythresh = [0 0];
-obj.colormap = 'jet';
+obj.overlaythresh = [4 4];
+obj.colormap = 'hot';
 obj.direction = '+';
 obj.reverse = 0; 
 obj.background = [0 0 0];
 obj.mappingfile = [];  %%% See PreconfigureFSinfo.m for an example of how to create a mapping file.
 obj.round = 0;  % if = 1, rounds all values on the surface to nearest whole number.  Useful for masks
 obj.fsaverage = 'fsaverage6';  %% Set which fsaverage to map to e.g. fsaverage, fsaverage3, fsaverage6
-obj.surface = 'pial';          %% Set the surface: inflated, pial, or white
+obj.surface = 'inflated';          %% Set the surface: inflated, pial, or white
 obj.shading = 'sulc';          %% Set the shading information for the surface: curv, sulc, or thk
 obj.shadingrange = [.1 .7];    %% Set the min anx max greyscale values for the surface underlay (range of 0 to 1)
-obj.Nsurfs = -1;              %% Choose which hemispheres and surfaces to show:  4=L/R med/lat;  2= L/R lat; 1.9=L med/lat; 2.1 = R med/lat; -1= L lat; 1-R lat;
-[h1 hh1] = surfPlot4(obj);
+obj.Nsurfs = 4;              %% Choose which hemispheres and surfaces to show:  4=L/R med/lat;  2= L/R lat; 1.9=L med/lat; 2.1 = R med/lat; -1= L lat; 1-R lat;
+[h1, hh1] = surfPlot4(obj);
 
 end
-
 function out = threshold_image(in, thresh, extent)
-imdims = size(in);
-in(in>thresh(1) & in<thresh(2)) = NaN;
-in(in==0) = NaN;
-[X Y Z] = ind2sub(size(in), find(in));
-voxels = sortrows([X Y Z])';
-cl_index = spm_clusters(voxels);
-for i = 1:max(cl_index)
-    a(cl_index == i) = sum(cl_index == i);
+    imdims = size(in);
+    in(in>thresh(1) & in<thresh(2)) = NaN;
+    in(in==0) = NaN;
+    [X Y Z] = ind2sub(size(in), find(in));
+    voxels = sortrows([X Y Z])';
+    cl_index = spm_clusters(voxels);
+    for i = 1:max(cl_index)
+        a(cl_index == i) = sum(cl_index == i);
+    end
+    which_vox = (a >= extent);
+    cluster_vox = voxels(:,which_vox);
+    cluster_vox = cluster_vox';
+    roi_mask = zeros(imdims);
+    for i = 1:size(cluster_vox,1)
+        roi_mask(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3)) = in(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3));
+    end
+    out = double(roi_mask);
+    out(out==0) = NaN;
 end
-which_vox = (a >= extent);
-cluster_vox = voxels(:,which_vox);
-cluster_vox = cluster_vox';
-roi_mask = zeros(imdims);
-for i = 1:size(cluster_vox,1)
-    roi_mask(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3)) = in(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3));
-end
-out = double(roi_mask);
-out(out==0) = NaN;
-end
-function [h hh] = surfPlot4(obj)
+function [h, hh] = surfPlot4(obj)
 %%% Written by Aaron P. Schultz - aschultz@martinos.org
 %%%
 %%% Copyright (C) 2014,  Aaron P. Schultz

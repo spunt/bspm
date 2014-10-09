@@ -105,7 +105,6 @@ switch operation
         outim(negidx) = neg;
     case {'imfill'}
         outim = imfill(im,6);
-        
     otherwise
         outim = eval(['im' operation]);
 end

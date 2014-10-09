@@ -1,7 +1,7 @@
 function bspm_save_table(image,intensity,cluster,separation,doinv,notstat)
 % BSPM_SAVE_TABLE
 %
-%   USAGE: bspm_save_table(image,intensity,cluster,separation)
+%   USAGE: bspm_save_table(image,intensity,cluster,separation,doinv,notstat)
 %
 %   ARGUMENTS
 %       image:      filename of input statistic image
@@ -22,9 +22,12 @@ function bspm_save_table(image,intensity,cluster,separation,doinv,notstat)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<4, error('USAGE: bspm_save_table(image,intensity,cluster,separation,doinv,notstat)'); return; end
+if nargin<3, separation = 20; end
+if nargin<4, disp('USAGE: bspm_save_table(image,intensity,cluster,separation,doinv,notstat)'); return; end
 if nargin<5, doinv = 1; end
 if nargin<6, notstat = 0; end
+
+basedir = pwd; 
 
 % make sure image name is character array
 if iscell(image), image = char(image); end
@@ -105,8 +108,10 @@ else
 end
 
 % cleanup
+cd(impath)
 delete *_peaks_*structure.mat
 delete *_peaks_*clusters.nii
+cd(basedir)
 
  
  
