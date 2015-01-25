@@ -12,6 +12,7 @@ function [data, hdr, info] = bspm_read_vol(in, varargin)
 %       'zscoretime'  - zscores the image data by time
 %       'implicit'- NaNs voxels less than 10% of the mean
 %       'mask' - (must pair with filename)
+%       'reslice' - (must pair with reference filename)
 %       
 
 % ------------------------ Copyright (C) 2014 ------------------------
@@ -29,19 +30,30 @@ if any(cellfun(@iscell, varargin))
 end
 hdr = spm_vol(in);
 nvol = length(hdr);
-data = spm_read_vols(hdr);
-datadim = size(data);
-if nargout==3
-    info.dim = datadim;
-    info.nvalid = sum(~isnan(data(:)));
-    info.mean = nanmean(data(:));
-    info.median = nanmedian(data(:));
-    info.std = nanstd(data(:)); 
-    info.max = nanmax(data(:));
-    info.min = nanmin(data(:));
-end
+if optional==0, data = spm_read_vols(hdr); datadim = size(data); end
 if optional
     varargin = lower(varargin);
+    if ismember('reslice', varargin) 
+        ref = varargin{find(ismember(varargin, 'reslice'))+1};
+        if iscell(ref), ref = char(ref); end
+        refhdr = spm_vol(ref); 
+        refmat = refhdr.mat; 
+        refdim = refhdr.dim; 
+        [x1,x2,x3]  = ndgrid(1:refdim(1),1:refdim(2),1:refdim(3));
+        d           = [1*[1 1 1]' [1 1 0]'];
+        data        = repmat(zeros(refdim), 1, 1, 1, nvol); 
+        for i = 1:nvol
+            C           = spm_bsplinc(hdr(i), d);
+            M           = inv(hdr(i).mat)*refmat; 
+            y1          = M(1,1)*x1+M(1,2)*x2+(M(1,3)*x3+M(1,4));
+            y2          = M(2,1)*x1+M(2,2)*x2+(M(2,3)*x3+M(2,4));
+            y3          = M(3,1)*x1+M(3,2)*x2+(M(3,3)*x3+M(3,4));
+            data(:,:,:,i) = spm_bsplins(C, y1,y2,y3, d);
+        end
+    else
+        data = spm_read_vols(hdr);
+    end
+    datadim = size(data); 
     if ismember('implicit', varargin);
         for i = 1:nvol
             tmp = data(:,:,:,i);
@@ -52,7 +64,11 @@ if optional
     if ismember('mask', varargin)
         maskfile = varargin{find(ismember(varargin, 'mask'))+1};
         if iscell(maskfile), maskfile = char(maskfile); end
-        mask = bob_reslice(maskfile, hdr(1).fname, 1, 1);
+        if ismember('reslice', varargin) 
+            mask = bob_reslice(maskfile, ref, 1, 1);
+        else
+            mask = bob_reslice(maskfile, hdr(1).fname, 1, 1);
+        end
         if length(datadim)==3 datadim(4) = 1; end
         tmp = data;
         tmp = reshape(tmp, prod(datadim(1:3)), datadim(4)); 
@@ -81,6 +97,15 @@ if optional
             data = reshape(data, datadim);
         end  
     end
+end
+if nargout==3
+    info.dim = datadim;
+    info.nvalid = sum(~isnan(data(:)));
+    info.mean = nanmean(data(:));
+    info.median = nanmedian(data(:));
+    info.std = nanstd(data(:)); 
+    info.max = nanmax(data(:));
+    info.min = nanmin(data(:));
 end
  
  

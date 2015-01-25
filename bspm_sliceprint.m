@@ -48,10 +48,10 @@ data = bspm_threshold_image(over{1},thresh(1),thresh(2),0,tmpfile);
 tmp = unique(data(data>0));
 if length(tmp)>10, cmapsize=64; else, cmapsize = length(tmp); end
 [data hdr info] = bspm_read_vol(tmpfile);
-% %% colormap
-% if ischar(cmap)
-%     if length(tmp)>12, cmapsize=64; else cmapsize = length(tmp); end
-% end
+%% colormap
+if ischar(cmap)
+    if length(tmp)>12, cmapsize=64; else cmapsize = length(tmp); end
+end
 
 [data hdr info] = bspm_read_vol(tmpfile);
 
@@ -94,58 +94,40 @@ for i = 1:length(slices)
     end
     o.img(2).outofrange{1} = 0;
     currento = paint(o);
-    
-    %% get and correct
-%     hf = gcf;
-%     im = getframe(hf);
-%     im = im.cdata;
-%     im2 = rgb2gray(im);
-%     hidx = find(nanmean(im2)>200);
-%     vidx = find(nanmean(im2,2)>200); 
-%     im(vidx,:,:) = [];
-%     im(:,hidx,:) = [];
-
-
+    tobj = findobj(gcf, 'type', 'text');
+    set(tobj, 'units', 'data', 'fontsize', .15, 'string', regexprep(get(tobj, 'string'), ' ', '')); 
+   
     %% save
     name = sprintf('%s_%02d_%s_%02d.jpg',basename,i,view,slices(i));
-    bob_save_figure(name);
+    bob_save_figure(name, 'crop', 1); 
     close all
-    %     imwrite(im, name, 'jpg');
-    %     close all
-    %     jheapcl
-    %% save (if non-empty)
-    %     if ~isempty(im)
-    %     imwrite(im, name, 'jpg');
-    %     end
-%     close all
-%     jheapcl
-
+    
 end
 
-%% colorbars
-set(0,'units','pixels');
-pos = get(0, 'screensize');
-pos(1:2) = 100;
-pos(3:4) = floor(pos(3:4)*.25);
-pos(4) = floor(pos(3)*.125);
-fs = floor(pos(4)*.5);
-figure('color','white','position',pos);
-imagesc(1:size(o.img(2).cmap,1)); 
-colormap(o.img(2).cmap);
-set(gca,'xtick',[]);
-set(gca,'ytick',[]);
-set(gca,'xticklabel',[]);
-set(gca,'yticklabel',[]);
-% x = get(gca,'XLim');
-% y = get(gca,'YLim');
-% text(x(1),sum(y)/2,sprintf('%2.1f',info.min),'FontUnits','pixels','FontName','Arial', ...
-%     'HorizontalAlignment','Left','VerticalAlignment','Middle','FontSize',fs,'Color',[1 1 1]);
-% text(x(end),sum(y)/2,sprintf('%2.1f',info.max),'FontUnits','pixels','FontName','Arial', ...
-%     'HorizontalAlignment','Right','VerticalAlignment','Middle','FontSize',fs,'Color',[0 0 0]);
-outname = sprintf('%s_%2.2fto%2.2f_colorbar.png',basename,info.min,info.max);
-bob_save_figure(outname);
-close all
-
+% %% colorbars
+% set(0,'units','pixels');
+% pos = get(0, 'screensize');
+% pos(1:2) = 100;
+% pos(3:4) = floor(pos(3:4)*.25);
+% pos(4) = floor(pos(3)*.125);
+% fs = floor(pos(4)*.5);
+% figure('color','white','position',pos);
+% imagesc(1:size(o.img(2).cmap,1)); 
+% colormap(o.img(2).cmap);
+% set(gca,'xtick',[]);
+% set(gca,'ytick',[]);
+% set(gca,'xticklabel',[]);
+% set(gca,'yticklabel',[]);
+% % x = get(gca,'XLim');
+% % y = get(gca,'YLim');
+% % text(x(1),sum(y)/2,sprintf('%2.1f',info.min),'FontUnits','pixels','FontName','Arial', ...
+% %     'HorizontalAlignment','Left','VerticalAlignment','Middle','FontSize',fs,'Color',[1 1 1]);
+% % text(x(end),sum(y)/2,sprintf('%2.1f',info.max),'FontUnits','pixels','FontName','Arial', ...
+% %     'HorizontalAlignment','Right','VerticalAlignment','Middle','FontSize',fs,'Color',[0 0 0]);
+% outname = sprintf('%s_%2.2fto%2.2f_colorbar.png',basename,info.min,info.max);
+% bob_save_figure(outname);
+% close all
+% 
 
 
 

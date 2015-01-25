@@ -96,7 +96,7 @@ end
 
 % | INITIALIZE SPM REGISTRY & ORTHVIEWS
 % | =======================================================================
-% try
+try
 % | REGISTRY OBJECT (HREG)
 S.hReg = uipanel('Parent',S.hFig,'Units','Pixels','Position',pos.pane.axes,...
         'BorderType', 'none', 'BackgroundColor',color.bg);
@@ -124,23 +124,23 @@ st          = struct( ...
             'snap',         []);
 st.vols     = cell(24,1);
 st.ol       = load_overlay(ol, .001, 5);
-spm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
+bspm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
 st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
 bspm_orthviews('MaxBB');
 bspm_orthviews('Register', S.hReg);
 setposition_axes; 
-setthresh(st.ol.C0(3,:));
 setxhaircolor;
-setcolormap; 
 put_figmenu; 
 put_axesxyz; 
 put_axesmenu;
-put_lowerpane;
 put_upperpane;
+setthresh(st.ol.C0(3,:), find(strcmpi({'positive', 'negative', 'both'}, st.direct))); 
+setcolormap; 
+put_lowerpane;
 if nargout==1, S.handles = gethandles; end
-% catch lasterr
-%     rethrow(lasterr)
-% end
+catch lasterr
+    rethrow(lasterr)
+end
 % =========================================================================
 % *
 % * SUBFUNCTIONS
@@ -149,24 +149,11 @@ if nargout==1, S.handles = gethandles; end
 
 % | GUI DEFAULTS
 % =========================================================================
-function color  = default_colors 
-    color.bg        = [20/255 23/255 24/255];
-    color.fg        = [248/255 248/255 248/255];
-    color.border    = [023/255 024/255 020/255]*2;
-    color.xhair     = [0.7020    0.8039    0.8902];
-    color.panel     = [.01 .22 .34];
-    color.blues = brewermap(40, 'Blues'); 
-function fonts  = default_fonts
-    fonts.name      = 'Arial'; 
-    fonts.sz1       = 24;
-    fonts.sz2       = 18; 
-    fonts.sz3       = 16; 
-    fonts.sz4       = 14; 
 function pos    = default_positions 
-    %% GENERAL
     screensize      = get(0, 'ScreenSize');
     pos.ss          = screensize(3:4);
-    pos.gui         = [pos.ss(1:2)*.5 pos.ss(2)*.55 pos.ss(2)*.5];
+    pos.gui         = [pos.ss(1)*.5 pos.ss(2)*.20 pos.ss(2)*.55 pos.ss(2)*.5];
+    pos.gui(3:4)    = pos.gui(3:4)*1.1; 
     pos.aspratio    = pos.gui(3)/pos.gui(4);
     guiss = [pos.gui(3:4) pos.gui(3:4)]; 
     h1 = 5; 
@@ -199,6 +186,19 @@ function pos    = default_positions
     pos.df             = [.800 .050 .175 .55];
     
     pos.pslider        = [.050 .025 .900 .150];
+function color  = default_colors 
+    color.bg        = [20/255 23/255 24/255];
+    color.fg        = [248/255 248/255 248/255];
+    color.border    = [023/255 024/255 020/255]*2;
+    color.xhair     = [0.7020    0.8039    0.8902];
+    color.panel     = [.01 .22 .34];
+    color.blues = brewermap(40, 'Blues'); 
+function fonts  = default_fonts
+    fonts.name      = 'Arial'; 
+    fonts.sz1       = 24;
+    fonts.sz2       = 18; 
+    fonts.sz3       = 16; 
+    fonts.sz4       = 14; 
 function prop   = buipanel_defaults 
     global st
     prop = { ...
@@ -224,14 +224,14 @@ function prop   = buipanel_defaults
         };
 function prop   = default_properties(varargin)
     global st
-    prop.darkbg     = {'visible','on', 'clip', 'off', 'backg', st.color.bg, 'foreg', st.color.fg};
-    prop.lightbg    = {'visible','on', 'clip', 'off', 'backg', st.color.fg, 'foreg', [0 0 0]};
+    prop.darkbg     = {'backg', st.color.bg, 'foreg', st.color.fg};
+    prop.lightbg    = {'backg', st.color.fg, 'foreg', [0 0 0]};
     if ~isempty(varargin), prop.darkbg = [varargin{:} prop.darkbg]; prop.lightbg = [varargin{:} prop.lightbg]; end
     prop.panel      = [prop.darkbg {'bordertype', 'none', 'titlepos', 'centertop', 'fontw', 'bold'}]; 
     prop.edit       = [prop.lightbg {'style', 'edit', 'horiz', 'center'}];
     prop.text       = [prop.darkbg {'style', 'text', 'horiz', 'center'}]; 
     prop.popup      = [prop.lightbg {'style', 'popup'}]; 
-    prop.slider     = [prop.darkbg {'style', 'slide', 'min', 1.0000e-20, 'max', 1, 'sliderstep', [1 5], 'value', st.ol.P}];
+%     prop.slider     = [prop.darkbg {'style', 'slide', 'min', 1.0000e-20, 'max', 1, 'sliderstep', [1 5], 'value', st.ol.P}];
     prop.push       = [prop.darkbg {'style', 'push', 'horiz', 'center'}]; 
     prop.radio      = [prop.darkbg {'style', 'radio', 'horiz', 'center'}];
     prop.toggle     = [prop.darkbg {'style', 'toggle'}]; 
@@ -272,16 +272,29 @@ tag             = {{'direct' 'direct' 'direct'}, {'maxval' 'colormaplist'}, pane
 for i = 1:length(panename)
     ph{i} = buipanel(panelh, panelabel{i}{1}, panelabel{i}{2}, relwidth{i}, 'paneltitle', panename{i}, 'panelposition', panepos(i,:), 'tag', tag{i}); 
 end
+
+% | Check valid directions for contrast display
+if any(st.ol.null)
+    allh = findobj(st.fig, 'Tag', 'direct'); 
+    opt = {'Positive' 'Negative'}; 
+    allhstr = get(allh, 'String');
+    set(allh(strcmp(allhstr, 'Both')), 'Value', 0, 'Enable', 'inactive', 'Visible', 'on');
+    set(allh(strcmp(allhstr, opt{st.ol.null})), 'Value', 0, 'Enable', 'inactive',  'Visible', 'on');
+    set(allh(strcmp(allhstr, opt{st.ol.null==0})), 'Value', 1, 'Enable', 'inactive');
+else
+    set(ph{1}.edit(3), 'value', 1, 'enable', 'inactive'); 
+end
+
+% | Set some values
 arrayset(ph{3}.edit, 'Callback', @cb_updateoverlay); 
 arrayset(ph{1}.edit, 'Callback', @cb_directmenu);
 arrayset(ph{4}.edit([1 3]), 'enable', 'inactive'); 
 set(ph{4}.edit(2), 'callback', @cb_changexyz); 
-set(ph{1}.edit(3), 'value', 1, 'enable', 'inactive'); 
 set(ph{2}.edit(1), 'str', sprintf('%2.3f',max(st.ol.Z)), 'callback', @cb_maxval); 
 Tdefvalues  = [st.ol.K st.ol.U st.ol.P st.ol.DF];
 Tstrform    = {'%d' '%2.3f' '%d' '%d'}; 
 for i = 1:length(Tdefvalues), set(ph{3}.edit(i), 'str', sprintf(Tstrform{i}, Tdefvalues(i))); end
-setvoxelinfo; 
+setvoxelinfo;
 function put_figmenu
     global st
     %% Main Menu
@@ -302,16 +315,16 @@ function put_figmenu
 function put_axesmenu
     [h,axpos] = gethandles_axes;
     cmenu = uicontextmenu;
-    ctxhair = uimenu(cmenu, 'Label', 'Toggle Crosshairs', 'checked', 'on', 'callback', @cb_crosshair); 
     ctmax   = uimenu(cmenu, 'Label', 'Go to global max', 'callback', @cb_minmax, 'separator', 'on');
-    ctmin   = uimenu(cmenu, 'Label', 'Go to global min', 'callback', @cb_minmax);
+%     ctmin   = uimenu(cmenu, 'Label', 'Go to global min', 'callback', @cb_minmax);
     ctclustmax  = uimenu(cmenu, 'Label', 'Go to cluster max', 'callback', @cb_clustminmax);
-    ctclustmin  = uimenu(cmenu, 'Label', 'Go to cluster min', 'callback', @cb_clustminmax);
-    ctsavemap   = uimenu(cmenu, 'Label', 'Save as intensity image', 'callback', @cb_saveimg, 'separator', 'on');
-    ctsavemask  = uimenu(cmenu, 'Label', 'Save as mask image', 'callback', @cb_saveimg);
-    ctsavemap   = uimenu(cmenu, 'Label', 'Save current cluster', 'callback', @cb_saveclust, 'separator', 'on');
-    ctsavemask  = uimenu(cmenu, 'Label', 'Save current cluster as mask', 'callback', @cb_saveclust);
-    ctsavergb  = uimenu(cmenu, 'Label', 'Do screencapture', 'callback', @cb_savergb, 'separator', 'on');
+%     ctclustmin  = uimenu(cmenu, 'Label', 'Go to cluster min', 'callback', @cb_clustminmax);
+%     ctsavemap   = uimenu(cmenu, 'Label', 'Save as intensity image', 'callback', @cb_saveimg, 'separator', 'on');
+%     ctsavemask  = uimenu(cmenu, 'Label', 'Save as mask image', 'callback', @cb_saveimg);
+    ctsavemap   = uimenu(cmenu, 'Label', 'Save cluster', 'callback', @cb_saveclust, 'separator', 'on');
+    ctsavemask  = uimenu(cmenu, 'Label', 'Save cluster (binary mask)', 'callback', @cb_saveclust);
+    ctsavergb   = uimenu(cmenu, 'Label', 'Save Screen Capture', 'callback', @cb_savergb, 'separator', 'on');
+    ctxhair     = uimenu(cmenu, 'Label', 'Toggle Crosshairs', 'checked', 'on', 'callback', @cb_crosshair, 'separator', 'on'); 
     for a = 1:3
         set(h.ax(a), 'uicontextmenu', cmenu); 
     end
@@ -382,14 +395,18 @@ function cb_loadol(varargin)
     setposition_axes;
     setcontrastname; 
 function cb_loadul(varargin)
-    global st
+    global st prevsect
     ul = uigetvol('Select an Image File for Underlay', 0);
-    bspm_orthviews('Delete', st.ho); 
+    prevsect    = ul;
+    h = gethandles_axes; 
+    delete(h.ax);
+    bspm_orthviews('Delete', st.ho);
     st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
     bspm_orthviews('MaxBB');
     bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
     bspm_orthviews('Register', st.registry.hReg);
-    setposition_axes; 
+    setposition_axes;
+    setxhaircolor;
     put_axesxyz;
     put_axesmenu;
 function cb_clustminmax(varargin)
@@ -445,19 +462,20 @@ function cb_directmenu(varargin)
 function cb_opencode(varargin)
     open(mfilename('fullpath'));
 function cb_closegui(varargin)
-    if length(varargin)==3
-        delete(varargin{3}); 
+   if length(varargin)==3
+        h = varargin{3};
     else
-        delete(varargin{1}); 
+        h = varargin{1};
     end
+    delete(h); % Bye-bye figure
 function cb_crosshair(varargin)
     state = get(varargin{1},'Checked');
     if strcmpi(state,'on');
-        spm_orthviews('Xhairs','off')
+        bspm_orthviews('Xhairs','off')
         set(varargin{1},'Checked','off');
     end
     if strcmpi(state,'off');
-        spm_orthviews('Xhairs','on')
+        bspm_orthviews('Xhairs','on')
         set(varargin{1},'Checked','on');
     end
 function cb_resizegui(varargin)
@@ -575,7 +593,8 @@ function setposition_axes
         pz(3) = py(3); 
         pz(4) = pz(3)/zrat; 
         px(1) = sum(py([1 3]))+.005;
-        py(2) = sum(pz([2 4]))+.005; 
+        py(2) = sum(pz([2 4]))+.005;
+        px(2) = py(2); 
         VL = sum(py([2 4]));
     end
     axpos = [pz; py; px]; 
@@ -601,11 +620,11 @@ function setthresh(C, di)
     global st
     if nargin==1, di = 3; end
     idx = find(C > 0); 
+    st.ol.Z     = st.ol.Y(idx);
+    if di~=3, st.ol.Z = abs(st.ol.Y(idx)); end
     st.ol.XYZ   = st.ol.XYZ0(:,idx);
     st.ol.XYZmm = st.ol.XYZmm0(:,idx);
     st.ol.C     = C(idx); 
-    st.ol.Z     = st.ol.Y(idx); 
-    if di~=3, st.ol.Z = abs(st.ol.Y(idx)); end
     bspm_orthviews('RemoveBlobs', st.ho);
     bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
     bspm_orthviews('Register', st.registry.hReg);
@@ -799,6 +818,10 @@ set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 
 if isfield(st.vols{vh}.blobs{bh},'name')
     ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
 end
+
+
+
+
     
 % | IMAGE MANIPULATION UTILITIES
 % =========================================================================
@@ -806,9 +829,35 @@ function OL = load_overlay(fname, pval, k)
     global st
     if nargin<3, k = 5; end
     if nargin<2, pval = .001; end
-    oh = spm_vol(fname); 
-    od = spm_read_vols(oh);
-    od(isnan(od)) = 0; 
+    badfn = 1; 
+    while badfn
+        oh = spm_vol(fname); 
+        od = spm_read_vols(oh);
+        od(isnan(od)) = 0;
+        if sum(od(:))==0
+            headsup('Your image file is empty. Please try a different file.')
+            fname = uigetvol('Select an Image File for Overlay', 0);
+            if isempty(fname), disp('Must select an overlay!'); return; end
+        else
+            badfn = 0; 
+        end
+    end
+
+    % check image
+    posneg = [sum(od(:)>0) sum(od(:)<0)]==0; 
+    if any(posneg)
+        opt = {'Positive' 'Negative'}; 
+        st.direct = lower(opt{posneg==0}); 
+        allh = findobj(st.fig, 'Tag', 'direct'); 
+        if ~isempty(allh)
+            allhstr = get(allh, 'String');
+            set(allh(strcmp(allhstr, 'Both')), 'Value', 0, 'Enable', 'inactive');
+            set(allh(strcmp(allhstr, opt{posneg})), 'Value', 0, 'Enable', 'inactive'); 
+        end
+    end
+
+    
+    
     %% DEGREES OF FREEDOM
     try
         tmp = oh.descrip;
@@ -830,6 +879,7 @@ function OL = load_overlay(fname, pval, k)
         pval = Inf; 
     end
     [C, I] = getclustidx(od, u, k);
+    
     if ~any(C(:))
         headsup('No suprathreshold voxels! Showing unthresholded image.')
         u = 0; 
@@ -850,6 +900,7 @@ function OL = load_overlay(fname, pval, k)
                 'descrip',  oh.descrip, ...
                 'hdr',      oh, ...
                 'DF',       df, ...
+                'null',     posneg, ...
                 'U',        u, ...
                 'P',        pval, ...
                 'K',        k, ...
@@ -1393,7 +1444,7 @@ handles(3) = uicontrol('parent', handles(1), 'units', 'norm', 'style', 'push', '
     'pos', [.4 .10 .2 .30], 'fontname', 'arial', 'fontw', 'bold', 'fontsize', 16, 'string', 'OK', 'visible', 'on', 'callback', {@cb_ok, handles});
 if wait4resp, uiwait(handles(1)); end
 function cb_ok(varargin)
-delete(varargin{:}); % Bye-bye figure
+delete(varargin{3}); % Bye-bye figure
 
 % | MAXIMUM INTENSITY PROJECTION (MIP; FROM SPM8)
 % =========================================================================
@@ -2104,7 +2155,7 @@ if ~nargout
     image(mip); axis tight; axis off;
 end
 
-% | SPM_OPTHVIEWS (MODIFIED FROM ORIGINAL SPM8 CODE)
+% | BSPM_OPTHVIEWS (MODIFIED FROM ORIGINAL SPM8 CODE)
 % =========================================================================
 function varargout = bspm_orthviews(action,varargin)
 % John Ashburner et al% Display orthogonal views of a set of images
@@ -2485,7 +2536,7 @@ if numel(V)>1, V=V(1); end
 
 ii = 1;
 while ~isempty(st.vols{ii}), ii = ii + 1; end
-DeleteFcn = ['bspm_orthviews(''Delete'',' num2str(ii) ');'];
+DeleteFcn = ['spm_orthviews(''Delete'',' num2str(ii) ');'];
 V.ax = cell(3,1);
 for i=1:3
     ax = axes('Visible','off', 'Parent', st.figax, ...
@@ -2583,17 +2634,19 @@ for i=valid_handles
 end
 if ~isempty(cent), centre = st.Space(1:3,1:3)*cent(:) + st.Space(1:3,4); end
 function handles = valid_handles(handles)
-global st
-if ~nargin, handles = 1:max_img; end
-if isempty(st) || ~isfield(st,'vols')
-    handles = [];
-else
-    handles = handles(:)';
-    handles = handles(handles<=max_img & handles>=1 & ~rem(handles,1));
-    for h=handles
-        if isempty(st.vols{h}), handles(handles==h)=[]; end
+    global st
+    if ~nargin, handles = 1:max_img; end
+    if isempty(st) || ~isfield(st,'vols')
+        handles = [];
+    elseif ~ishandle(st.fig)
+        handles = []; 
+    else
+        handles = handles(:)';
+        handles = handles(handles<=max_img & handles>=1 & ~rem(handles,1));
+        for h=handles
+            if isempty(st.vols{h}), handles(handles==h)=[]; end
+        end
     end
-end
 function img = scaletocmap(inpimg,mn,mx,cmap,miscol)
 if nargin < 5, miscol=1; end
 cml = size(cmap,1);
@@ -2942,9 +2995,9 @@ for i = 1:numel(valid_handles)
 end
 function my_reset
 global st
-if ~isempty(st) && isfield(st,'registry') && ishandle(st.registry.hMe)
-    delete(st.registry.hMe); st = rmfield(st,'registry');
-end
+% if ~isempty(st) && isfield(st,'registry') && ishandle(st.registry.hMe)
+%     delete(st.registry.hMe); st = rmfield(st,'registry');
+% end
 my_delete(1:max_img);
 reset_st;
 function my_delete(handle)
@@ -3493,7 +3546,6 @@ bb  = []; %[ [-78 78]' [-112 76]' [-50 85]' ];
 st  = struct('n', 0, 'vols',{cell(max_img,1)}, 'bb',bb, 'Space',eye(4), ...
              'centre',[0 0 0], 'callback',';', 'xhairs',1, 'hld',1, ...
              'fig',fig, 'mode',1, 'plugins',{{}}, 'snap',[]);
-
 xTB = spm('TBs');
 if ~isempty(xTB)
     pluginbase = {spm('Dir') xTB.dir};
@@ -3501,7 +3553,8 @@ else
     pluginbase = {spm('Dir')};
 end
 for k = 1:numel(pluginbase)
-    pluginpath = fullfile(pluginbase{k},'bspm_orthviews');
+    pluginpath = fullfile(pluginbase{k},'spm_orthviews');
+    pluginpath = fileparts(mfilename); 
     if isdir(pluginpath)
         pluginfiles = dir(fullfile(pluginpath,'spm_ov_*.m'));
         if ~isempty(pluginfiles)
@@ -3968,9 +4021,1067 @@ for i = 1:numel(cm_handles)
     end % leave all unchecked if either bounding box option was chosen
 end
 
+% | bspm_figure (MODIFIED FROM ORIGINAL SPM8 CODE)
+% =========================================================================
+function varargout=bspm_figure(varargin)
+% Setup and callback functions for Graphics window
+% FORMAT varargout=spm_figure(varargin)
+%
+% spm_figure provides utility routines for using the SPM Graphics 
+% interface. Most used syntaxes are listed here, see the embedded callback
+% reference in the main body of this function, below the help text.
+%
+% FORMAT F = spm_figure('Create',Tag,Name,Visible)
+% FORMAT F = spm_figure('FindWin',Tag)
+% FORMAT F = spm_figure('GetWin',Tag)
+% FORMAT spm_figure('Clear',F,Tags)
+% FORMAT spm_figure('Close',F)
+% FORMAT spm_figure('Print',F)
+% FORMAT spm_figure('WaterMark',F,str,Tag,Angle,Perm)
+%
+% FORMAT spm_figure('NewPage',hPage)
+% FORMAT spm_figure('TurnPage',move,F)
+% FORMAT spm_figure('DeletePageControls',F)
+% FORMAT n = spm_figure('#page')
+% FORMAT n = spm_figure('CurrentPage')
+%__________________________________________________________________________
+%
+% spm_figure creates and manages the 'Graphics' window. This window and
+% these facilities may be used independently of SPM, and any number of
+% Graphics windows my be used within the same MATLAB session. (Though
+% only one SPM 'Graphics' 'Tag'ed window is permitted).
+%
+% The Graphics window is provided with a menu bar at the top that
+% facilitates editing and printing of the current graphic display.
+% (This menu is also provided as a figure background "ContextMenu" - 
+% right-clicking on the figure background should bring up the menu).
+%
+% "Print": Graphics windows with multi-page axes are printed page by page.
+%
+% "Clear": Clears the Graphics window. If in SPM usage (figure 'Tag'ed as
+% 'Graphics') then all SPM windows are cleared and reset.
+%
+% "Colours":
+% * gray, hot, pink, jet: Sets the colormap to selected item.
+% * gray-hot, etc: Creates a 'split' colormap {128 x 3 matrix}.
+%      The lower half is a gray scale and the upper half is selected
+%      colormap  This colormap is used for viewing 'rendered' SPMs on a 
+%      PET, MRI or other background images.
+% Colormap effects:
+% * Invert: Inverts (flips) the current color map.
+% * Brighten and Darken: Brighten and Darken the current colourmap
+%      using the MATLAB BRIGHTEN command, with  beta's of +0.2 and -0.2
+%      respectively.
+%
+% For SPM usage, the figure should be 'Tag'ed as 'Graphics'.
+%
+% See also: spm_print, spm_clf
+%__________________________________________________________________________
+% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+
+% Andrew Holmes
+% $Id: spm_figure.m 4405 2011-07-22 12:54:59Z guillaume $
+
+
+%==========================================================================
+% - FORMAT specifications for embedded CallBack functions
+%==========================================================================
+%
+% FORMAT F = spm_figure
+% [ShortCut] Defaults to Action 'Create'
+%
+% FORMAT F = spm_figure(F) - numeric F
+% [ShortCut] Defaults to spm_figure('CreateBar',F)
+%
+% FORMAT F = spm_figure('Create',Tag,Name,Visible)
+% Create a full length WhiteBg figure 'Tag'ed Tag (if specified),
+% with a ToolBar and background context menu.
+% Equivalent to spm_figure('CreateWin','Tag') and spm_figure('CreateBar')
+% Tag     - 'Tag' string for figure.
+% Name    - Name for window
+% Visible - 'on' or 'off'
+% F   - Figure used
+%
+% FORMAT F = spm_figure('FindWin',F)
+% Finds window with 'Tag' or figure numnber F - returns empty F if not found
+% F - (Input)  Figure to use [Optional] - 'Tag' string or figure number.
+%   - Defaults to 'Graphics'
+% F - (Output) Figure number (if found) or empty (if not).
+%
+% FORMAT F = spm_figure('GetWin',Tag)
+% Like spm_figure('FindWin',Tag), except that if no such 'Tag'ged figure
+% is found and 'Tag' is recognized, one is created. Further, the "got" 
+% window is made current.
+% Tag   - Figure 'Tag' to get, defaults to 'Graphics'
+% F - Figure number (if found/created) or empty (if not).
+%
+% FORMAT spm_figure('Clear',F,Tags)
+% Clears figure, leaving ToolBar (& other objects with invisible handles)
+% Optional third argument specifies 'Tag's of objects to delete.
+% If figure F is 'Tag'ged 'Interactive' (SPM usage), then the window
+% name and pointer are reset.
+% F - 'Tag' string or figure number of figure to clear, defaults to gcf
+% Tags  - 'Tag's (string matrix or cell array of strings) of objects to delete
+%         *regardless* of 'HandleVisibility'. Only these objects are deleted.
+%         '!all' denotes all objects
+%
+% FORMAT spm_figure('Close',F)
+% Closes figures (deletion without confirmation)
+% Also closes the docking container if empty.
+% F - 'Tag' string or figure number of figure to clear, defaults to gcf
+% 
+% FORMAT spm_figure('Print',F)
+% F - [Optional] Figure to print. ('Tag' or figure number)
+%     Defaults to figure 'Tag'ed as 'Graphics'.
+%     If none found, uses CurrentFigure if avaliable.
+% If objects 'Tag'ed 'NextPage' and 'PrevPage' are found, then the
+% pages are shown and printed in order. In breif, pages are held as
+% seperate axes, with ony one 'Visible' at any one time. The handles of
+% the "page" axes are stored in the 'UserData' of the 'NextPage'
+% object, while the 'PrevPage' object holds the current page number.
+% See spm_help('!Disp') for details on setting up paging axes.
+%
+% FORMAT [hNextPage, hPrevPage, hPageNo] = spm_figure('NewPage',hPage)
+% SPM pagination function: Makes objects with handles hPage paginated
+% Creates pagination buttons if necessary.
+% hPage                         - Handles of objects to stick to this page
+% hNextPage, hPrevPage, hPageNo - Handles of pagination controls
+%
+% FORMAT spm_figure('TurnPage',move,F)
+% SPM pagination function: Turn to specified page
+%
+% FORMAT spm_figure('DeletePageControls',F)
+% SPM pagination function: Deletes page controls
+% F - [Optional] Figure in which to attempt to turn the page
+%         Defaults to 'Graphics' 'Tag'ged window
+%
+% FORMAT n = spm_figure('#page')
+% Returns the current number of pages.
+%
+% FORMAT n = spm_figure('CurrentPage');
+% Return the current page number.
+%
+% FORMAT spm_figure('WaterMark',F,str,Tag,Angle,Perm)
+% Adds watermark to figure windows.
+% F - Figure for watermark. Defaults to gcf
+% str   - Watermark string. Defaults (missing or empty) to SPM
+% Tag   - Tag for watermark axes. Defaults to ''
+% Angle - Angle for watermark. Defaults to -45
+% Perm  - If specified, then watermark is permanent (HandleVisibility 'off')
+%
+% FORMAT F = spm_figure('CreateWin',Tag,Name,Visible)
+% Creates a full length WhiteBg figure 'Tag'ged Tag (if specified).
+% F   - Figure created
+% Tag     - Tag for window
+% Name    - Name for window
+% Visible - 'on' or 'off'
+%
+% FORMAT spm_figure('CreateBar',F)
+% Creates toolbar in figure F (defaults to gcf). F can be a 'Tag'
+%
+% FORMAT spm_figure('ColorMap')
+% Callback for "ColorMap" menu
+%
+% FORMAT spm_figure('FontSize')
+% Callback for "FontSize" menu
+%__________________________________________________________________________
+
+
+%-Condition arguments
+%--------------------------------------------------------------------------
+if ~nargin, Action = 'Create'; else Action = varargin{1}; end
+
+%==========================================================================
+switch lower(Action), case 'create'
+%==========================================================================
+% F = spm_figure('Create',Tag,Name,Visible)
+
+if nargin<4, Visible='on'; else Visible=varargin{4}; end
+if nargin<3, Name=''; else Name=varargin{3}; end
+if nargin<2, Tag=''; else Tag=varargin{2}; end
+
+F = spm_figure('CreateWin',Tag,Name,Visible);
+spm_figure('CreateBar',F);
+spm_figure('FigContextMenu',F);
+varargout = {F};
+
+%==========================================================================
+case 'findwin'
+%==========================================================================
+% F=spm_figure('FindWin',F)
+% F=spm_figure('FindWin',Tag)
+%-Find window: Find window with FigureNumber# / 'Tag' attribute
+%-Returns empty if window cannot be found - deletes multiple tagged figs.
+
+if nargin<2, F='Graphics'; else F=varargin{2}; end
+
+if isempty(F)
+    % Leave F empty
+elseif ischar(F)
+    % Finds Graphics window with 'Tag' string - delete multiples
+    Tag = F;
+    F = findall(allchild(0),'Flat','Tag',Tag);
+    if length(F) > 1
+        % Multiple Graphics windows - close all but most recent
+        close(F(2:end))
+        F = F(1);
+    end
+else
+    % F is supposed to be a figure number - check it
+    if ~any(F==allchild(0)), F=[]; end
+end
+varargout = {F};
+
+%==========================================================================
+case 'getwin'
+%==========================================================================
+% F=spm_figure('GetWin',Tag)
+%-Like spm_figure('FindWin',Tag), except that if no such 'Tag'ged figure
+% is found and 'Tag' is recognized, one is created.
+
+if nargin<2, Tag='Graphics'; else Tag=varargin{2}; end
+F = spm_figure('FindWin',Tag);
+
+if isempty(F)
+    if ischar(Tag)
+        switch Tag
+            case 'Graphics'
+                F = spm_figure('Create','Graphics','Graphics');
+            case 'DEM'
+                F = spm_figure('Create','DEM','Dynamic Expectation Maximisation');
+            case 'DFP'
+                F = spm_figure('Create','DFP','Variational filtering');
+            case 'FMIN'
+                F = spm_figure('Create','FMIN','Function minimisation');
+            case 'MFM'
+                F = spm_figure('Create','MFM','Mean-field and neural mass models');
+            case 'MVB'
+                F = spm_figure('Create','MVB','Multivariate Bayes');
+            case 'SI'
+                F = spm_figure('Create','SI','System Identification');
+            case 'PPI'
+                F = spm_figure('Create','PPI','Physio/Psycho-Physiologic Interaction');
+            case 'Interactive'
+                F = spm('CreateIntWin');
+            otherwise
+                F = spm_figure('Create',Tag,Tag);
+        end
+    end
+else
+    set(0,'CurrentFigure',F);
+    figure(F);
+end
+varargout = {F};
+
+%==========================================================================
+case 'parentfig'
+%==========================================================================
+% F=spm_figure('ParentFig',h)
+
+warning('spm_figure(''ParentFig'',h) is deprecated. Use ANCESTOR instead.');
+if nargin<2, error('No object specified'), else h=varargin{2}; end
+F = ancestor(h,'figure');
+varargout = {F};
+
+%==========================================================================
+case 'clear'
+%==========================================================================
+% spm_figure('Clear',F,Tags)
+
+%-Sort out arguments
+if nargin<3, Tags=[]; else Tags=varargin{3}; end
+if nargin<2, F=get(0,'CurrentFigure'); else F=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), return, end
+
+%-Clear figure
+isdocked = strcmp(get(F,'WindowStyle'),'docked');
+if isempty(Tags)
+    %-Clear figure of objects with 'HandleVisibility' 'on'
+    pos = get(F,'Position');
+    delete(findall(allchild(F),'flat','HandleVisibility','on'));
+    drawnow
+    if ~isdocked, set(F,'Position',pos); end
+    %-Reset figures callback functions
+    zoom(F,'off');
+    rotate3d(F,'off');
+    set(F,'KeyPressFcn','',...
+        'WindowButtonDownFcn','',...
+        'WindowButtonMotionFcn','',...
+        'WindowButtonUpFcn','')
+    %-If this is the 'Interactive' window, reset name & UserData
+    if strcmp(get(F,'Tag'),'Interactive')
+        set(F,'Name','','UserData',[]), end
+else
+    %-Clear specified objects from figure
+    if ischar(Tags); Tags=cellstr(Tags); end
+    if any(strcmp(Tags(:),'!all'))
+        delete(allchild(F))
+    else
+        for tag = Tags(:)'
+        delete(findall(allchild(F),'flat','Tag',tag{:}));
+        end
+    end 
+end
+set(F,'Pointer','Arrow')
+%if ~isdocked && ~spm('CmdLine'), movegui(F); end
+
+%==========================================================================
+case 'close'
+%==========================================================================
+% spm_figure('Close',F)
+
+%-Sort out arguments
+if nargin < 2, F = gcf; else F = varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), return, end
+
+%-Detect if SPM windows are in docked mode
+hMenu = spm_figure('FindWin','Menu');
+isdocked = strcmp(get(hMenu,'WindowStyle'),'docked');
+
+%-Close figures (and deleted without confirmation)
+delete(F);
+
+%-If in docked mode and closing SPM, close the container as well
+if isdocked && ismember(hMenu,F)
+    try
+        desktop = com.mathworks.mde.desk.MLDesktop.getInstance;
+        group   = ['Statistical Parametric Mapping (' spm('Ver') ')'];
+        hContainer = desktop.getGroupContainer(group);
+        hContainer.getTopLevelAncestor.hide;
+    end
+end
+
+%==========================================================================
+case 'print'
+%==========================================================================
+% spm_figure('Print',F,fname)
+
+%-Arguments & defaults
+if nargin<3, fname=''; else fname=varargin{3};end
+if nargin<2, F='Graphics'; else F=varargin{2}; end
+
+%-Find window to print, default to gcf if specified figure not found
+% Return if no figures
+if ~isempty(F), F = spm_figure('FindWin',F); end
+if  isempty(F), F = get(0,'CurrentFigure'); end
+if  isempty(F), return, end
+
+%-Note current figure, & switch to figure to print
+cF = get(0,'CurrentFigure');
+set(0,'CurrentFigure',F)
+
+%-See if window has paging controls
+hNextPage = findall(F,'Tag','NextPage');
+hPrevPage = findall(F,'Tag','PrevPage');
+hPageNo   = findall(F,'Tag','PageNo');
+iPaged    = ~isempty(hNextPage);
+
+%-Temporarily change all units to normalized prior to printing
+H  = findall(allchild(F),'flat','Type','axes');
+if ~isempty(H)
+    un = cellstr(get(H,'Units'));
+    set(H,'Units','normalized');
+end
+
+%-Print
+if ~iPaged
+    spm_print(fname,F);
+else
+    hPg    = get(hNextPage,'UserData');
+    Cpage  = get(hPageNo,  'UserData');
+    nPages = size(hPg,1);
+
+    set([hNextPage,hPrevPage,hPageNo],'Visible','off');
+    if Cpage~=1
+        set(hPg{Cpage,1},'Visible','off');
+    end
+    for p = 1:nPages
+        set(hPg{p,1},'Visible','on');
+        spm_print(fname,F);
+        set(hPg{p,1},'Visible','off');
+    end
+    set(hPg{Cpage,1},'Visible','on');
+    set([hNextPage,hPrevPage,hPageNo],'Visible','on');
+end
+if ~isempty(H), set(H,{'Units'},un); end
+set(0,'CurrentFigure',cF);
+
+%==========================================================================
+case 'printto'
+%==========================================================================
+%spm_figure('PrintTo',F)
+
+%-Arguments & defaults
+if nargin<2, F='Graphics'; else F=varargin{2}; end
+
+%-Find window to print, default to gcf if specified figure not found
+% Return if no figures
+F=spm_figure('FindWin',F);
+if isempty(F), F = get(0,'CurrentFigure'); end
+if isempty(F), return, end
+
+[fn, pn, fi] = uiputfile({'*.ps','PostScript file (*.ps)'},'Print to File');
+if isequal(fn,0) || isequal(pn,0), return, end
+
+psname = fullfile(pn, fn);
+spm_figure('Print',F,psname);
+
+%==========================================================================
+case 'newpage'
+%==========================================================================
+% [hNextPage, hPrevPage, hPageNo] = spm_figure('NewPage',h)
+
+if nargin<2 || isempty(varargin{2}), error('No handles to paginate')
+else h=varargin{2}(:)'; end
+
+%-Work out which figure we're in
+F = ancestor(h(1),'figure');
+
+hNextPage = findall(F,'Tag','NextPage');
+hPrevPage = findall(F,'Tag','PrevPage');
+hPageNo   = findall(F,'Tag','PageNo');
+
+%-Create pagination widgets if required
+%--------------------------------------------------------------------------
+if isempty(hNextPage)
+    WS = spm('WinScale');
+    FS = spm('FontSizes');
+    SatFig = findall(0,'Tag','Satellite');
+    if ~isempty(SatFig)
+        SatFigPos    = get(SatFig,'Position');
+        hNextPagePos = [SatFigPos(3)-25 15 15 15];
+        hPrevPagePos = [SatFigPos(3)-40 15 15 15];
+        hPageNo      = [SatFigPos(3)-40  5 30 10];
+    else
+        hNextPagePos = [580 022 015 015].*WS;
+        hPrevPagePos = [565 022 015 015].*WS;
+        hPageNo      = [550 005 060 015].*WS;
+    end
+    
+    hNextPage = uicontrol(F,'Style','Pushbutton',...
+        'HandleVisibility','on',...
+        'String','>','FontSize',FS(10),...
+        'ToolTipString','next page',...
+        'Callback','spm_figure(''TurnPage'',''+1'',gcbf)',...
+        'Position',hNextPagePos,...
+        'ForegroundColor',[0 0 0],...
+        'Tag','NextPage','UserData',[]);
+    hPrevPage = uicontrol(F,'Style','Pushbutton',...
+        'HandleVisibility','on',...
+        'String','<','FontSize',FS(10),...
+        'ToolTipString','previous page',...
+        'Callback','spm_figure(''TurnPage'',''-1'',gcbf)',...
+        'Position',hPrevPagePos,...
+        'Visible','on',...
+        'Enable','off',...
+        'Tag','PrevPage');
+    hPageNo = uicontrol(F,'Style','Text',...
+        'HandleVisibility','on',...
+        'String','1',...
+        'FontSize',FS(6),...
+        'HorizontalAlignment','center',...
+        'BackgroundColor','w',...
+        'Position',hPageNo,...
+        'Visible','on',...
+        'UserData',1,...
+        'Tag','PageNo','UserData',1);
+end
+
+%-Add handles for this page to UserData of hNextPage
+%-Make handles for this page invisible if PageNo>1
+%--------------------------------------------------------------------------
+mVis    = strcmp('on',get(h,'Visible'));
+mHit    = strcmp('on',get(h,'HitTest'));
+hPg     = get(hNextPage,'UserData');
+if isempty(hPg)
+    hPg = {h(mVis), h(~mVis), h(mHit), h(~mHit)};
+else
+    hPg = [hPg; {h(mVis), h(~mVis), h(mHit), h(~mHit)}];
+    set(h(mVis),'Visible','off');
+        set(h(mHit),'HitTest','off');
+end
+set(hNextPage,'UserData',hPg)
+
+%-Return handles to pagination controls if requested
+if nargout>0, varargout = {[hNextPage, hPrevPage, hPageNo]}; end
+
+%==========================================================================
+case 'turnpage'
+%==========================================================================
+% spm_figure('TurnPage',move,F)
+
+if nargin<3, F='Graphics'; else F=varargin{3}; end
+if nargin<2, move=1; else move=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), error('No Graphics window'), end
+
+hNextPage = findall(F,'Tag','NextPage');
+hPrevPage = findall(F,'Tag','PrevPage');
+hPageNo   = findall(F,'Tag','PageNo');
+if isempty(hNextPage), return, end
+hPg       = get(hNextPage,'UserData');
+Cpage     = get(hPageNo,  'UserData');
+nPages    = size(hPg,1);
+
+%-Sort out new page number
+if ischar(move), Npage = Cpage+eval(move); else Npage = move; end
+Npage = max(min(Npage,nPages),1);
+
+%-Make current page invisible, new page visible, set page number string
+set(hPg{Cpage,1},'Visible','off');
+set(hPg{Cpage,3},'HitTest','off');
+set(hPg{Npage,1},'Visible','on');
+set(hPg{Npage,3},'HitTest','on');
+set(hPageNo,'UserData',Npage,'String',sprintf('%d / %d',Npage,nPages))
+
+for k = 1:length(hPg{Npage,1})
+    if isgraphics(hPg{ Npage, 1 }( k ),'axes')
+        axes(hPg{Npage,1}(k));
+    end
+end
+
+%-Disable appropriate page turning control if on first/last page
+if Npage==1, set(hPrevPage,'Enable','off')
+else set(hPrevPage,'Enable','on'), end
+if Npage==nPages, set(hNextPage,'Enable','off')
+else set(hNextPage,'Enable','on'), end
+
+%==========================================================================
+case 'deletepagecontrols'
+%==========================================================================
+% spm_figure('DeletePageControls',F)
+
+if nargin<2, F='Graphics'; else F=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), error('No Graphics window'), end
+
+hNextPage = findall(F,'Tag','NextPage');
+hPrevPage = findall(F,'Tag','PrevPage');
+hPageNo   = findall(F,'Tag','PageNo');
+
+delete([hNextPage hPrevPage hPageNo])
+
+%==========================================================================
+case '#page'
+%==========================================================================
+% n = spm_figure('#Page',F)
+
+if nargin<2, F='Graphics'; else F=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), error('No Graphics window'), end
+
+hNextPage = findall(F,'Tag','NextPage');
+if isempty(hNextPage)
+    n = 1;
+else
+    n = size(get(hNextPage,'UserData'),1)+1;
+end
+varargout = {n};
+
+%==========================================================================
+case 'currentpage'
+%==========================================================================
+% n = spm_figure('CurrentPage', F)
+
+if nargin<2, F='Graphics'; else F=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), error('No Graphics window'), end
+
+hPageNo   = findall(F,'Tag','PageNo');
+Cpage     = get(hPageNo,  'UserData');
+
+varargout = {Cpage};
+
+%==========================================================================
+case 'watermark'
+%==========================================================================
+% spm_figure('WaterMark',F,str,Tag,Angle,Perm)
+
+if nargin<6, HVis='on'; else HVis='off'; end
+if nargin<5, Angle=-45; else Angle=varargin{5}; end
+if nargin<4 || isempty(varargin{4}), Tag = 'WaterMark'; else Tag=varargin{4}; end
+if nargin<3 || isempty(varargin{3}), str = 'SPM';       else str=varargin{3}; end
+if nargin<2, if any(allchild(0)), F=gcf; else F=''; end
+else F=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), return, end
+
+%-Specify watermark color from background colour
+Colour = get(F,'Color');
+%-Only mess with grayscale backgrounds
+if ~all(Colour==Colour(1)), return, end
+%-Work out colour - lighter unless grey value > 0.9
+Colour = Colour+(2*(Colour(1)<0.9)-1)*0.02;
+
+cF = get(0,'CurrentFigure');
+set(0,'CurrentFigure',F)
+Units=get(F,'Units');
+set(F,'Units','normalized');
+h = axes('Position',[0.45,0.5,0.1,0.1],...
+    'Units','normalized',...
+    'Visible','off',...
+    'Tag',Tag);
+set(F,'Units',Units)
+text(0.5,0.5,str,...
+    'FontSize',spm('FontSize',80),...
+    'FontWeight','Bold',...
+    'FontName',spm_platform('Font','times'),...
+    'Rotation',Angle,...
+    'HorizontalAlignment','Center',...
+    'VerticalAlignment','middle',...
+    'Color',Colour,...
+    'ButtonDownFcn',[...
+        'if strcmp(get(gcbf,''SelectionType''),''open''),',...
+            'delete(get(gcbo,''Parent'')),',...
+        'end'])
+set(h,'HandleVisibility',HVis)
+set(0,'CurrentFigure',cF)
+
+%==========================================================================
+case 'createwin'
+%==========================================================================
+% F=spm_figure('CreateWin',Tag,Name,Visible)
+
+if nargin<4 || isempty(varargin{4}), Visible='on'; else Visible=varargin{4}; end
+if nargin<3, Name=''; else Name = varargin{3}; end
+if nargin<2, Tag='';  else Tag  = varargin{2}; end
+
+FS   = spm('FontSizes');          %-Scaled font sizes
+PF   = spm_platform('fonts');     %-Font names (for this platform)
+Rect = spm('WinSize','Graphics'); %-Graphics window rectangle
+S0   = spm('WinSize','0',1);      %-Screen size (of the current monitor)
+
+F    = figure(...
+    'Tag',Tag,...
+    'Position',[S0(1) S0(2) 0 0] + Rect,...
+    'Resize','off',...
+    'Color','w',...
+    'ColorMap',gray(64),...
+    'DefaultTextColor','k',...
+    'DefaultTextInterpreter','none',...
+    'DefaultTextFontName',PF.helvetica,...
+    'DefaultTextFontSize',FS(10),...
+    'DefaultAxesColor','w',...
+    'DefaultAxesXColor','k',...
+    'DefaultAxesYColor','k',...
+    'DefaultAxesZColor','k',...
+    'DefaultAxesFontName',PF.helvetica,...
+    'DefaultPatchFaceColor','k',...
+    'DefaultPatchEdgeColor','k',...
+    'DefaultSurfaceEdgeColor','k',...
+    'DefaultLineColor','k',...
+    'DefaultUicontrolFontName',PF.helvetica,...
+    'DefaultUicontrolFontSize',FS(10),...
+    'DefaultUicontrolInterruptible','on',...
+    'PaperType','A4',...
+    'PaperUnits','normalized',...
+    'PaperPosition',[.0726 .0644 .854 .870],...
+    'InvertHardcopy','off',...
+    'Renderer',spm_get_defaults('renderer'),...
+    'Visible','off',...
+    'Toolbar','none');
+if ~isempty(Name)
+    set(F,'Name',sprintf('%s%s: %s',spm('ver'),...
+        spm('getUser',' (%s)'),Name),'NumberTitle','off')
+end
+set(F,'Visible',Visible)
+varargout = {F};
+
+isdocked = strcmp(get(spm_figure('FindWin','Menu'),'WindowStyle'),'docked');
+if isdocked
+    try
+        desktop = com.mathworks.mde.desk.MLDesktop.getInstance;
+        group   = ['Statistical Parametric Mapping (' spm('Ver') ')'];
+        set(getJFrame(F),'GroupName',group);
+        set(F,'WindowStyle','docked');
+    end
+end
+
+%==========================================================================
+ case 'createbar'
+%==========================================================================
+% spm_figure('CreateBar',F)
+
+if nargin<2, if any(allchild(0)), F=gcf; else F=''; end
+else F=varargin{2}; end
+F = spm_figure('FindWin',F);
+if isempty(F), return, end
+
+%-Help Menu
+t0 = findall(allchild(F),'Flat','Label','&Help'); 
+delete(allchild(t0)); set(t0,'Callback','');
+if isempty(t0), t0 = uimenu( F,'Label','&Help'); end;
+pos = get(t0,'Position');
+uimenu(t0,'Label','SPM Help','CallBack','spm_help');
+uimenu(t0,'Label','SPM Manual (PDF)',...
+    'CallBack','try,open(fullfile(spm(''dir''),''man'',''manual.pdf''));end');
+t1=uimenu(t0,'Label','SPM &Web Resources');
+uimenu(t1,'Label','SPM Web &Site',...
+    'CallBack','web(''http://www.fil.ion.ucl.ac.uk/spm/'');');
+uimenu(t1,'Label','SPM &WikiBook',...
+    'CallBack','web(''http://en.wikibooks.org/wiki/SPM'');');
+uimenu(t1,'Separator','on','Label','SPM &Extensions',...
+    'CallBack','web(''http://www.fil.ion.ucl.ac.uk/spm/ext/'');');
+
+%-Check Menu
+if ~isdeployed
+    uimenu(t0,'Separator','on','Label','SPM Check Installation',...
+        'CallBack','spm_check_installation(''full'')');
+    uimenu(t0,'Label','SPM Check for Updates',...
+        'CallBack','spm(''alert"'',evalc(''spm_update''),''SPM Update'');');
+end
+
+%- About Menu
+uimenu(t0,'Separator','on','Label',['&About ' spm('Ver')],...
+    'CallBack',@spm_about);
+uimenu(t0,'Label','&About MATLAB',...
+    'CallBack','helpmenufcn(gcbf,''HelpAbout'')');
+
+%-Figure Menu
+t0=uimenu(F, 'Position',pos, 'Label','&SPM Figure', 'HandleVisibility','off', 'Callback',@myisresults);
+
+%-Show All Figures
+uimenu(t0, 'Label','Show All &Windows', 'HandleVisibility','off',...
+    'CallBack','spm(''Show'');');
+
+%-Dock SPM Figures
+uimenu(t0, 'Label','&Dock SPM Windows', 'HandleVisibility','off',...
+    'CallBack',@mydockspm);
+
+%-Print Menu
+t1=uimenu(t0, 'Label','&Save Figure', 'HandleVisibility','off','Separator','on');
+uimenu(t1,    'Label','&Default File', 'HandleVisibility','off', ...
+    'CallBack','spm_figure(''Print'',gcf)');
+uimenu(t1,    'Label','&Specify File...', 'HandleVisibility','off', ...
+    'CallBack','spm_figure(''PrintTo'',spm_figure(''FindWin'',''Graphics''))');
+
+%-Copy Figure
+if ispc
+    uimenu(t0, 'Label','Co&py Figure', 'HandleVisibility','off',...
+       'CallBack','editmenufcn(gcbf,''EditCopyFigure'')');
+end
+
+%-Clear Menu
+uimenu(t0,    'Label','&Clear Figure', 'HandleVisibility','off', ...
+    'CallBack','spm_figure(''Clear'',gcbf)');
+
+%-Close non-SPM figures
+uimenu(t0,    'Label','C&lose non-SPM Figures', 'HandleVisibility','off', ...
+    'CallBack',@myclosefig);
+
+%-Colour Menu
+t1=uimenu(t0, 'Label','C&olours',  'HandleVisibility','off','Separator','on');
+t2=uimenu(t1, 'Label','Colormap');
+uimenu(t2,    'Label','Gray',      'CallBack','spm_figure(''ColorMap'',''gray'')');
+uimenu(t2,    'Label','Hot',       'CallBack','spm_figure(''ColorMap'',''hot'')');
+uimenu(t2,    'Label','Pink',      'CallBack','spm_figure(''ColorMap'',''pink'')');
+uimenu(t2,    'Label','Jet',       'CallBack','spm_figure(''ColorMap'',''jet'')');
+uimenu(t2,    'Label','Gray-Hot',  'CallBack','spm_figure(''ColorMap'',''gray-hot'')');
+uimenu(t2,    'Label','Gray-Cool', 'CallBack','spm_figure(''ColorMap'',''gray-cool'')');
+uimenu(t2,    'Label','Gray-Pink', 'CallBack','spm_figure(''ColorMap'',''gray-pink'')');
+uimenu(t2,    'Label','Gray-Jet',  'CallBack','spm_figure(''ColorMap'',''gray-jet'')');
+t2=uimenu(t1, 'Label','Effects');
+uimenu(t2,    'Label','Invert',    'CallBack','spm_figure(''ColorMap'',''invert'')');
+uimenu(t2,    'Label','Brighten',  'CallBack','spm_figure(''ColorMap'',''brighten'')');
+uimenu(t2,    'Label','Darken',    'CallBack','spm_figure(''ColorMap'',''darken'')');
+
+%-Font Size Menu
+t1=uimenu(t0, 'Label','&Font Size', 'HandleVisibility','off');
+uimenu(t1, 'Label','&Increase', 'CallBack','spm_figure(''FontSize'',1)',  'Accelerator', '=');
+uimenu(t1, 'Label','&Decrease', 'CallBack','spm_figure(''FontSize'',-1)', 'Accelerator', '-');
+
+%-Satellite Table
+uimenu(t0,    'Label','&Results Table', 'HandleVisibility','off', ...
+    'Separator','on', 'Callback',@mysatfig);
+    
+% Tasks Menu
+%try, spm_jobman('pulldown'); end
+
+%==========================================================================
+case 'figcontextmenu'
+%==========================================================================
+% h = spm_figure('FigContextMenu',F)
+
+if nargin<2
+    F = get(0,'CurrentFigure');
+    if isempty(F), error('no figure'), end
+else
+    F = spm_figure('FindWin',varargin{2});
+    if isempty(F), error('no such figure'), end
+end
+h     = uicontextmenu('Parent',F,'HandleVisibility','CallBack');
+copy_menu(F,h);
+set(F,'UIContextMenu',h)
+varargout = {h};
+
+%==========================================================================
+case 'colormap'
+%==========================================================================
+% spm_figure('ColorMap',ColAction)
+
+if nargin<2, ColAction='gray'; else ColAction=varargin{2}; end
+
+switch lower(ColAction), case 'gray'
+    colormap(gray(64))
+case 'hot'
+    colormap(hot(64))
+case 'pink'
+    colormap(pink(64))
+case 'jet'
+    colormap(jet(64))
+case 'gray-hot'
+    tmp = hot(64 + 16);  tmp = tmp((1:64) + 16,:);
+    colormap([gray(64); tmp]);
+case 'gray-cool'
+    cool = [zeros(10,1) zeros(10,1) linspace(0.5,1,10)';
+            zeros(31,1) linspace(0,1,31)' ones(31,1);
+            linspace(0,1,23)' ones(23,1) ones(23,1) ];
+    colormap([gray(64); cool]);
+case 'gray-pink'
+    tmp = pink(64 + 16); tmp = tmp((1:64) + 16,:);
+    colormap([gray(64); tmp]);
+case 'gray-jet'
+    colormap([gray(64); jet(64)]);
+case 'invert'
+    colormap(flipud(colormap));
+case 'brighten'
+    colormap(brighten(colormap, 0.2));
+case 'darken'
+    colormap(brighten(colormap, -0.2));
+otherwise
+    error('Illegal ColAction specification');
+end
+
+%==========================================================================
+case 'fontsize'
+%==========================================================================
+% spm_figure('FontSize',sz)
+
+if nargin<2, sz=0; else sz=varargin{2}; end
+
+h  = [get(0,'CurrentFigure') spm_figure('FindWin','Satellite')];
+h  = [findall(h,'type','text'); findall(h,'type','uicontrol')];
+fs = get(h,'fontsize');
+if ~isempty(fs)
+    set(h,{'fontsize'},cellfun(@(x) max(x+sz,eps),fs,'UniformOutput',false));
+end
+
+
+%==========================================================================
+otherwise
+%==========================================================================
+warning(['Illegal Action string: ',Action])
+end
+return;
+function myisresults(obj,evt)
+%==========================================================================
+hr = findall(obj,'Label','&Results Table');
+try
+    evalin('base','xSPM;');
+    set(hr,'Enable','on');
+catch
+    set(hr,'Enable','off');
+end
+SatWindow = spm_figure('FindWin','Satellite');
+if ~isempty(SatWindow)
+    set(hr,'Checked','on');
+else
+    set(hr,'Checked','off');
+end
+function mysatfig(obj,evt)
+%==========================================================================
+SatWindow = spm_figure('FindWin','Satellite');
+if ~isempty(SatWindow)
+    figure(SatWindow)
+else
+    FS   = spm('FontSizes');             %-Scaled font sizes
+    PF   = spm_platform('fonts');        %-Font names
+    WS   = spm('WinSize','0','raw');     %-Screen size (of current monitor)
+    Rect = [WS(1)+5 WS(4)*.40 WS(3)*.49 WS(4)*.57];
+    figure(...
+        'Tag','Satellite',...
+        'Position',Rect,...
+        'Resize','off',...
+        'MenuBar','none',...
+        'Name','SPM: Satellite Results Table',...
+        'Numbertitle','off',...
+        'Color','w',...
+        'ColorMap',gray(64),...
+        'DefaultTextColor','k',...
+        'DefaultTextInterpreter','none',...
+        'DefaultTextFontName',PF.helvetica,...
+        'DefaultTextFontSize',FS(10),...
+        'DefaultAxesColor','w',...
+        'DefaultAxesXColor','k',...
+        'DefaultAxesYColor','k',...
+        'DefaultAxesZColor','k',...
+        'DefaultAxesFontName',PF.helvetica,...
+        'DefaultPatchFaceColor','k',...
+        'DefaultPatchEdgeColor','k',...
+        'DefaultSurfaceEdgeColor','k',...
+        'DefaultLineColor','k',...
+        'DefaultUicontrolFontName',PF.helvetica,...
+        'DefaultUicontrolFontSize',FS(10),...
+        'DefaultUicontrolInterruptible','on',...
+        'PaperType','A4',...
+        'PaperUnits','normalized',...
+        'PaperPosition',[.0726 .0644 .854 .870],...
+        'InvertHardcopy','off',...
+        'Renderer',spm_get_defaults('renderer'),...
+        'Visible','on');
+end
+function mydockspm(obj,evt)
+%==========================================================================
+% Largely inspired by setFigDockGroup from Yair Altman
+% http://www.mathworks.com/matlabcentral/fileexchange/16650
+hMenu = spm_figure('FindWin','Menu');
+hInt  = spm_figure('FindWin','Interactive');
+hGra  = spm_figure('FindWin','Graphics');
+h     = [hMenu hInt hGra];
+group   = ['Statistical Parametric Mapping (' spm('Ver') ')'];
+try
+    desktop = com.mathworks.mde.desk.MLDesktop.getInstance;
+    if ~ismember(group,cell(desktop.getGroupTitles))
+        desktop.addGroup(group);
+    end
+    for i=1:length(h)
+        set(getJFrame(h(i)),'GroupName',group);
+    end
+    hContainer = desktop.getGroupContainer(group);
+    set(hContainer,'userdata',group);
+end
+set(h,'WindowStyle','docked');
+try, pause(0.5), desktop.setGroupDocked(group,false); end
+function myclosefig(obj,evt)
+%==========================================================================
+hMenu = spm_figure('FindWin','Menu');
+hInt  = spm_figure('FindWin','Interactive');
+hGra  = spm_figure('FindWin','Graphics');
+h     = setdiff(findobj(get(0,'children'),'flat','visible','on'), ...
+    [hMenu hInt hGra gcf]);
+close(h,'force');
+function copy_menu(F,G)
+%==========================================================================
+handles = findall(allchild(F),'Flat','Type','uimenu','Visible','on');
+if isempty(handles), return; end;
+for F1=handles(:)'
+    if ~ismember(get(F1,'Label'),{'&Window' '&Desktop'})
+        G1 = uimenu(G,'Label',get(F1,'Label'),...
+            'CallBack',get(F1,'CallBack'),...
+            'Position',get(F1,'Position'),...
+            'Separator',get(F1,'Separator'));
+        copy_menu(F1,G1);
+    end
+end
+function jframe = getJFrame(h)
+%==========================================================================
+warning('off','MATLAB:HandleGraphics:ObsoletedProperty:JavaFrame');
+hhFig    = handle(h);
+jframe   = [];
+maxTries = 16;
+while maxTries > 0
+    try
+        jframe = get(hhFig,'javaframe');
+        if ~isempty(jframe)
+            break;
+        else
+            maxTries = maxTries - 1;
+            drawnow; pause(0.1);
+        end
+    catch
+        maxTries = maxTries - 1;
+        drawnow; pause(0.1);
+    end
+end
+if isempty(jframe)
+    error('Cannot retrieve the java frame from handle.');
+end
+function spm_about(obj,evt)
+%==========================================================================
+[v,r] = spm('Ver');
+h = figure('MenuBar','none',...
+           'NumberTitle','off',...
+           'Name',['About ' v],...
+           'Resize','off',...
+           'Toolbar','none',...
+           'Tag','AboutSPM',...
+           'WindowStyle','Modal',...
+           'Color',[0 0 0],...
+           'Visible','off');
+pos = get(h,'Position');
+pos([3 4]) = [300 400];
+set(h,'Position',pos);
+set(h,'Visible','on');
+
+a = axes('Parent',h, 'Units','pixels', 'Position',[50 201 200 200],...
+    'Visible','off');
+IMG = imread(fullfile(spm('Dir'),'man','images','spm8.png'));
+image(IMG,'Parent',a); set(a,'Visible','off');
+
+a = axes('Parent',h,'Units','pixels','Position',[0 0 300 400],...
+    'Visible','off','Tag','textcont');
+text(0.5,0.45,'Statistical Parametric Mapping','Parent',a,...
+    'HorizontalAlignment','center','Color',[1 1 1],'FontWeight','Bold');
+text(0.5,0.40,[v ' (v' r ')'],'Parent',a,'HorizontalAlignment','center',...
+    'Color',[1 1 1]);
+text(0.5,0.30,'Wellcome Trust Centre for Neuroimaging','Parent',a,...
+    'HorizontalAlignment','center','Color',[1 1 1],'FontWeight','Bold');
+text(0.5,0.25,['Copyright (C) 1991,1994-' datestr(now,'yyyy')],...
+    'Parent',a,'HorizontalAlignment','center','Color',[1 1 1]);
+text(0.5,0.20,'http://www.fil.ion.ucl.ac.uk/spm/','Parent',a,...
+    'HorizontalAlignment','center','Color',[1 1 1],...
+    'ButtonDownFcn','web(''http://www.fil.ion.ucl.ac.uk/spm/'');');
+
+uicontrol('Style','pushbutton','String','Credits','Position',[40 25 60 25],...
+    'Callback',@myscroll,'BusyAction','Cancel');
+uicontrol('Style','pushbutton','String','OK','Position',[200 25 60 25],...
+    'Callback','close(gcf)','BusyAction','Cancel');
+function myscroll(obj,evt)
+%==========================================================================
+ax = findobj(gcf,'Tag','textcont');
+cla(ax);
+[current, previous] = spm_authors;
+authors = {['*' spm('Ver') '*'] current{:} '' ...
+           '*Previous versions*' previous{:} '' ...
+           '*Thanks to the SPM community*'};
+x = 0.2;
+h = gobjects(0);
+for i=1:numel(authors)
+    h(i) = text(0.5,x,authors{i},'Parent',ax,...
+        'HorizontalAlignment','center','Color',col(x));
+    if any(authors{i} == '*')
+        set(h(i),'String',strrep(authors{i},'*',''),'FontWeight','Bold');
+    end
+    x = x - 0.05;
+end
+pause(0.5);
+try
+    for j=1:fix((0.5-(0.2-numel(authors)*0.05))/0.01)
+        for i=1:numel(h)
+            p  = get(h(i),'Position');
+            p2 = p(2)+0.01;
+            set(h(i),'Position',[p(1) p2 p(3)],'Color',col(p2));
+            if p2 > 0.5, set(h(i),'Visible','off'); end
+        end
+        pause(0.1)
+    end
+end
+function c = col(x)
+%==========================================================================
+if x < 0.4 && x > 0.3
+    c = [1 1 1];
+elseif x <= 0.3
+    c = [1 1 1] - 6*abs(0.3-x);
+else
+    c = [1 1 1] - 6*abs(0.4-x);
+end
+c(c<0) = 0; c(c>1) = 1;
+
 % | bspm_XYZreg (MODIFIED FROM ORIGINAL SPM8 CODE)
 % =========================================================================
-function varargout=bspm_XYZreg(varargin)
+function varargout = bspm_XYZreg(varargin)
 % Registry for GUI XYZ locations, and point list utility functions
 %
 %                           ----------------
@@ -5061,7 +6172,7 @@ function [paramsStruct, msgStr] = convertPos(paramsStruct)
         dY = 0;
         dW = 0;
         dH = 0;
-        if ~isa(handle(hParent),'figure')
+        if ~isgraphics(hParent,'figure')
             % Get the reguested component's pixel position
             parentPos = getPixelPos(hParent, 1);  % no true available in ML6
 
@@ -5071,7 +6182,7 @@ function [paramsStruct, msgStr] = convertPos(paramsStruct)
             
             % Fix for images
             %isAxes  = isa(handle(hParent),'axes');
-            isImage = isa(handle(hParent),'image');
+            isImage = isgraphics(hParent,'image');
             if isImage  % | (isAxes & strcmpi(get(hParent,'YDir'),'reverse'))  %#ok ML6
 
                 % Compensate for resized image axes
@@ -5204,7 +6315,6 @@ function [positionRect, jFrameUsed, msgStr] = getInteractivePosition(hFig)
                ... %'or single-click any Matlab figure to capture the entire figure.' ...
                };
     catch
-        % Something failed, so revert to a simple rbbox on a visible figure
         try delete(f); drawnow; catch, end  %Cleanup...
         jFrameUsed = 0;  % no false available in ML6
         msg = {'Mouse-click within any Matlab figure and then', ...
@@ -5212,13 +6322,8 @@ function [positionRect, jFrameUsed, msgStr] = getInteractivePosition(hFig)
                'or single-click to capture the entire figure'};
     end
     uiwait(msgbox(msg,'ScreenCapture'));
-    
-    k = waitforbuttonpress;  %#ok k is unused
-    %hFig = getCurrentFig;
-    %p1 = get(hFig,'CurrentPoint');
+    pause; 
     positionRect = rbbox;
-    %p2 = get(hFig,'CurrentPoint');
-
     if jFrameUsed
         jFrameOrigin = getPixelPos(f);
         delete(f); drawnow;
@@ -5292,7 +6397,7 @@ function pos = getPixelPos(hObj,varargin)
             originalObj = hObj;
         end
 
-        if isa(handle(hObj),'figure') %| isa(handle(hObj),'axes')
+        if isgraphics(hObj,'figure') %| isa(handle(hObj),'axes')
         %try
             pos = getPos(hObj,'OuterPosition','pixels');
         else  %catch
@@ -5300,7 +6405,7 @@ function pos = getPixelPos(hObj,varargin)
             pos = getpixelposition(hObj,varargin{:});
 
             % add the axes labels/ticks if relevant (plus a tiny margin to fix 2px label/title inconsistencies)
-            if isa(handle(hObj),'axes') & ~isa(handle(originalObj),'image')  %#ok ML6
+            if isgraphics(hObj,'axes') & ~isgraphics(originalObj,'image')  %#ok ML6
                 tightInsets = getPos(hObj,'TightInset','pixel');
                 pos = pos + tightInsets.*[-1,-1,1,1] + [-1,1,1+tightInsets(1:2)];
             end
@@ -5639,14 +6744,14 @@ P           = uipanel(parent, 'units', 'norm', 'pos', panelposition, 'title', pa
             'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
 labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight}; 
 editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname', editfontname, 'foreg', editforecolor, 'backg', editbackcolor}; 
-propadd = {'tag','callback','enable','value','str'};
+propadd     = {'tag','callback','enable','value','str'};
 
 % | UICONTROLS
 pos = getpositions(relwidth, relheight, marginsep, uicontrolsep);
 editpos = pos(pos(:,1)==1,3:6); 
 labelpos = pos(pos(:,1)==2, 3:6); 
 hc = zeros(length(uilabels), 1); 
-he = zeros(length(uilabels), 1); 
+he = gobjects(length(uilabels), 1); 
 for i = 1:length(uilabels)
     ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox'}, uistyles{i}));
     if sum(ctag)==1
@@ -5704,7 +6809,299 @@ pos(:,4) = uibottoms(pos(:,1));
 pos(:,5) = uiwidths(pos(:,2)); 
 pos(:,6) = uiheights(pos(:,1)); 
 
+% | COLORMAP STUFF (lutbar.m)
+% =========================================================================
+function lutbar
+%LUTBAR	shows available colormaps as icons in a figure's toolbar
+%
+%	- creates a figure toolbar, which shows available colormaps (LUT)
+%	  as colorbar icons
+%	- clicking on an icon will change the figure's LUT
+%	- adds a context menu to the figure listing available LUTs
+%	  - clicking on a menu item will change the figure's LUT
+%	- subsequent calls toggle the bar/menu off/on
+%	- tooltips of each icon show the LUT name/colorspace
+%
+%	- LUT list composition
+%		1) all ML colormap files that are listd in a file <deflut.m>
+%	  or	   if <deflut.m> does not exist
+%		1) all ML colormap files that can be interpolated
+%	  and
+%		2) all files that are listed in a file <usrlut.m>
+%	  or	   if <usrlut.m> does not exist
+%		2) any file of the form <xxx_lut.m> in MLpath
+%
+%SYNTAX
+%		lutbar;
+%
+%NOTE
+%	the accompanying utility LUT2MAT creates <xxx_lut.m>
+%	files from NIH IMAGE compatible <xxx.lut> files
+%	provided by, eg,
+%	1)	Chris Rorden's MRICRO
+%			http://www.sph.sc.edu/comd/rorden/mricro.html
+%			currently: 19 LUT files
+%	2)	sourceforge.net's XMEDCON extra contribution
+%			http://xmedcon.sourceforge.net/download/index.html
+%			currently: 96 LUT files
+%
+%EXAMPLE
+%		imagesc(rand(128));
+%		colormap(bone(256));
+%		lutbar;
+%		colorbar;
 
+% created:
+%	us	10-Jan-2000
+% modified:
+%	us	19-Jan-2008 04:28:47
+
+		wp=27;			% TEDIOUS!	R14.SP3+
+		nc=20;
+		ns=10;
+		ltag='LUTBAR';
+
+		p=get(gcf,'position');
+% toggle
+	if	reset(ltag,p,wp);
+		return;
+	end
+
+		[ll,ds,us]=lutlst(10);
+		nl=size(ll,1);
+		cmap=colormap;
+		mc=size(cmap,1);
+
+% toolbar
+		t=uitoolbar;
+		set(t,'tag',ltag);
+% context menu
+% ... save current context menu
+		mo=findall(gcf,'type','uicontextmenu');
+		m=uicontextmenu;
+		set(m,'tag',ltag);
+		set(m,'userdata',mo);
+		set(gcf,'uicontextmenu',m);
+		set(gcf,'position',p+[0 -wp 0 0]);
+
+		lof=3;
+		uh=gobjects(nl+lof,1);
+	for	i=1:nl+lof
+		cm=[];
+	if	i == 1
+		cd=cross;
+		com='quit LUTBAR';
+	elseif	i == 2	|| ...
+		i == 3
+		cm=cmap;
+		cd=flipud(cmap);
+		cx=fix(linspace(1,mc,nc));
+		cd=cd(cx,:);
+		cs=size(cd,1);
+		cd=reshape(cd,[cs,1,3]);
+		cd=repmat(cd,1,ns);
+		com='current LUT';
+	if	i == 2
+		com='original LUT';
+	end
+	else
+		com=sprintf('%s(%-1d)',ll{i-lof},mc);
+		cm=feval(ll{i-lof},mc);
+		cd=flipud(feval(ll{i-lof},nc));
+		cd=reshape(cd,[nc,1,3]);
+		cd=repmat(cd,1,ns);
+	end
+		uh(i,1)=uitoggletool(t,...
+			'cdata',cd,...
+			'userdata',{cm,cd},...
+			'tooltipstring',com);
+		ch=uimenu(m,...
+			'label',com);
+		set(ch,'userdata',{cm,cd});
+	end
+
+		ch=flipud(get(m,'children'));
+	if	us
+		set(ch([2,3,4,ds+lof+1]),'separator','on');
+		set(uh([1,2,3,4,ds+lof+1]),'separator','on');
+	else
+		set(ch([2,3,4]),'separator','on');
+		set(uh([1,2,3,4]),'separator','on');
+	end
+		set(uh(1),'userdata',{ltag,p,0});
+		set(uh(3),'state','on');
+	for	i=1:numel(uh)
+		set(uh(i),...
+			'clickedcallback',{@ucb,i,uh,ch});
+		set(ch(i),...
+			'callback',{@ucb,i,uh,ch});
+	end
+		return;
+function ucb(hd,ec,ix,uhv,chv) %#ok
+
+		uh=uhv(ix);
+	if	ix ~= 1	&& ...
+		ix ~= 3
+		ud=get(uh,'userdata');
+		colormap(ud{1});
+		set(uhv(3),'cdata',ud{2});
+		set(uhv,'state','off');
+		set(uh,'state','on');
+		set(chv,'checked','off');
+		set(chv(ix),'checked','on');
+	end
+		set(uhv(3),'state','on');
+	if	ix == 1
+		ud=get(uhv(1),'userdata');
+		reset(ud{:});
+	end
+		return;
+function rflg=reset(ltag,p,wp)
+
+		rflg=true;
+		h=findall(gcf,'tag',ltag);
+	if	~isempty(h)
+% ... restore old context menu
+		m=get(h(1),'userdata');
+		delete(h);
+	if	~isempty(m)
+		set(gcf,'uicontextmenu',m(end));
+	end
+		set(gcf,'position',p+[0 wp 0 0]);
+		return;
+	end
+		rflg=false;
+		return;
+function x=cross
+
+		b=1;
+		f=0;
+		x=[
+			b b b b b b b b b b
+			b b b b b b b b b b
+			b b f b b b b f b b
+			b b b f b b f b b b
+			b b b b f f b b b b
+			b b b b f f b b b b
+			b b b f b b f b b b
+			b b f b b b b f b b
+			b b b b b b b b b b
+			b b b b b b b b b b
+		];
+		x=repmat(x,[1,1,3]);
+		return;   
+function [ll,ds,us]=lutlst(flag)
+
+		deflut='deflut.m';
+		usrlut='usrlut.m';
+
+% get default LUTs
+	if	exist(deflut,'file')
+		[dn,df]=textread(deflut,'%s %d','commentstyle','matlab');
+	else
+		[dn,df]=get_deflut;
+	end
+		ds=size(dn,1);
+		dx=(1:ds).'~=0;
+
+% get user defined LUTs
+	if	exist(usrlut,'file')
+		un=textread(usrlut,'%s','commentstyle','matlab');
+		uo=un;
+		us=size(un,1);
+	for	i=1:us
+		[up,un{i},ue]=fileparts(un{i});	%#ok
+	end
+		uf=repmat({3},us,1);
+		ux=(1:us).'~=0;
+	else
+		usrlut='*_lut.m';
+		un=dir(usrlut);
+		un=struct2cell(un);
+		un=un(1,:).';
+		us=size(un,1);
+		uf=repmat({3},us,1);
+		ux=(1:us).'~=0;
+	for	i=1:us
+		[up,un{i},ue]=fileparts(un{i});	%#ok
+		un{i}=fullfile(up,un{i});
+	end
+	end
+
+% check validity of LUT files
+	for	i=1:ds
+	if	~exist(dn{i},'file')
+		disp(sprintf('LUTLST> def lut not found <%s>',dn{i}));
+		dx(i)=false;
+	end
+	end
+	for	i=1:us
+	if	~exist(un{i},'file')
+		disp(sprintf('LUTLST> usr lut not found <%s> <%s>',un{i},uo{i}));
+		ux(i)=false;
+	end
+	end
+
+% LUT list
+		ds=sum(df(dx)==1);
+		us=sum(ux);
+		lo=[num2cell(df(dx)),dn(dx);uf(ux),un(ux)];
+		ll=lo(:,2);
+		ln=[lo{:,1}];
+	if	nargin
+	if	bitand(flag,100)
+		lx=ln==1;
+		lo=lo(lx,:);
+		ll=lo(:,2);
+	elseif	bitand(flag,10)
+		lx=ln==1 | ln==3;
+		lo=lo(lx,:);
+		ll=lo(:,2);
+	end
+	if	bitand(flag,1)
+		ll=sort(ll);
+	end
+	end
+		return;
+function [ll,lf,ls]=get_deflut
+
+%	LUT files
+%	ML colormaps
+%	--------------------
+%	R2006b
+%	03-Sep-2006
+
+		lut={
+%		LUT name	flag:
+%				1=can interpolate
+%				2=cannot interpolate
+%---------------------------------------------------
+		'autumn'	1
+		'bone'		1
+		'colorcube'	1
+		'contrast'	2
+		'cool'		1
+		'copper'	1
+		'flag'		1
+		'gray'		1
+		'hot'		1
+		'hsv'		1
+		'jet'		1
+		'lines'		1
+		'pink'		1
+		'prism'		1
+		'spring'	1
+		'summer'	1
+		'vga'		2
+		'white'		2
+		'winter'	1
+		};
+
+		ll=lut(:,1);
+		lf=[lut{:,2}].';
+		ls=size(ll,1);
+
+		return;
 
 
     

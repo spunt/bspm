@@ -1,4 +1,4 @@
-function [h1 hh1] = bspm_render(im, cmapflag, medialflag)
+function [h1 hh1] = bspm_render(im, cmapflag, medialflag, outname)
 % BSPM_RENDER Render 3D intensity map using Aaron Schultz's SurfPlot
 %
 %  USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input
@@ -17,34 +17,72 @@ if nargin < 1, disp('USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional in
 if nargin < 2, cmapflag = 1; end
 if nargin < 3, medialflag = 1; end
 
+
 [d, h] = bspm_read_vol(im);
-d(d==0) = NaN;
-obj.colorlims = [ceil(min(d(d>0))) floor(max(d(:)))];
+d(isnan(d)) = 0; 
+% obj.colorlims = [ceil(min(d(d>0))) floor(max(d(:)))];
+obj.colorlims = [0 floor(max(d(:)))];
 obj.medialflag = medialflag; 
 obj.input.m = d;
 obj.input.he = h; 
 obj.cmapflag = cmapflag; 
-obj.figno = 1; % Figure number for output plot
+obj.figno = 0; % Figure number for output plot
 obj.newfig = 1; 
-obj.overlaythresh = [4 4];
+obj.overlaythresh = 0; 
 obj.colormap = 'hot';
 obj.direction = '+';
 obj.reverse = 0; 
 obj.background = [0 0 0];
 obj.mappingfile = [];  %%% See PreconfigureFSinfo.m for an example of how to create a mapping file.
 obj.round = 0;  % if = 1, rounds all values on the surface to nearest whole number.  Useful for masks
-obj.fsaverage = 'fsaverage6';  %% Set which fsaverage to map to e.g. fsaverage, fsaverage3, fsaverage6
+obj.fsaverage = 'fsaverage';  %% Set which fsaverage to map to e.g. fsaverage, fsaverage3, fsaverage6
 obj.surface = 'inflated';          %% Set the surface: inflated, pial, or white
 obj.shading = 'sulc';          %% Set the shading information for the surface: curv, sulc, or thk
 obj.shadingrange = [.1 .7];    %% Set the min anx max greyscale values for the surface underlay (range of 0 to 1)
 obj.Nsurfs = 4;              %% Choose which hemispheres and surfaces to show:  4=L/R med/lat;  2= L/R lat; 1.9=L med/lat; 2.1 = R med/lat; -1= L lat; 1-R lat;
+
+
+
+ss = get(0, 'ScreenSize');
+ts = floor(ss/2);     
+switch obj.Nsurfs
+case 4
+   ts(4) = ts(4)*.90;
+case 2
+   ts(4) = ts(4)*.60;
+case 'L Lateral'
+   obj.Nsurfs = -1;
+case 1.9
+   ts(4) = ts(4)*.60;
+case 2.1
+   ts(4) = ts(4)*.60;
+otherwise
+end
+obj.position = ts; 
+
+
+
 [h1, hh1] = surfPlot4(obj);
+
+if nargin==4
+    tightfig
+    export_fig(outname, '-jpg', '-m1', '-zbuffer', gcf);
+end
 
 end
 function out = threshold_image(in, thresh, extent)
     imdims = size(in);
-    in(in>thresh(1) & in<thresh(2)) = NaN;
-    in(in==0) = NaN;
+    if ismember(thresh,[.10 .05 .01 .005 .001 .0005 .0001]);
+        tmp = in_hdr.descrip;
+        idx1 = regexp(tmp,'[','ONCE');
+        idx2 = regexp(tmp,']','ONCE');
+        df = str2num(tmp(idx1+1:idx2-1));
+        thresh = bob_p2t(thresh, df);
+    end
+    in(in<thresh) = NaN;
+    in(in==0)=NaN;
+%     in(in>thresh(1) & in<thresh(2)) = NaN;
+%     in(in==0) = NaN;s
     [X Y Z] = ind2sub(size(in), find(in));
     voxels = sortrows([X Y Z])';
     cl_index = spm_clusters(voxels);
@@ -81,23 +119,6 @@ function [h, hh] = surfPlot4(obj)
 
 pth = [fileparts(which('fsaverage.mat')) filesep];
 load([pth obj.fsaverage '.mat']);
-
-ss = get(0, 'ScreenSize');
-ts = floor(ss/2);     
-switch obj.Nsurfs
-case 4
-   ts(4) = ts(4)*.90;
-case 2
-   ts(4) = ts(4)*.60;
-case 'L Lateral'
-   obj.Nsurfs = -1;
-case 1.9
-   ts(4) = ts(4)*.60;
-case 2.1
-   ts(4) = ts(4)*.60;
-otherwise
-end
-obj.position = ts; 
 
 switch lower(obj.surface)
     case 'inflated'
@@ -140,7 +161,7 @@ if obj.newfig
         figure(obj.figno); clf;
         set(gcf,'color',obj.background, 'position', obj.position); shg
     else
-        figure; clf;
+        figure('pos', obj.position); clf;
         set(gcf,'color',obj.background, 'position', obj.position); shg
         obj.figno = gcf;
     end
@@ -153,6 +174,8 @@ if obj.newfig
     c = c.*diff(rang);
     c = c-min(c)+rang(1);
     col1 = [c c c];
+    
+    
     
  if obj.Nsurfs == 4;
         

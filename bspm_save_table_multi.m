@@ -1,4 +1,4 @@
-function bspm_save_table_multi(allim,intensity,separation,mask)
+function bspm_save_table_multi(allim,intensity,separation,customextentthresh)
 % BSPM_SAVE_TABLE_MULTI
 %
 %   USAGE: bspm_save_table_multi(allim,intensity,separation,mask)
@@ -7,7 +7,9 @@ function bspm_save_table_multi(allim,intensity,separation,mask)
 %       allim:      filename of input statistic image
 %       intensity:  intensity threshold to use
 %       separation: minimum peak separation (in mm)
-%       mask: maskfile to use (optional)
+%       customextentthresh: by default, will choose fwe cluster corrected
+%       extent to use a custom extent threshold, set a value here
+%       
 %      
 % Created April 8, 2013 - Bob Spunt
 % Uses code authored by:
@@ -19,9 +21,8 @@ function bspm_save_table_multi(allim,intensity,separation,mask)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<4, mask = []; end
-if nargin<3, error('USAGE: bspm_save_table_multi(allim,intensity,separation,mask)'); return; end
+if nargin<4, customextentthresh = []; end
+if nargin<3, error('USAGE: bspm_save_table_multi(allim,intensity,separation,customextentthresh)'); return; end
 
 %% Start it Off %%
 headers1 = {'Analysis Name' '' '' '' '' 'MNI Coordinates' '' ''};
@@ -34,7 +35,11 @@ for i = 1:length(allim)
     image = allim{i};
     
     %% get cluster level correction extent %%
-    cluster = bspm_cluster_correct(image);
+    if isempty(customextentthresh)
+        cluster = bspm_cluster_correct(image);
+    else
+        cluster = customextentthresh; 
+    end
 
     %% default structure input to peak_nii %%
     peaknii.thresh = intensity;
@@ -94,8 +99,8 @@ for i = 1:length(allim)
 end
 
 %% Save to Excel %%
-[day time] = bob_timestamp;
-outname = ['multi_table_I' num2str(intensity) '_S' num2str(separation) '_' day '_' time '.xls'];
+[day, tme] = bob_timestamp;
+outname = ['multi_table_I' num2str(intensity) '_S' num2str(separation) '_' day '_' tme '.xls'];
 try 
     xlwrite(outname,combinedcell);
 catch
