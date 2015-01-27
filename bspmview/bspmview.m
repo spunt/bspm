@@ -54,6 +54,7 @@ try
     fonts   = default_fonts; 
     pos     = default_positions; 
     color   = default_colors; 
+    default_preferences(1); 
     S.hFig    = figure(...
     'Units', 'pixels', ...
     'Position',pos.gui,...
@@ -122,6 +123,7 @@ st          = struct( ...
             'fonts',        fonts,...
             'direct',       'both',...
             'snap',         []);
+st.cmap     = default_colormaps(64); 
 st.vols     = cell(24,1);
 st.ol       = load_overlay(ol, .001, 5);
 bspm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
@@ -134,9 +136,10 @@ put_figmenu;
 put_axesxyz; 
 put_axesmenu;
 put_upperpane;
-setthresh(st.ol.C0(3,:), find(strcmpi({'positive', 'negative', 'both'}, st.direct))); 
-setcolormap; 
 put_lowerpane;
+setthresh(st.ol.C0(3,:), find(strcmpi({'positive', 'negative', 'both'}, st.direct))); 
+setvoxelinfo;
+setcolormap; 
 if nargout==1, S.handles = gethandles; end
 catch lasterr
     rethrow(lasterr)
@@ -155,7 +158,7 @@ function pos    = default_positions
     pos.gui         = [pos.ss(1)*.5 pos.ss(2)*.20 pos.ss(2)*.55 pos.ss(2)*.5];
     pos.gui(3:4)    = pos.gui(3:4)*1.1; 
     pos.aspratio    = pos.gui(3)/pos.gui(4);
-    guiss = [pos.gui(3:4) pos.gui(3:4)]; 
+    guiss           = [pos.gui(3:4) pos.gui(3:4)]; 
     h1 = 5; 
     h2 = pos.gui(4) - h1; 
     h = h2-h1;
@@ -165,26 +168,20 @@ function pos    = default_positions
     h1up = round(h*.925);
     hup = h-h1up; 
     %% PANELS   
-    pos.pane.upper  = [w1 h1up w hup]; 
-    pos.pane.axes   = [w1 h1 w h1up-h1]; 
-    
-
+    pos.pane.upper     = [w1 h1up w hup]; 
+    pos.pane.axes      = [w1 h1 w h1up-h1]; 
     pos.peakvalue      = [.050 .050 .250 .50];
     pos.xyz            = [.325 .050 .325 .50];
     pos.clustersize    = [.675 .050 .250 .50];
-    
     pos.maxval         = [.050 .050 .250 .50];
     pos.cmap           = [.325 .050 .325 .50];
-
     pos.pos            = [.100 .050 .250 .85];
     pos.neg            = [.400 .050 .250 .85];
     pos.posneg         = [.700 .050 .250 .85];
-    
     pos.k              = [.025 .050 .200 .55];
     pos.tval           = [.250 .050 .225 .55];
     pos.pval           = [.500 .050 .275 .55];
     pos.df             = [.800 .050 .175 .55];
-    
     pos.pslider        = [.050 .025 .900 .150];
 function color  = default_colors 
     color.bg        = [20/255 23/255 24/255];
@@ -237,6 +234,55 @@ function prop   = default_properties(varargin)
     prop.toggle     = [prop.darkbg {'style', 'toggle'}]; 
     prop.checkbox   = [prop.darkbg {'style', 'check'}]; 
     prop.listbox    = [prop.darkbg {'style', 'list'}]; 
+function cmap   = default_colormaps(depth)
+    if nargin==0, depth = 64; end
+    cmap = []; 
+    cmap{1,1}  = jet(depth);
+    cmap{1,2}  = 'jet';
+    cmap{2,1}  = hot(depth);
+    cmap{2,2}  = 'hot';
+    bmap1 = {'Blues' 'Greens' 'Greys' 'Oranges' 'Purples' 'Reds'};
+    for i = 1:length(bmap1)
+        tmp = brewermap(50, bmap1{i});
+        cmap{2+i,1} = cmap_upsample(tmp(11:end,:), depth); 
+        cmap{2+i,2} = sprintf('%s', bmap1{i});
+    end
+    tmp1 = brewermap(36, '*Blues'); 
+    tmp2 = brewermap(36, 'Reds'); 
+    cmap{end+1,1} = [tmp1(1:32,:); tmp2(5:36,:)]; 
+    cmap{end,2} = 'Blues-Reds';
+    bmap2 = {'Accent' 'Dark2' 'Paired' 'Pastel1' 'Pastel2' 'Set1' 'Set2' 'Set3'};
+    bnum2 = [8 8 12 9 8 9 8 12];
+    anchor = size(cmap,1); 
+    for i = 1:length(bmap2)
+        cmap{anchor+i,1} = cmap_upsample(brewermap(bnum2(i), bmap2{i}), depth); 
+        cmap{anchor+i,2} = sprintf('%s (%d)', bmap2{i}, bnum2(i));
+    end
+function preferences = default_preferences(initial) 
+    global st
+    if nargin==0, initial = 0; end
+    if initial
+        st.preferences  = struct( ...
+            'separation',   20, ...
+            'shape'     ,  'Sphere', ...
+            'size'      ,   10, ...
+            'surface'   ,   'Inflated', ...
+            'shading'   ,   'Sulc', ...
+            'nverts'    ,   40962); 
+        return
+    end; 
+    [preferences, button] = settingsdlg(...
+        'title'                     ,   'Preferences', ...
+        'separator'                 ,   'Peak', ...
+        {'Separation'; 'separation'},   20, ...
+        'separator'                 ,   'ROI', ...
+        {'Shape'; 'shape'}          ,   {'Sphere' 'Box'}, ...
+        {'Size (mm)'; 'size'}       ,   10, ...
+        'separator'                 ,   'Render', ...
+        {'Surface'; 'surface'}      ,   {'Inflated' 'Pial' 'White'}, ...
+        {'Shading'; 'shading'}      ,   {'Curv' 'Sulc' 'Thk'}, ...
+        {'N Vertices'; 'nverts'}    ,   num2cell([642 2562 10242 40962 163842])); 
+    if strcmpi(button, 'cancel'), return; else st.preferences = preferences; end
 
 % | GUI COMPONENTS
 % =========================================================================
@@ -245,60 +291,70 @@ function put_upperpane(varargin)
     cnamepos = [.01 .01 .98 .90]; 
     prop = default_properties('units', 'pixels', 'fontu', 'norm', 'fonts', .60); 
     panelh  = uipanel('parent',st.fig, prop.panel{:}, 'pos', st.pos.pane.upper, 'tag', 'upperpanel');
+    set(panelh, 'units', 'norm');
     prop = default_properties('units', 'norm', 'fontu', 'norm', 'fonts', .60); 
     uicontrol('parent', panelh, prop.text{:}, 'pos', cnamepos, 'tag', 'ContrastName', 'string', st.ol.descrip); 
 function put_lowerpane(varargin)
-global st
 
-% | Create the total panel
-prop = default_properties('units', 'norm', 'fontn', 'arial', 'fonts', 19);  
-[h,axpos] = gethandles_axes;
-lowpos = axpos(1,:);
-lowpos(1) = axpos(3, 1); 
-lowpos(3) = 1 - lowpos(1) - axpos(1,2);
-panelh = uipanel('parent', st.figax, prop.panel{:}, 'pos',lowpos, 'tag', 'lowerpanel');
+    global st
 
-% | Create each subpanel 
-prop            = buipanel_defaults; 
-panepos         = getpositions(1, [3 4 4 4], .025, .025);
-panepos(:,1:2)  = [];
-panename        = {'Effect to Display' 'Color Map' 'Thresholding Options' 'Current Voxel'};
-panelabel{1}    = {{'Positive' 'Negative' 'Both'}, {'Radio' 'Radio' 'Radio'}}; 
-panelabel{2}    = {{'Set Max' 'Set Map'}, {'Edit' 'List'}};  
-panelabel{3}    = {{'Extent' 'Thresh' 'P-Value' 'DF'}, {'Edit' 'Edit' 'Edit' 'Edit'}}; 
-panelabel{4}    = {{'Value' 'Coordinate' 'Cluster Size'}, {'Edit' 'Edit' 'Edit'}}; 
-relwidth        = {[6 6 5] [2 2] [4 4 4 3] [3 5 3]};
-tag             = {{'direct' 'direct' 'direct'}, {'maxval' 'colormaplist'}, panelabel{3}{1}, {'voxval' 'xyz' 'clustersize'}};  
-for i = 1:length(panename)
-    ph{i} = buipanel(panelh, panelabel{i}{1}, panelabel{i}{2}, relwidth{i}, 'paneltitle', panename{i}, 'panelposition', panepos(i,:), 'tag', tag{i}); 
-end
+    % | Create the total panel
+    prop = default_properties('units', 'norm', 'fontn', 'arial', 'fonts', 19);  
+    [h,axpos] = gethandles_axes;
+    lowpos = axpos(1,:);
+    lowpos(1) = axpos(3, 1); 
+    lowpos(3) = 1 - lowpos(1) - axpos(1,2);
+    panelh = uipanel('parent', st.figax, prop.panel{:}, 'pos',lowpos, 'tag', 'lowerpanel');
 
-% | Check valid directions for contrast display
-if any(st.ol.null)
-    allh = findobj(st.fig, 'Tag', 'direct'); 
-    opt = {'Positive' 'Negative'}; 
-    allhstr = get(allh, 'String');
-    set(allh(strcmp(allhstr, 'Both')), 'Value', 0, 'Enable', 'inactive', 'Visible', 'on');
-    set(allh(strcmp(allhstr, opt{st.ol.null})), 'Value', 0, 'Enable', 'inactive',  'Visible', 'on');
-    set(allh(strcmp(allhstr, opt{st.ol.null==0})), 'Value', 1, 'Enable', 'inactive');
-else
-    set(ph{1}.edit(3), 'value', 1, 'enable', 'inactive'); 
-end
+    % | Create each subpanel 
+    prop            = buipanel_defaults; 
+    panepos         = getpositions(1, [3 4 4 4], .025, .025);
+    panepos(:,1:2)  = [];
+    panename        = {'Effect to Display' 'Color Bar' 'Thresholding Options' 'Current Voxel'};
+    panelabel{1}    = {{'Positive' 'Negative' 'Both'}, {'Radio' 'Radio' 'Radio'}}; 
+    panelabel{2}    = {{'Max' 'Colormap' 'Reverse'}, {'Edit' 'Popup' 'Check'}};  
+    panelabel{3}    = {{'Extent' 'Thresh' 'P-Value' 'DF'}, {'Edit' 'Edit' 'Edit' 'Edit'}}; 
+    panelabel{4}    = {{'Value' 'Coordinate' 'Cluster Size'}, {'Edit' 'Edit' 'Edit'}}; 
+    relwidth        = {[6 6 3] [3 4 2] [4 4 5 3] [3 5 3]};
+    tag             = {{'direct' 'direct' 'direct'}, {'maxval' 'colormaplist' 'reversemap'}, panelabel{3}{1}, {'voxval' 'xyz' 'clustersize'}};  
+    for i = 1:length(panename)
+        ph{i} = buipanel(panelh, panelabel{i}{1}, panelabel{i}{2}, relwidth{i}, 'paneltitle', panename{i}, 'panelposition', panepos(i,:), 'tag', tag{i}); 
+    end
 
-% | Set some values
-arrayset(ph{3}.edit, 'Callback', @cb_updateoverlay); 
-arrayset(ph{1}.edit, 'Callback', @cb_directmenu);
-arrayset(ph{4}.edit([1 3]), 'enable', 'inactive'); 
-set(ph{4}.edit(2), 'callback', @cb_changexyz); 
-set(ph{2}.edit(1), 'str', sprintf('%2.3f',max(st.ol.Z)), 'callback', @cb_maxval); 
-Tdefvalues  = [st.ol.K st.ol.U st.ol.P st.ol.DF];
-Tstrform    = {'%d' '%2.3f' '%d' '%d'}; 
-for i = 1:length(Tdefvalues), set(ph{3}.edit(i), 'str', sprintf(Tstrform{i}, Tdefvalues(i))); end
-setvoxelinfo;
+    % | Check valid directions for contrast display
+    if any(st.ol.null)
+        allh = findobj(st.fig, 'Tag', 'direct'); 
+        opt = {'Positive' 'Negative'}; 
+        allhstr = get(allh, 'String');
+        set(allh(strcmp(allhstr, 'Both')), 'Value', 0, 'Enable', 'inactive', 'Visible', 'on');
+        set(allh(strcmp(allhstr, opt{st.ol.null})), 'Value', 0, 'Enable', 'inactive',  'Visible', 'on');
+        set(allh(strcmp(allhstr, opt{st.ol.null==0})), 'Value', 1, 'Enable', 'inactive');
+    else
+        set(ph{1}.edit(3), 'value', 1, 'enable', 'inactive'); 
+    end
+
+    % | Set some values
+    arrayset(ph{3}.edit, 'Callback', @cb_updateoverlay); 
+    arrayset(ph{1}.edit, 'Callback', @cb_directmenu);
+    arrayset(ph{4}.edit([1 3]), 'enable', 'inactive'); 
+    set(ph{4}.edit(2), 'callback', @cb_changexyz); 
+    set(ph{2}.edit(2), 'String', st.cmap(:,2), 'Value', 1, 'callback', @setcolormap); 
+    set(ph{2}.edit(1), 'callback', @cb_maxval);
+    set(ph{2}.edit(3), 'callback', @cb_reversemap);
+    Tdefvalues  = [st.ol.K st.ol.U st.ol.P st.ol.DF];
+    Tstrform    = {'%d' '%2.3f' '%d' '%d'}; 
+    for i = 1:length(Tdefvalues), set(ph{3}.edit(i), 'str', sprintf(Tstrform{i}, Tdefvalues(i))); end
 function put_figmenu
     global st
     %% Main Menu
-    S.menu1 = uimenu('Parent', st.fig, 'Label', 'bspmVIEW');
+    S.menu1     = uimenu('Parent', st.fig, 'Label', 'bspmVIEW');
+    S.prefs     = uimenu(S.menu1, 'Label','Preferences', 'Callback', @cb_preferences); 
+    S.guisize   = uimenu(S.menu1, 'Label','GUI Size'); 
+    S.gui(1)   = uimenu(S.guisize, 'Label', 'Increase', 'Callback', @cb_changeguisize);
+    S.gui(2)   = uimenu(S.guisize, 'Label', 'Decrease', 'Separator', 'on', 'Callback',@cb_changeguisize);
+    S.fontsize  = uimenu(S.menu1, 'Label','Font Size'); 
+    S.font(1)   = uimenu(S.fontsize, 'Label', 'Increase', 'Accelerator', 'i', 'Callback', @cb_changefontsize);
+    S.font(2)   = uimenu(S.fontsize, 'Label', 'Decrease', 'Accelerator', 'd', 'Separator', 'on', 'Callback',@cb_changefontsize);
     S.opencode  = uimenu(S.menu1, 'Label','Open GUI M-File', 'Callback', @cb_opencode); 
     S.exit      = uimenu(S.menu1, 'Label', 'Exit', 'Callback', {@cb_closegui, st.fig});
     %% Load Menu
@@ -433,8 +489,8 @@ elseif regexp(lab, 'global min')
 end
 bspm_orthviews('reposition', centre); 
 function cb_maxval(varargin)
-val = str2num(get(varargin{1}, 'string')); 
-bspm_orthviews('SetBlobsMax', 1, 1, val)
+    val = str2num(get(varargin{1}, 'string')); 
+    bspm_orthviews('SetBlobsMax', 1, 1, val)
 function cb_changexyz(varargin)
 xyz = str2num(get(varargin{1}, 'string')); 
 bspm_orthviews('reposition', xyz'); 
@@ -522,11 +578,11 @@ function cb_saveclust(varargin)
     outimg = st.ol.Y*opt(di);
     outhdr = st.ol.hdr; 
     outimg(clidx==0) = NaN;
-    putmsg = 'Save current cluster'; 
+    putmsg = 'Save cluster'; 
     outhdr.descrip = 'Thresholded Cluster Image'; 
     [p,n] = fileparts(outhdr.fname); 
     deffn = sprintf('%s/Cluster_%s_x=%d_y=%d_z=%d_%svoxels.nii', p, n, xyz, str);  
-    if regexp(lab, 'Save current cluster as mask')
+    if regexp(lab, 'binary mask')
         outimg(outimg>0) = 1; 
         outhdr.descrip = 'Thresholded Mask Image'; 
         putmsg = 'Save mask image as'; 
@@ -554,13 +610,41 @@ function cb_savergb(varargin)
     if isempty(imname), disp('User cancelled.'); return; end
     imwrite(im, fullfile(pname, imname)); 
     fprintf('\nImage saved to %s\n', fullfile(pname, imname));   
-    
+function cb_changeguisize(varargin)
+    global st
+    F = 0.9; 
+    if strcmp(get(varargin{1}, 'Label'), 'Increase'), F = 1.1; end
+    guipos = get(st.fig, 'pos');
+    guisize = guipos(3:4)*F; 
+    guipos(3:4) = guipos(3:4)*F;
+    set(st.fig, 'pos', guipos);    
+function cb_changefontsize(varargin)
+    global st
+    F = 0.95; 
+    if strcmp(get(varargin{1}, 'Label'), 'Increase'), F = 1.05; end
+    h   = findall(st.fig, '-property', 'FontSize'); 
+    fs  = cell2mat(get(h, 'fontsize'))*F; 
+    for i = 1:length(h), set(h(i), 'fontsize', fs(i)); end
+function cb_correct(varargin)
+    global st
+    str     = get(varargin{1}, 'string');
+    allh = findobj(st.fig, 'Tag', 'direct');  
+function cb_preferences(varargin)
+    global st
+    preferences = default_preferences; 
+function cb_reversemap(varargin)
+global st
+for i = 1:size(st.cmap, 1)
+   st.cmap{i,1} = st.cmap{i,1}(end:-1:1,:); 
+end
+setcolormap;     
+
 % | SETTERS
 % =========================================================================
 function setcontrastname
-global st
-connamh = findobj(st.fig, 'Tag', 'ContrastName'); 
-set(connamh, 'String', st.ol.descrip); 
+    global st
+    connamh = findobj(st.fig, 'Tag', 'ContrastName'); 
+    set(connamh, 'String', st.ol.descrip); 
 function setposition_axes
     global st
     %% Handles for axes
@@ -625,12 +709,13 @@ function setthresh(C, di)
     st.ol.XYZ   = st.ol.XYZ0(:,idx);
     st.ol.XYZmm = st.ol.XYZmm0(:,idx);
     st.ol.C     = C(idx); 
+    set(findobj(st.fig, 'Tag', 'maxval'), 'str', sprintf('%2.3f',max(st.ol.Z)));
     bspm_orthviews('RemoveBlobs', st.ho);
     bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
     bspm_orthviews('Register', st.registry.hReg);
     setposition_axes;
     setcontrastname;
-    if di==3, setcolormap(jet(64)); else setcolormap(hot(64)); end
+    setcolormap; 
     bspm_orthviews('Reposition');
 function [voxval, clsize] = setvoxelinfo
     global st
@@ -733,16 +818,17 @@ function [xyz, voxidx, dist] = getnearestvoxel
     
 % | COLORBAR STUFF
 % =========================================================================
-function setcolormap(newmap, interval)
+function setcolormap(varargin)
     global st
-    if nargin < 1, newmap = jet(64); end
-    if nargin < 2, interval = [st.vols{1}.blobs{1}.min st.vols{1}.blobs{1}.max]; end
+    val = get(findobj(st.fig, 'Tag', 'colormaplist'), 'Value'); 
+    newmap = st.cmap{val, 1}; 
+    interval = [st.vols{1}.blobs{1}.min st.vols{1}.blobs{1}.max]; 
     cbh = st.vols{1}.blobs{1}.cbar; 
     cmap = [gray(64); newmap];
     set(findobj(cbh, 'type', 'image'), 'CData', (65:128)', 'CdataMapping', 'direct');
     set(st.fig,'Colormap', cmap);
     bspm_orthviews('SetBlobsMax', 1, 1, max(st.ol.Z))
-    set(findobj(st.fig, 'tag', 'maxval'), 'str',  sprintf('%2.3f',max(st.ol.Z))); 
+    set(findobj(st.fig, 'tag', 'maxval'), 'str',  sprintf('%2.3f',max(st.ol.Z)));
 function addcolourbar(vh,bh)
     global st
     axpos = zeros(3, 4);
@@ -787,42 +873,45 @@ if size(cmap, 2)~=3
     cmap = [];
 end
 function redraw_colourbar(vh,bh,interval,cdata)
-global st
-axpos = zeros(3, 4);
-for a = 1:3
-    axpos(a,:) = get(st.vols{vh}.ax{a}.ax, 'position');
-end
-cbpos = axpos(3,:); 
-cbpos(4) = cbpos(4)*.9; 
-cbpos(2) = cbpos(2) + (axpos(3,4)-cbpos(4))/2; 
-cbpos(1) = sum(cbpos([1 3])); 
-cbpos(3) = (1 - cbpos(1))/2; 
-cbpos(1) = cbpos(1) + (cbpos(3)/4);
-% only scale cdata if we have out-of-range truecolour values
-if ndims(cdata)==3 && max(cdata(:))>1
-    cdata=cdata./max(cdata(:));
-end
-% yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max]; 
-yl = interval;
-if range(yl) < 1
-    yltick = [min(yl) max(yl)]; 
-else
-    yltick = [ceil(min(yl)) floor(max(yl))];
-end
-image([0 1],interval,cdata,'Parent',st.vols{vh}.blobs{bh}.cbar);
-set(st.vols{vh}.blobs{bh}.cbar, 'ycolor', st.color.fg, ...
-    'position', cbpos, 'YAxisLocation', 'right', ...
-    'ytick', yltick, ...
-    'Box','off', 'YDir','normal', 'XTickLabel',[], 'XTick',[]); 
-set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 'fontname', st.fonts.name); 
-if isfield(st.vols{vh}.blobs{bh},'name')
-    ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
-end
+    global st
+    axpos = zeros(3, 4);
+    for a = 1:3
+        axpos(a,:) = get(st.vols{vh}.ax{a}.ax, 'position');
+    end
+    cbpos = axpos(3,:); 
+    cbpos(4) = cbpos(4)*.9; 
+    cbpos(2) = cbpos(2) + (axpos(3,4)-cbpos(4))/2; 
+    cbpos(1) = sum(cbpos([1 3])); 
+    cbpos(3) = (1 - cbpos(1))/2; 
+    cbpos(1) = cbpos(1) + (cbpos(3)/4);
+    % only scale cdata if we have out-of-range truecolour values
+    if ndims(cdata)==3 && max(cdata(:))>1
+        cdata=cdata./max(cdata(:));
+    end
+    % yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max]; 
+    yl = interval;
+    if range(yl) < 1
+        yltick = [min(yl) max(yl)]; 
+    else
+        yltick = [ceil(min(yl)) floor(max(yl))];
+    end
+    image([0 1],interval,cdata,'Parent',st.vols{vh}.blobs{bh}.cbar);
+    set(st.vols{vh}.blobs{bh}.cbar, 'ycolor', st.color.fg, ...
+        'position', cbpos, 'YAxisLocation', 'right', ...
+        'ytick', yltick, ...
+        'Box','off', 'YDir','normal', 'XTickLabel',[], 'XTick',[]); 
+    set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 'fontname', st.fonts.name); 
+    if isfield(st.vols{vh}.blobs{bh},'name')
+        ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
+    end
+function out = cmap_upsample(in, N)
+    num = size(in,1);
+    ind = repmat(1:num, ceil(N/num), 1);
+    rem = numel(ind) - N; 
+    if rem, ind(end,end-rem+1:end) = NaN; end
+    ind = ind(:); ind(isnan(ind)) = [];
+    out = in(ind(:),:);
 
-
-
-
-    
 % | IMAGE MANIPULATION UTILITIES
 % =========================================================================
 function OL = load_overlay(fname, pval, k)
@@ -855,9 +944,6 @@ function OL = load_overlay(fname, pval, k)
             set(allh(strcmp(allhstr, opt{posneg})), 'Value', 0, 'Enable', 'inactive'); 
         end
     end
-
-    
-    
     %% DEGREES OF FREEDOM
     try
         tmp = oh.descrip;
@@ -1344,6 +1430,520 @@ if ~nowrite
     newname = sprintf('%s_%dx%dx%d%s',n,dim,e);
     OutHead.fname = [p filesep newname];
     spm_write_vol(OutHead,out);
+end
+function [h1 hh1] = bspm_render(im, cmapflag, medialflag, outname)
+% BSPM_RENDER Render 3D intensity map using Aaron Schultz's SurfPlot
+%
+%  USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input
+% __________________________________________________________________________
+%  INPUTS
+%	im:  image filename
+%	cmapflag: flag to include colormap (default = 1)
+%	medialflag:  flag to include medial sections (default = 1)
+%
+
+% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
+%	Created:  2014-10-07
+%	Email:    spunt@caltech.edu
+% __________________________________________________________________________
+if nargin < 1, disp('USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input'); return; end
+if nargin < 2, cmapflag = 1; end
+if nargin < 3, medialflag = 1; end
+[d, h] = bspm_read_vol(im);
+d(isnan(d)) = 0; 
+% obj.colorlims = [ceil(min(d(d>0))) floor(max(d(:)))];
+obj.colorlims = [0 floor(max(d(:)))];
+obj.medialflag = medialflag; 
+obj.input.m = d;
+obj.input.he = h; 
+obj.cmapflag = cmapflag; 
+obj.figno = 0; % Figure number for output plot
+obj.newfig = 1; 
+obj.overlaythresh = 0; 
+obj.colormap = 'hot';
+obj.direction = '+';
+obj.reverse = 0; 
+obj.background = [0 0 0];
+obj.mappingfile = [];  %%% See PreconfigureFSinfo.m for an example of how to create a mapping file.
+obj.round = 0;  % if = 1, rounds all values on the surface to nearest whole number.  Useful for masks
+obj.fsaverage = 'fsaverage';  %% Set which fsaverage to map to e.g. fsaverage, fsaverage3, fsaverage6
+obj.surface = 'inflated';          %% Set the surface: inflated, pial, or white
+obj.shading = 'sulc';          %% Set the shading information for the surface: curv, sulc, or thk
+obj.shadingrange = [.1 .7];    %% Set the min anx max greyscale values for the surface underlay (range of 0 to 1)
+obj.Nsurfs = 4;              %% Choose which hemispheres and surfaces to show:  4=L/R med/lat;  2= L/R lat; 1.9=L med/lat; 2.1 = R med/lat; -1= L lat; 1-R lat;
+ss = get(0, 'ScreenSize');
+ts = floor(ss/2);     
+switch obj.Nsurfs
+case 4
+   ts(4) = ts(4)*.90;
+case 2
+   ts(4) = ts(4)*.60;
+case 'L Lateral'
+   obj.Nsurfs = -1;
+case 1.9
+   ts(4) = ts(4)*.60;
+case 2.1
+   ts(4) = ts(4)*.60;
+otherwise
+end
+obj.position = ts; 
+
+
+
+[h1, hh1] = surfPlot4(obj);
+
+if nargin==4
+    tightfig
+    export_fig(outname, '-jpg', '-m1', '-zbuffer', gcf);
+end
+function out = threshold_image(in, thresh, extent)
+    imdims = size(in);
+    if ismember(thresh,[.10 .05 .01 .005 .001 .0005 .0001]);
+        tmp = in_hdr.descrip;
+        idx1 = regexp(tmp,'[','ONCE');
+        idx2 = regexp(tmp,']','ONCE');
+        df = str2num(tmp(idx1+1:idx2-1));
+        thresh = bob_p2t(thresh, df);
+    end
+    in(in<thresh) = NaN;
+    in(in==0)=NaN;
+%     in(in>thresh(1) & in<thresh(2)) = NaN;
+%     in(in==0) = NaN;s
+    [X Y Z] = ind2sub(size(in), find(in));
+    voxels = sortrows([X Y Z])';
+    cl_index = spm_clusters(voxels);
+    for i = 1:max(cl_index)
+        a(cl_index == i) = sum(cl_index == i);
+    end
+    which_vox = (a >= extent);
+    cluster_vox = voxels(:,which_vox);
+    cluster_vox = cluster_vox';
+    roi_mask = zeros(imdims);
+    for i = 1:size(cluster_vox,1)
+        roi_mask(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3)) = in(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3));
+    end
+    out = double(roi_mask);
+    out(out==0) = NaN;
+function [h, hh] = surfPlot4(obj)
+%%% Written by Aaron P. Schultz - aschultz@martinos.org
+%%%
+%%% Copyright (C) 2014,  Aaron P. Schultz
+%%%
+%%% Supported in part by the NIH funded Harvard Aging Brain Study (P01AG036694) and NIH R01-AG027435 
+%%%
+%%% This program is free software: you can redistribute it and/or modify
+%%% it under the terms of the GNU General Public License as published by
+%%% the Free Software Foundation, either version 3 of the License, or
+%%% any later version.
+%%% 
+%%% This program is distributed in the hope that it will be useful,
+%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%%% GNU General Public License for more details.
+%%%
+
+pth = [fileparts(which('fsaverage.mat')) filesep];
+load([pth obj.fsaverage '.mat']);
+
+switch lower(obj.surface)
+    case 'inflated'
+        lVert = T.inflated.lVert;
+        lFace = T.inflated.lFace;
+        rVert = T.inflated.rVert;
+        rFace = T.inflated.rFace;
+    case 'pial'
+        lVert = T.pial.lVert;
+        lFace = T.pial.lFace;
+        rVert = T.pial.rVert;
+        rFace = T.pial.rFace;
+    case 'white'
+        lVert = T.white.lVert;
+        lFace = T.white.lFace;
+        rVert = T.white.rVert;
+        rFace = T.white.rFace;
+    otherwise
+        error('Surface option Not Found:  Available options are inflated, pial, and white');
+end
+
+switch lower(obj.shading)
+    case 'curv'
+        lShade = -T.lCurv;
+        rShade = -T.rCurv;
+    case 'sulc'
+        %lShade = -round(T.lSulc);
+        %rShade = -round(T.rSulc);
+        lShade = -(T.lSulc);
+        rShade = -(T.rSulc);
+    case 'thk'
+        lShade = T.lThk;
+        rShade = T.rThk;
+    otherwise
+         error('Shading option Not Found:  Available options are curv, sulc, and thk');
+end
+
+if obj.newfig
+    if obj.figno>0
+        figure(obj.figno); clf;
+        set(gcf,'color',obj.background, 'position', obj.position); shg
+    else
+        figure('pos', obj.position); clf;
+        set(gcf,'color',obj.background, 'position', obj.position); shg
+        obj.figno = gcf;
+    end
+    
+    rang = obj.shadingrange;
+    
+    c = lShade;
+    c = demean(c);
+    c = c./spm_range(c);
+    c = c.*diff(rang);
+    c = c-min(c)+rang(1);
+    col1 = [c c c];
+    
+    
+    
+ if obj.Nsurfs == 4;
+        
+        subplot(2,12,1:5);
+        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
+        shading interp;
+        axis equal; axis tight; axis off;
+        view(270,0)
+        
+        subplot(2,12,13:17);
+        h(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
+        shading interp;
+        axis equal; axis tight; axis off;
+        view(90,0)
+        
+    elseif obj.Nsurfs == 2;
+        
+        subplot(1,11,1:5);
+        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
+        shading interp;
+        axis equal; axis tight; axis off;
+        view(270,0)
+        
+    elseif obj.Nsurfs == 1.9;
+        
+        subplot(1,24,1:10);
+        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
+        shading interp;
+        axis equal; axis tight; axis off;
+        view(270,0)
+        
+        subplot(1,24,13:22);
+        h(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
+        shading interp;
+        axis equal; axis tight; axis off;
+        view(90,0)
+        
+    elseif obj.Nsurfs == -1;    
+        
+        subplot(1,11,1:10);
+        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
+        shading interp;
+        axis equal; axis tight; axis off;
+        if ~obj.medialflag
+            view(270,0)
+        end
+        
+    end
+    
+    c = rShade;
+    c = demean(c);
+    c = c./spm_range(c);
+    c = c.*diff(rang);
+    c = c-min(c)+rang(1);
+    
+    col2 = [c c c];
+    
+    if obj.Nsurfs == 4;
+        
+        subplot(2,12,6:10);
+        h(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
+        shading interp;
+        axis equal; axis tight; axis off
+        view(90,0)
+        
+        subplot(2,12,18:22);
+        h(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
+        shading interp;
+        axis equal; axis tight; axis off
+        view(270,0)
+        
+    elseif obj.Nsurfs == 2;
+        
+        subplot(1,11,6:10);
+        h(2) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
+        shading interp;
+        axis equal; axis tight; axis off
+        view(90,0)
+        
+    elseif obj.Nsurfs == 2.1;
+        
+        subplot(1,24,1:10);
+        h(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
+        shading interp;
+        axis equal; axis tight; axis off
+        view(90,0)
+        
+        subplot(1,24,13:22);
+        h(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
+        shading interp;
+        axis equal; axis tight; axis off
+        view(270,0)
+        
+    elseif obj.Nsurfs == 1;
+        
+        subplot(1,11,1:10);
+        h(1) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
+        shading interp;
+        axis equal; axis tight; axis off
+        view(90,0)
+        
+    end
+        
+else
+    
+    tmp = get(obj.figno,'UserData');
+    col1 = tmp{1};
+    col2 = tmp{2};
+    h = tmp{3};
+    
+end
+
+%%%
+lMNI = T.map.lMNI;
+lv = T.map.lv;
+
+rMNI =T.map.rMNI;
+rv = T.map.rv;
+
+
+if ischar(obj.input);
+    [m he] = openIMG(obj.input);
+else
+    try
+        m = obj.input.m;
+        he = obj.input.he;
+    catch
+        he = obj.input;
+        m = spm_read_vols(he);
+    end
+end
+[x y z] = ind2sub(he.dim,(1:numel(m))');
+mat = [x y z ones(numel(z),1)];
+mni = mat*he.mat';
+mni = mni(:,1:3);
+% mni(:,1) = mni(:,1)+10;
+
+if obj.reverse==1
+    m = m*-1;
+end
+% keyboard;
+if ~isempty(obj.mappingfile);
+    load(obj.mappingfile);
+    lVoxels = MP.lVoxels;
+    rVoxels = MP.rVoxels;
+    lWeights = MP.lWeights;
+    rWeights = MP.rWeights;    
+    
+    lVals = m(lVoxels);
+    lWeights(isnan(lVals))=NaN;
+    lVals = nansum(lVals.*lWeights,2)./nansum(lWeights,2);
+    
+    rVals = m(rVoxels);
+    rWeights(isnan(rVals))=NaN;
+    rVals = nansum(rVals.*rWeights,2)./nansum(rWeights,2);
+else    
+    
+
+%     %%%%%%%%%%%%%%%%%%%%%%
+%     mloc = mloc(:,1:3);
+%     a = sum(1-abs( (mloc-round(mloc)) ),2);
+%     b = sum(1-abs( (mloc-ceil(mloc)) ),2);
+%     c = sum(1-abs( (mloc-floor(mloc)) ),2);
+%     
+%     
+%     w = [a b c];
+%     w = w./repmat(sum(w,2),1,size(w,2));
+%     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    if isfield(obj,'nearestneighbor') && obj.nearestneighbor == 1;
+        mloc = ([T.map.lMNI ones(size(T.map.lMNI,1),1)]*inv(he.mat'));
+        lVoxels = sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)));
+        lWeights = 1;
+        
+        mloc = ([T.map.rMNI ones(size(T.map.rMNI,1),1)]*inv(he.mat'));
+        rVoxels = sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)));
+        rWeights = 1;
+        
+    else
+        mloc = ([T.map.lMNI ones(size(T.map.lMNI,1),1)]*inv(he.mat'));
+        lVoxels = [sub2ind(he.dim,floor(mloc(:,1)),floor(mloc(:,2)),floor(mloc(:,3))) sub2ind(he.dim,ceil(mloc(:,1)),ceil(mloc(:,2)),ceil(mloc(:,3))) sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)))];
+        lWeights = (1/3);
+        
+        mloc = ([T.map.rMNI ones(size(T.map.rMNI,1),1)]*inv(he.mat'));
+        rVoxels = [sub2ind(he.dim,floor(mloc(:,1)),floor(mloc(:,2)),floor(mloc(:,3))) sub2ind(he.dim,ceil(mloc(:,1)),ceil(mloc(:,2)),ceil(mloc(:,3))) sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)))];
+        rWeights = (1/3);
+    end
+    lVals = nansum(m(lVoxels).*lWeights,2);
+    rVals = nansum(m(rVoxels).*rWeights,2);
+end
+
+if isfield(obj,'round') && obj.round == 1;
+    lVals = round(lVals);
+    rVals = round(rVals);
+end
+%%%
+
+% if contains('aschultz',{UserTime})
+% %     keyboard; 
+%     lVals = lVals+(lShade(T.map.lv+1)*2);
+%     rVals = rVals+(rShade(T.map.rv+1)*2);
+% end
+
+if numel(obj.overlaythresh) == 1;
+    if obj.direction == '+'
+        ind1 = find(lVals>obj.overlaythresh);
+        ind2 = find(rVals>obj.overlaythresh);
+    elseif obj.direction == '-'
+        ind1 = find(lVals<obj.overlaythresh);
+        ind2 = find(rVals<obj.overlaythresh);
+    end
+else
+    ind1 = find(lVals<=obj.overlaythresh(1) | lVals>=obj.overlaythresh(2));
+    ind2 = find(rVals<=obj.overlaythresh(1) | rVals>=obj.overlaythresh(2));
+end
+%%%
+
+
+val = max([abs(min([lVals; rVals])) abs(max([lVals; rVals]))]);
+if obj.colorlims(1) == -inf
+    obj.colorlims(1)=-val;
+end
+if obj.colorlims(2) == inf
+    obj.colorlims(2)=val;
+end
+
+
+[cols CD] = cmap(lVals(ind1), obj.colorlims, obj.colormap);
+% col1(lv(ind1)+1,:) = cols;
+% set(h(1),'FaceVertexCdata',col1);
+% set(h(2),'FaceVertexCdata',col1);
+
+col = nan(size(col1));
+col(lv(ind1)+1,:) = cols;
+if obj.Nsurfs == 4;
+    
+    subplot(2,12,1:5);
+    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
+    shading interp
+    
+    subplot(2,12,13:17);
+    hh(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
+    shading interp;
+    
+elseif obj.Nsurfs == 1.9;
+    
+    subplot(1,24,1:10);
+    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
+    shading interp
+    
+    subplot(1,24,13:22);
+    hh(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
+    shading interp;    
+    
+elseif obj.Nsurfs == 2;
+    
+    subplot(1,11,1:5);
+    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
+    shading interp
+    
+elseif obj.Nsurfs == -1;
+    
+    subplot(1,11,1:10);
+    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
+    shading interp
+    if obj.medialflag
+        view(90,0)
+    end
+    
+end
+
+
+[cols CD] = cmap(rVals(ind2), obj.colorlims ,obj.colormap);
+% col2(rv(ind2)+1,:) = cols;
+% set(h(3),'FaceVertexCdata',col2);
+% set(h(4),'FaceVertexCdata',col2);
+
+col = nan(size(col2));
+col(rv(ind2)+1,:) = cols;
+if obj.Nsurfs == 4;
+    
+    subplot(2,12,6:10);
+    hh(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
+    shading interp
+    
+    subplot(2,12,18:22);
+    hh(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
+    shading interp;
+    
+elseif obj.Nsurfs == 2.1;
+    
+    subplot(1,24,1:10);
+    hh(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
+    shading interp
+    
+    subplot(1,24,13:22);
+    hh(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
+    shading interp;    
+    
+elseif obj.Nsurfs == 2;
+    
+    subplot(1,11,6:10);
+    hh(2) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
+    shading interp
+    
+elseif obj.Nsurfs == 1;
+    
+    subplot(1,11,1:10);
+    hh(1) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
+    shading interp
+end
+
+set(gcf,'UserData',{col1 col2,h});
+
+drawnow;
+if obj.cmapflag
+if obj.Nsurfs == 4
+    subplot(2,12,[12 24])
+elseif obj.Nsurfs == 1.9 || obj.Nsurfs == 2.1;
+    subplot(1, 22, 22);
+else 
+    subplot(1,11,11);
+end
+cla
+
+mp = [];
+mp(1:256,1,1:3) = CD;
+ch = imagesc((1:256)');
+set(ch,'CData',mp)
+
+try
+[cl trash indice] = cmap(obj.overlaythresh,obj.colorlims,obj.colormap);
+catch
+    keyboard; 
+end
+
+tickmark = unique(sort([1 122 255 indice(:)']));
+ticklabel = unique(sort([obj.colorlims(1) mean(obj.colorlims) obj.colorlims(2) obj.overlaythresh])');
+tickmark = tickmark([1 end]);
+ticklabel = ticklabel([1 end]);
+% keyboard;
+set(gca,'YDir','normal','YAxisLocation','right','XTick',[],'YTick',(tickmark),'YTickLabel',(ticklabel),'fontsize',14,'YColor','w');
+shading interp
 end
 
 % | MISC UTILITIES
@@ -2288,6 +2888,7 @@ switch lower(action)
         redraw_all;
         
     case 'redraw'
+        
         redraw_all;
         callback;
         if isfield(st,'registry')
@@ -2409,6 +3010,10 @@ switch lower(action)
         
     case 'setblobsmax'
         st.vols{varargin{1}}.blobs{varargin{2}}.max = varargin{3};
+        bspm_orthviews('redraw')
+        
+    case 'setblobsmin'
+        st.vols{varargin{1}}.blobs{varargin{2}}.min = varargin{3};
         bspm_orthviews('redraw')
         
     case 'addcolouredblobs'
@@ -6753,7 +7358,7 @@ labelpos = pos(pos(:,1)==2, 3:6);
 hc = zeros(length(uilabels), 1); 
 he = gobjects(length(uilabels), 1); 
 for i = 1:length(uilabels)
-    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox'}, uistyles{i}));
+    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox', 'popup'}, uistyles{i}));
     if sum(ctag)==1
         hc(i) = uibutton(labelprop{:}, 'pos', labelpos(i,:), 'str', uilabels{i}); 
         he(i) = uicontrol(editprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:));  
@@ -7102,6 +7707,793 @@ function [ll,lf,ls]=get_deflut
 		ls=size(ll,1);
 
 		return;
+        
+% | PROPERTIES GUI
+% =========================================================================      
+function [hPropsPane,parameters] = propertiesGUI(hParent, parameters)
+% propertiesGUI displays formatted editable list of properties
+%
+% Syntax:
+%    [hPropsPane,parameters] = propertiesGUI(hParent, parameters)
+%
+% Description:
+%    propertiesGUI processes a list of data properties and displays
+%    them in a GUI table, where each parameter value has a unique
+%    associated editor.
+%
+%    propertiesGUI by itself, with no input parameters, displays a demo
+%
+%    By default, propertiesGUI identifies and processes the following
+%    field types: signed, unsigned, float, file, folder, text or string,
+%    color, IPAddress, password, date, boolean, cell-array, numeric array,
+%    font, struct and class object.
+%
+% Inputs:
+%    hParent - optional handle of a parent GUI container (figure/uipanel
+%              /uitab) in which the properties table will appear.
+%              If missing or empty or 0, the table will be shown in a
+%              new modal dialog window; otherwise it will be embedded
+%              in the parent container.
+%
+%    parameters - struct or object with data fields. The fields are
+%              processed separately to determine their corresponding cell
+%              editor. If parameters is not specified, then the global
+%              test_data will be used. If test_data is also empty, then
+%              a demo of several different data types will be used.
+%
+% Outputs:
+%    hPropsPane - handle of the properties panel widget, which can be
+%              customized to display field descriptions, toolbar, etc.
+%
+%    parameters - the resulting (possibly-updated) parameters struct.
+%              Naturally, this is only relevant in case of a modal dialog.
+%
+%    (global test_data) - this global variable is updated internally when
+%              the <OK> button is clicked. It is meant to enable easy data
+%              passing between the properties GUI and other application
+%              component. Using global vars is generally discouraged as
+%              bad programming, but it simplifies component interaction.
+%
+% Customization:
+%    This utility is meant to be used either as stand-alone, or as a
+%    template for customization. For example, you can attach a unique
+%    description to each property that will be shown in an internal
+%    sub-panel: see the customizePropertyPane() and preparePropsList()
+%    sub-functions.
+%
+%    When passing the properties in an input parameters struct, the
+%    utility automatically inspects each struct field and assigns a
+%    corresponding cell-editor with no description and a field label
+%    that reflects the field name. The properties are automatically
+%    set as modifiable (editable) and assigned a default callback
+%    function (propUpdatedCallback() sub-function).
+%    See the demoParameters() sub-function for some examples.
+%
+%    You can have specific control over each property's description,
+%    label,  editability, cell-editor and callback function. See the
+%    preparePropsList() sub-functions for some examples. You can add
+%    additional cell-editors/renderers in the newProperty() sub-function.
+%
+%    You can place specific control over the acceptable property values
+%    by entering custom code into the checkProp() sub-function.
+%
+% Future development:
+%    1. Improve the editor for time, numeric and cell arrays
+%    2. Enable more control over appearance and functionality via 
+%       propertiesGUI's input parameters
+%    3. Add additional built-in cell editors/renderers: slider, point,
+%       rectangle (=position), ...
+%
+% Example:
+%    propertiesGUI;   % displays the demo
+%
+%    params.name   = 'Yair';
+%    params.age    = uint8(41);
+%    params.folder = pwd;
+%    params.date   = now;
+%    params.size.width  = 10;
+%    params.size.height = 20;
+%    [hPropsPane, params] = propertiesGUI(params);
+%
+% Bugs and suggestions:
+%    Please send to Yair Altman (altmany at gmail dot com)
+%
+% Warning:
+%    This code heavily relies on undocumented and unsupported Matlab
+%    functionality. It works on Matlab 7+, but use at your own risk!
+%
+%    A technical description of the implementation can be found at:
+%    http://undocumentedmatlab.com/blog/propertiesGUI/
+%    http://undocumentedmatlab.com/blog/jide-property-grids/
+%    http://undocumentedmatlab.com/blog/advanced-jide-property-grids/
+%
+% Change log:
+%    2013-12-24: Fixes for R2013b & R2014a; added support for Font property
+%    2013-04-23: Handled multi-dimensional arrays
+%    2013-04-23: Fixed case of empty ([]) data, handled class objects & numeric/cell arrays, fixed error reported by Andrew Ness
+%    2013-01-26: Updated help section
+%    2012-11-07: Minor fix for file/folder properties
+%    2012-11-07: Accept any object having properties/fields as input parameter; support multi-level properties
+%    2012-10-31: First version posted on <a href="http://www.mathworks.com/matlabcentral/fileexchange/authors/27420">MathWorks File Exchange</a>
+%
+% See also:
+%    inspect, uiinspect (#17935 on the MathWorks File Exchange)
+
+% License to use and modify this code is granted freely to all interested, as long as the original author is
+% referenced and attributed as such. The original author maintains the right to be solely associated with this work.
+
+% Programmed and Copyright by Yair M. Altman: altmany(at)gmail.com
+% $Revision: 1.09 $  $Date: 2013/12/24 14:33:21 $
+
+  % Get the initial data
+  global test_data
+  if nargin < 2
+      try
+          isObj = nargin==1;
+          [hasProps,isHG] = hasProperties(hParent);
+          isObj = isObj && hasProps && ~isHG;
+      catch
+          % ignore - maybe nargin==0, so no hParent is available
+      end
+      if isObj
+          parameters = hParent;
+          hParent = [];
+      else
+          parameters = test_data;  % comment this if you do not want persistent parameters
+          if isempty(parameters)
+              % demo mode
+              parameters = demoParameters;
+          end
+      end
+  end
+
+  % Accept any object having data fields/properties
+  try
+      parameters = get(parameters);
+  catch
+      oldWarn = warning('off','MATLAB:structOnObject');
+      parameters = struct(parameters);
+      warning(oldWarn);
+  end
+  
+  % Init JIDE
+  com.mathworks.mwswing.MJUtilities.initJIDE;
+
+  % Prepare the list of properties
+  oldWarn = warning('off','MATLAB:hg:JavaSetHGProperty');
+  warning off MATLAB:hg:PossibleDeprecatedJavaSetHGProperty
+  isEditable = true; %=nargin < 1;
+  propsList = preparePropsList(parameters, isEditable);
+  
+  % Create a mapping propName => prop
+  propsHash = java.util.Hashtable;
+  propsArray = propsList.toArray();
+  for propsIdx = 1 : length(propsArray)
+      thisProp = propsArray(propsIdx);
+      propName = getPropName(thisProp);
+      propsHash.put(propName, thisProp);
+  end
+  warning(oldWarn);
+
+  % Prepare a properties table that contains the list of properties
+  model = javaObjectEDT(com.jidesoft.grid.PropertyTableModel(propsList));
+  model.expandAll();
+
+  % Prepare the properties table (grid)
+  grid = javaObjectEDT(com.jidesoft.grid.PropertyTable(model));
+  grid.setShowNonEditable(grid.SHOW_NONEDITABLE_BOTH_NAME_VALUE);
+  %set(handle(grid.getSelectionModel,'CallbackProperties'), 'ValueChangedCallback', @propSelectedCallback);
+  com.jidesoft.grid.TableUtils.autoResizeAllColumns(grid);
+  %com.jidesoft.grid.TableUtils.autoResizeAllRows(grid);
+  grid.setRowHeight(19);  % default=16; autoResizeAllRows=20 - we need something in between
+
+  % Auto-end editing upon focus loss
+  grid.putClientProperty('terminateEditOnFocusLost',true);
+
+  % If no parent (or the root) was specified
+  if nargin < 1 || isempty(hParent) || isequal(hParent,0)
+      % Create a new figure window
+      delete(findall(0, '-depth',1, 'Tag','fpropertiesGUI'));
+      hFig = figure('Number','off', 'Name','Application properties', 'Units','pixel', 'Pos',[300,200,500,500], 'Menu','none', 'Toolbar','none', 'Tag','fpropertiesGUI', 'Visible','off');
+      hParent = hFig;
+      setappdata(0,'isParamsGUIApproved',false)
+
+      % Add the bottom action buttons
+      btOK     = uicontrol('String','OK',     'Units','pixel', 'Pos',[ 50,5,60,30], 'Tag','btOK',     'Callback',@btOK_Callback);
+      btCancel = uicontrol('String','Cancel', 'Units','pixel', 'Pos',[150,5,60,30], 'Tag','btCancel', 'Callback',@(h,e)close(hFig)); %#ok<NASGU>
+
+      % Check the property values to determine whether the <OK> button should be enabled or not
+      checkProps(propsList, btOK, true);
+  
+      % Set the figure icon & make visible
+      jFrame = get(handle(hFig),'JavaFrame');
+      icon = javax.swing.ImageIcon(fullfile(matlabroot, '/toolbox/matlab/icons/tool_legend.gif'));
+      jFrame.setFigureIcon(icon);
+      set(hFig, 'WindowStyle','modal', 'Visible','on');
+      
+      % Set the component's position
+      %pos = [5,40,490,440];
+      hFigPos = getpixelposition(hFig);
+      pos = [5,40,hFigPos(3)-10,hFigPos(4)-50];
+  else
+      % Set the component's position
+      drawnow;
+      pos = getpixelposition(hParent);
+      pos(1:2) = 5;
+      pos = pos - [0,0,10,10];
+      hFig = [];
+  end
+
+  %drawnow; pause(0.05);
+  pane = javaObjectEDT(com.jidesoft.grid.PropertyPane(grid));
+  customizePropertyPane(pane);
+  [jPropsPane, hPropsPane_] = javacomponent(pane, pos, hParent);
+  setappdata(hParent, 'jPropsPane',jPropsPane);
+  setappdata(hParent, 'propsList',propsList);
+  setappdata(hParent, 'propsHash',propsHash);
+  setappdata(hParent, 'mirror',parameters);
+  set(hPropsPane_,'tag','hpropertiesGUI');
+
+  set(hPropsPane_, 'Units','norm');
+
+  % Align the background colors
+  bgcolor = pane.getBackground.getComponents([]);
+  try set(hParent, 'Color', bgcolor(1:3)); catch, end  % this fails in uitabs - never mind (works ok in stand-alone figures)
+  try pane.setBorderColor(pane.getBackground); catch, end  % error reported by Andrew Ness
+  
+  % If a new figure was created, make it modal and wait for user to close it
+  if ~isempty(hFig)
+      uiwait(hFig);
+      if getappdata(0,'isParamsGUIApproved')
+          parameters = test_data; %=getappdata(hFig, 'mirror');
+      end
+  end
+  
+  if nargout, hPropsPane = hPropsPane_; end  % prevent unintentional printouts to the command window
+function [hasProps,isHG] = hasProperties(object)
+    % A bunch of tests, some of which may croak depending on the Matlab release, platform
+    try isHG  = ishghandle(object); catch, isHG  = ishandle(object);  end
+    try isst  = isstruct(object);   catch, isst  = false; end
+    try isjav = isjava(object);     catch, isjav = false; end
+    try isobj = isobject(object);   catch, isobj = false; end
+    try isco  = iscom(object);      catch, isco  = false; end
+    hasProps = ~isempty(object) && (isst || isjav || isobj || isco);
+function customizePropertyPane(pane)
+  pane.setShowDescription(false);  % YMA: we don't currently have textual descriptions of the parameters, so no use showing an empty box that just takes up GUI space...
+  pane.setShowToolBar(false);
+  pane.setOrder(2);  % uncategorized, unsorted - see http://undocumentedmatlab.com/blog/advanced-jide-property-grids/#comment-42057
+function parameters = demoParameters
+    parameters.floating_point_property = pi;
+    parameters.signed_integer_property = int16(12);
+    parameters.unsigned_integer_property = uint16(12);
+    parameters.flag_property = true;
+    parameters.file_property = mfilename('fullpath');
+    parameters.folder_property = pwd;
+    parameters.text_property = 'Sample text';
+    parameters.fixed_choice_property = {'Yes','No','Maybe'};
+    parameters.editable_choice_property = {'Yes','No','Maybe',''};  % editable if the last cell element is ''
+    parameters.date_property = java.util.Date;  % today's date
+    parameters.another_date_property = now-365;  % last year
+    parameters.time_property = datestr(now,'HH:MM:SS');
+    parameters.password_property = '*****';
+    parameters.IP_address_property = '10.20.30.40';
+    parameters.my_category.width = 4;
+    parameters.my_category.height = 3;
+    parameters.my_category.and_a_subcategory.is_OK = true;
+    parameters.numeric_array_property = [11,12,13,14];
+    parameters.cell_array_property  = {1,magic(3),'text',-4};
+    parameters.color_property = [0.4,0.5,0.6];
+    parameters.another_color_property = java.awt.Color.red;
+    parameters.font_property = java.awt.Font('Arial', java.awt.Font.BOLD, 12);
+    try parameters.class_object_property = matlab.desktop.editor.getActive; catch, end
+function propsList = preparePropsList(parameters, isEditable)
+  propsList = java.util.ArrayList();
+
+  % Convert a class object into a struct
+  if isobject(parameters)
+      parameters = struct(parameters);
+  end
+
+  % Check for an array of inputs (currently unsupported)
+  %if numel(parameters) > 1,  error('YMA:propertiesGUI:ArrayParameters','Non-scalar inputs are currently unsupported');  end
+
+  % Prepare a dynamic list of properties, based on the struct fields
+  if isstruct(parameters) && ~isempty(parameters)
+      %allParameters = parameters(:);  % convert ND array => 3D array
+      allParameters = reshape(parameters, size(parameters,1),size(parameters,2),[]);
+      numParameters = numel(allParameters);
+      if numParameters > 1
+          for zIdx = 1 : size(allParameters,3)
+              for colIdx = 1 : size(allParameters,2)
+                  for rowIdx = 1 : size(allParameters,1)
+                      parameters = allParameters(rowIdx,colIdx,zIdx);
+                      field_name = '';
+                      field_label = sprintf('(%d,%d,%d)',rowIdx,colIdx,zIdx);
+                      field_label = regexprep(field_label,',1\)',')');  % remove 3D if unnecesary
+                      newProp = newProperty(parameters, field_name, field_label, isEditable, '', '', @propUpdatedCallback);
+                      propsList.add(newProp);
+                  end
+              end
+          end
+      else
+          % Dynamically (generically) inspect all the fields and assign corresponding props
+          field_names = fieldnames(parameters);
+          for field_idx = 1 : length(field_names)
+              field_name = field_names{field_idx};
+              value = parameters.(field_name);
+              field_label = strrep(field_name,'_',' ');
+              field_label(1) = upper(field_label(1));
+              %if numParameters > 1,  field_label = [field_label '(' num2str(parametersIdx) ')'];  end
+              field_description = '';  % TODO
+              type = 'string';
+              if isempty(value)
+                  type = 'string';  % not really needed, but for consistency
+              elseif isa(value,'java.awt.Color')
+                  type = 'color';
+              elseif isa(value,'java.awt.Font')
+                  type = 'font';
+              elseif isnumeric(value)
+                  try %if length(value)==3
+                      colorComponents = num2cell(value);
+                      if numel(colorComponents) ~= 3
+                          error(' ');  % bail out if definitely not a color
+                      end
+                      try
+                          value = java.awt.Color(colorComponents{:});  % value between 0-1
+                      catch
+                          colorComponents = num2cell(value/255);
+                          value = java.awt.Color(colorComponents{:});  % value between 0-255
+                      end
+                      type = 'color';
+                  catch %else
+                      if numel(value)==1
+                          %value = value(1);
+                          if value > now-3650 && value < now+3650
+                              type = 'date';
+                              value = java.util.Date(datestr(value));
+                          elseif isa(value,'uint') || isa(value,'uint8') || isa(value,'uint16') || isa(value,'uint32') || isa(value,'uint64')
+                              type = 'unsigned';
+                          elseif isinteger(value)
+                              type = 'signed';
+                          else
+                              type = 'float';
+                          end
+                      else
+                          value = num2str(value);
+                          if size(value,1) > size(value,2)
+                              value = value';
+                          end
+                          if size(squeeze(value),2) > 1
+                              % Convert multi-row string into a single-row string
+                              value = [value'; repmat(' ',1,size(value,1))];
+                              value = value(:)';
+                          end
+                          value = strtrim(regexprep(value,' +',' '));
+                          if length(value) > 50
+                              value(51:end) = '';
+                              value = [value '...']; %#ok<AGROW>
+                          end
+                          value = ['[ ' value ' ]']; %#ok<AGROW>
+                      end
+                  end
+              elseif islogical(value)
+                  type = 'boolean';
+              elseif ischar(value)
+                  if exist(value,'dir')
+                      type = 'folder';
+                      value = java.io.File(value);
+                  elseif exist(value,'file')
+                      type = 'file';
+                      value = java.io.File(value);
+                  elseif value(1)=='*'
+                      type = 'password';
+                  elseif sum(value=='.')==3
+                      type = 'IPAddress';
+                  else
+                      type = 'string';
+                      if length(value) > 50
+                          value(51:end) = '';
+                          value = [value '...']; %#ok<AGROW>
+                      end
+                  end
+              elseif iscellstr(value)
+                  type = value;  % editable if the last cell element is ''
+              elseif isa(value,'java.util.Date')
+                  type = 'date';
+              elseif isa(value,'java.io.File')
+                  if value.isFile
+                      type = 'file';
+                  else  % value.isDirectory
+                      type = 'folder';
+                  end
+              elseif iscell(value)
+                  value = strtrim(regexprep(evalc('disp(value)'),' +',' '));
+                  value = ['{ ' value ' }']; %#ok<AGROW>
+              elseif isobject(value)
+                  oldWarn = warning('off','MATLAB:structOnObject');
+                  value = struct(value);
+                  warning(oldWarn);
+              elseif ~isstruct(value)
+                  value = strtrim(regexprep(evalc('disp(value)'),' +',' '));
+              end
+              parameters.(field_name) = value;  % possibly updated above
+              newProp = newProperty(parameters, field_name, field_label, isEditable, type, field_description, @propUpdatedCallback);
+              propsList.add(newProp);
+          end
+      end
+  else
+      % You can also use direct assignments, instead of the generic code above. For example:
+      % (Possible property types: signed, unsigned, float, file, folder, text or string, color, IPAddress, password, date, boolean, cell-array of strings)
+      propsList.add(newProperty(parameters, 'flag_prop_name',   'Flag value:',     isEditable, 'boolean',            'Turn this on if you want to make extra plots', @propUpdatedCallback));
+      propsList.add(newProperty(parameters, 'float_prop_name',  'Boolean prop',    isEditable, 'float',              'description 123...',   @propUpdatedCallback));
+      propsList.add(newProperty(parameters, 'string_prop_name', 'My text msg:',    isEditable, 'string',             'Yaba daba doo',        @propUpdatedCallback));
+      propsList.add(newProperty(parameters, 'int_prop_name',    'Now an integer',  isEditable, 'unsigned',           '123 456...',           @propUpdatedCallback));
+      propsList.add(newProperty(parameters, 'choice_prop_name', 'And a drop-down', isEditable, {'Yes','No','Maybe'}, 'no description here!', @propUpdatedCallback));
+  end
+function prop = newProperty(dataStruct, propName, label, isEditable, dataType, description, propUpdatedCallback)
+
+  % Auto-generate the label from the property name, if the label was not specified
+  if isempty(label)
+      label = strrep(propName,'_',' ');
+      label(1) = upper(label(1));
+  end
+
+  % Create a new property with the chosen label
+  prop = javaObjectEDT(com.jidesoft.grid.DefaultProperty);  % UNDOCUMENTED internal MATLAB component
+  prop.setName(label);
+  
+  % Set the property to the current patient's data value
+  try
+      thisProp = dataStruct.(propName);
+  catch
+      thisProp = dataStruct;
+  end
+  origProp = thisProp;
+  if isstruct(thisProp)  %hasProperties(thisProp)
+      % Accept any object having data fields/properties
+      try
+          thisProp = get(thisProp);
+      catch
+          oldWarn = warning('off','MATLAB:structOnObject');
+          thisProp = struct(thisProp);
+          warning(oldWarn);
+      end
+
+      % Parse the children props and add them to this property
+      %summary = regexprep(evalc('disp(thisProp)'),' +',' ');
+      %prop.setValue(summary);  % TODO: display summary dynamically
+      if numel(thisProp) < 2
+          prop.setValue('');
+      else
+          sz = size(thisProp);
+          szStr = regexprep(num2str(sz),' +','x');
+          prop.setValue(['[' szStr ' struct array]']);
+      end
+      prop.setEditable(false);
+      children = toArray(preparePropsList(thisProp, isEditable));
+      for childIdx = 1 : length(children)
+          prop.addChild(children(childIdx));
+      end
+  else
+      prop.setValue(thisProp);
+      prop.setEditable(isEditable);
+  end
+
+  % Set property editor, renderer and alignment
+  if iscell(dataType)
+      % treat this as drop-down values
+      cbIsEditable = true;
+      if isempty(dataType{end})  % ends with '' - editable
+          dataType(end) = [];  % remove from the drop-down list
+      else  % standard drop-down, non-editable
+          cbIsEditable = false;
+      end
+      editor = com.jidesoft.grid.ListComboBoxCellEditor(dataType);
+      try editor.getComboBox.setEditable(cbIsEditable); catch, end % #ok<NOCOM>
+      %set(editor,'EditingStoppedCallback',{@propUpdatedCallback,tagName,propName});
+      alignProp(prop, editor);
+      try prop.setValue(origProp{1}); catch, end
+  else
+      switch lower(dataType)
+          case 'signed',    %alignProp(prop, com.jidesoft.grid.IntegerCellEditor,    'int32');
+                            model = javax.swing.SpinnerNumberModel(prop.getValue, -intmax, intmax, 1);
+                            editor = com.jidesoft.grid.SpinnerCellEditor(model);
+                            alignProp(prop, editor, 'int32');
+          case 'unsigned',  %alignProp(prop, com.jidesoft.grid.IntegerCellEditor,    'uint32');
+                            val = max(0, min(prop.getValue, intmax));
+                            model = javax.swing.SpinnerNumberModel(val, 0, intmax, 1);
+                            editor = com.jidesoft.grid.SpinnerCellEditor(model);
+                            alignProp(prop, editor, 'uint32');
+          case 'float',     alignProp(prop, com.jidesoft.grid.CalculatorCellEditor, 'double');  % DoubleCellEditor
+          case 'boolean',   alignProp(prop, com.jidesoft.grid.BooleanCheckBoxCellEditor, 'logical');
+          case 'folder',    alignProp(prop, com.jidesoft.grid.FolderCellEditor);
+          case 'file',      alignProp(prop, com.jidesoft.grid.FileCellEditor);
+          case 'ipaddress', alignProp(prop, com.jidesoft.grid.IPAddressCellEditor);
+          case 'password',  alignProp(prop, com.jidesoft.grid.PasswordCellEditor);
+          case 'color',     alignProp(prop, com.jidesoft.grid.ColorCellEditor);
+          case 'font',      alignProp(prop, com.jidesoft.grid.FontCellEditor);
+          case 'text',      alignProp(prop);
+          case 'time',      alignProp(prop);  % maybe use com.jidesoft.grid.FormattedTextFieldCellEditor ?
+
+          case 'date',      dateModel = com.jidesoft.combobox.DefaultDateModel;
+                            dateFormat = java.text.SimpleDateFormat('dd/MM/yyyy');
+                            dateModel.setDateFormat(dateFormat);
+                            editor = com.jidesoft.grid.DateCellEditor(dateModel, 1);
+                            alignProp(prop, editor, 'java.util.Date');
+                            try
+                                prop.setValue(dateFormat.parse(prop.getValue));  % convert string => Date
+                            catch
+                                % ignore
+                            end
+
+          otherwise,        alignProp(prop);  % treat as a simple text field
+      end
+  end  % for all possible data types
+
+  prop.setDescription(description);
+  if ~isempty(description)
+      renderer = com.jidesoft.grid.CellRendererManager.getRenderer(prop.getType, prop.getEditorContext);
+      renderer.setToolTipText(description);
+  end
+
+  % Set the property's editability state
+  if prop.isEditable
+      % Set the property's label to be black
+      prop.setDisplayName(['<html><font size="4" color="black">' label]);
+
+      % Add callbacks for property-change events
+      hprop = handle(prop, 'CallbackProperties');
+      set(hprop,'PropertyChangeCallback',{propUpdatedCallback,propName});
+  else
+      % Set the property's label to be gray
+      prop.setDisplayName(['<html><font size="4" color="gray">' label]);
+  end
+  
+  setPropName(prop,propName);
+function setPropName(hProp,propName)
+    try
+        set(hProp,'UserData',propName)
+    catch
+        %setappdata(hProp,'UserData',propName)
+        hp = schema.prop(handle(hProp),'UserData','mxArray'); %#ok<NASGU>
+        set(handle(hProp),'UserData',propName)
+    end
+function propName = getPropName(hProp)
+    try
+        propName = get(hProp,'UserData');
+    catch
+        %propName = char(getappdata(hProp,'UserData'));
+        propName = get(handle(hProp),'UserData');
+    end
+function alignProp(prop, editor, propTypeStr, direction)
+  if nargin < 2 || isempty(editor),      editor = com.jidesoft.grid.StringCellEditor;  end  %(javaclass('char',1));
+  if nargin < 3 || isempty(propTypeStr), propTypeStr = 'cellstr';  end  % => javaclass('char',1)
+  if nargin < 4 || isempty(direction),   direction = javax.swing.SwingConstants.RIGHT;  end
+
+  % Set this property's data type
+  propType = javaclass(propTypeStr);
+  prop.setType(propType);
+
+  % Prepare a specific context object for this property
+  if strcmpi(propTypeStr,'logical')
+      %TODO - FIXME
+      context = editor.CONTEXT;
+      prop.setEditorContext(context);
+      %renderer = CheckBoxRenderer;
+      %renderer.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+      %com.jidesoft.grid.CellRendererManager.registerRenderer(propType, renderer, context);
+  else
+      context = com.jidesoft.grid.EditorContext(prop.getName);
+      prop.setEditorContext(context);
+
+      % Register a unique cell renderer so that each property can be modified seperately
+      %renderer = com.jidesoft.grid.CellRendererManager.getRenderer(propType, prop.getEditorContext);
+      renderer = com.jidesoft.grid.ContextSensitiveCellRenderer;
+      com.jidesoft.grid.CellRendererManager.registerRenderer(propType, renderer, context);
+      renderer.setBackground(java.awt.Color.white);
+      renderer.setHorizontalAlignment(direction);
+      %renderer.setHorizontalTextPosition(direction);
+  end
+
+  % Update the property's cell editor
+  try editor.setHorizontalAlignment(direction); catch, end
+  try editor.getTextField.setHorizontalAlignment(direction); catch, end
+  try editor.getComboBox.setHorizontalAlignment(direction); catch, end
+  
+  % Set limits on unsigned int values
+  try
+      if strcmpi(propTypeStr,'uint32')
+          %pause(0.01);
+          editor.setMinInclusive(java.lang.Integer(0));
+          editor.setMinExclusive(java.lang.Integer(-1));
+          editor.setMaxExclusive(java.lang.Integer(intmax));
+          editor.setMaxInclusive(java.lang.Integer(intmax));
+      end
+  catch
+      % ignore
+  end
+  com.jidesoft.grid.CellEditorManager.registerEditor(propType, editor, context);
+function propUpdatedCallback(prop, eventData, propName)
+  try if strcmpi(char(eventData.getPropertyName),'parent'),  return;  end;  catch, end
+  hFig = findall(0, '-depth',1, 'Tag','fpropertiesGUI');
+  if isempty(hFig)
+      hPropsPane = findall(0,'Tag','hpropertiesGUI');
+      if isempty(hPropsPane),  return;  end
+      hFig = get(hPropsPane,'Parent');
+  end
+  if isempty(hFig),  return;  end
+  propsList = getappdata(hFig, 'propsList');
+  propsPane = getappdata(hFig, 'jPropsPane');
+  data = getappdata(hFig, 'mirror');
+
+  % Get the updated property value
+  propValue = get(prop,'Value');
+  if isjava(propValue)
+      if isa(propValue,'java.util.Date')
+          sdf = java.text.SimpleDateFormat('MM-dd-yyyy');
+          propValue = datenum(sdf.format(propValue).char);  %#ok<NASGU>
+      elseif isa(propValue,'java.awt.Color')
+          propValue = propValue.getColorComponents([])';  %#ok<NASGU>
+      else
+          propValue = char(propValue);  %#ok<NASGU>
+      end
+  end
+
+  % Get the actual recursive propName
+  try
+      oldWarn = warning('off','MATLAB:hg:JavaSetHGProperty');
+      try prop = java(prop); catch, end
+      while isa(prop,'com.jidesoft.grid.Property')
+          prop = get(prop,'Parent');
+          newName = getPropName(prop);
+          if isempty(newName), break; end
+          propName = [newName '.' propName]; %#ok<AGROW>
+      end
+  catch
+      % Reached the top of the property's heirarchy - bail out
+      warning(oldWarn);
+  end
+  
+  % Update the mirror with the updated field value
+  %data.(propName) = propValue;  % croaks on multiple sub-fields
+  eval(['data.' propName ' = propValue;']);
+
+  % Update the local mirror
+  setappdata(hFig, 'mirror',data);
+  
+  % Update the display
+  checkProps(propsList, hFig);
+  try propsPane.repaint; catch; end
+function btOK_Callback(btOK, eventData) %#ok<INUSD>
+  global test_data
+
+  % Store the current data-info struct mirror in the global struct
+  hFig = ancestor(btOK, 'figure');
+  test_data = getappdata(hFig, 'mirror');
+  setappdata(0,'isParamsGUIApproved',true);
+
+  % Close the window
+  try
+      close(hFig);
+  catch
+      delete(hFig);  % force-close
+  end
+function checkProps(propsList, hContainer, isInit)
+    if nargin < 3,  isInit = false;  end
+    okEnabled = 'on';
+    try propsArray = propsList.toArray(); catch, return; end
+    for propsIdx = 1 : length(propsArray)
+        isOk = checkProp(propsArray(propsIdx));
+        if ~isOk || isInit,  okEnabled = 'off';  end
+    end
+    
+    % Update the <OK> button's editability state accordingly
+    btOK = findall(hContainer, 'Tag','btOK');
+    set(btOK, 'Enable',okEnabled);
+    drawnow; pause(0.01);
+function isOk = checkProp(prop)
+  isOk = true;
+  oldWarn = warning('off','MATLAB:hg:JavaSetHGProperty');
+  warning off MATLAB:hg:PossibleDeprecatedJavaSetHGProperty
+  propName = getPropName(prop);
+  renderer = com.jidesoft.grid.CellRendererManager.getRenderer(get(prop,'Type'), get(prop,'EditorContext'));
+  warning(oldWarn);
+  mandatoryFields = {};  % TODO - add the mandatory field-names here
+  if any(strcmpi(propName, mandatoryFields)) && isempty(get(prop,'Value'))
+      propColor = java.awt.Color.yellow;
+      isOk = false;
+  elseif ~prop.isEditable
+      %propColor = java.awt.Color.gray;
+      propColor = renderer.getBackground();
+  else
+      propColor = java.awt.Color.white;
+  end
+  renderer.setBackground(propColor);
+function jclass = javaclass(mtype, ndims)
+    % Input arguments:
+    % mtype:
+    %    the MatLab name of the type for which to return the java.lang.Class
+    %    instance
+    % ndims:
+    %    the number of dimensions of the MatLab data type
+    %
+    % See also: class
+    
+    % Copyright 2009-2010 Levente Hunyadi
+    % Downloaded from: http://www.UndocumentedMatlab.com/files/javaclass.m
+    
+    validateattributes(mtype, {'char'}, {'nonempty','row'});
+    if nargin < 2
+        ndims = 0;
+    else
+        validateattributes(ndims, {'numeric'}, {'nonnegative','integer','scalar'});
+    end
+    
+    if ndims == 1 && strcmp(mtype, 'char');  % a character vector converts into a string
+        jclassname = 'java.lang.String';
+    elseif ndims > 0
+        jclassname = javaarrayclass(mtype, ndims);
+    else
+        % The static property .class applied to a Java type returns a string in
+        % MatLab rather than an instance of java.lang.Class. For this reason,
+        % use a string and java.lang.Class.forName to instantiate a
+        % java.lang.Class object; the syntax java.lang.Boolean.class will not do so
+        switch mtype
+            case 'logical'  % logical vaule (true or false)
+                jclassname = 'java.lang.Boolean';
+            case 'char'  % a singe character
+                jclassname = 'java.lang.Character';
+            case {'int8','uint8'}  % 8-bit signed and unsigned integer
+                jclassname = 'java.lang.Byte';
+            case {'int16','uint16'}  % 16-bit signed and unsigned integer
+                jclassname = 'java.lang.Short';
+            case {'int32','uint32'}  % 32-bit signed and unsigned integer
+                jclassname = 'java.lang.Integer';
+            case {'int64','uint64'}  % 64-bit signed and unsigned integer
+                jclassname = 'java.lang.Long';
+            case 'single'  % single-precision floating-point number
+                jclassname = 'java.lang.Float';
+            case 'double'  % double-precision floating-point number
+                jclassname = 'java.lang.Double';
+            case 'cellstr'  % a single cell or a character array
+                jclassname = 'java.lang.String';
+            otherwise
+                jclassname = mtype;
+                %error('java:javaclass:InvalidArgumentValue', ...
+                %    'MatLab type "%s" is not recognized or supported in Java.', mtype);
+        end
+    end
+    % Note: When querying a java.lang.Class object by name with the method
+    % jclass = java.lang.Class.forName(jclassname);
+    % MatLab generates an error. For the Class.forName method to work, MatLab
+    % requires class loader to be specified explicitly.
+    jclass = java.lang.Class.forName(jclassname, true, java.lang.Thread.currentThread().getContextClassLoader());
+function jclassname = javaarrayclass(mtype, ndims)
+    switch mtype
+        case 'logical'  % logical array of true and false values
+            jclassid = 'Z';
+        case 'char'  % character array
+            jclassid = 'C';
+        case {'int8','uint8'}  % 8-bit signed and unsigned integer array
+            jclassid = 'B';
+        case {'int16','uint16'}  % 16-bit signed and unsigned integer array
+            jclassid = 'S';
+        case {'int32','uint32'}  % 32-bit signed and unsigned integer array
+            jclassid = 'I';
+        case {'int64','uint64'}  % 64-bit signed and unsigned integer array
+            jclassid = 'J';
+        case 'single'  % single-precision floating-point number array
+            jclassid = 'F';
+        case 'double'  % double-precision floating-point number array
+            jclassid = 'D';
+        case 'cellstr'  % cell array of strings
+            jclassid = 'Ljava.lang.String;';
+        otherwise
+            jclassid = ['L' mtype ';'];
+            %error('java:javaclass:InvalidArgumentValue', ...
+            %    'MatLab type "%s" is not recognized or supported in Java.', mtype);
+    end
+    jclassname = [repmat('[',1,ndims), jclassid];
 
 
     
