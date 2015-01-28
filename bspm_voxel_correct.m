@@ -102,15 +102,3 @@ end
 
 %% get threshold
 u = spm_uc(alpha,df,STAT,R,n,S); 
-
-
-
-
-
-
-
-
- 
- 
- 
- 
