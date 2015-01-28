@@ -27,7 +27,6 @@ function bspm_save_rois(in, thresh, roi, name)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
 if nargin<3, error('USAGE: bspm_save_rois(in, thresh, roi, name)'); end
 if iscell(in), in = char(in); end
 if nargin<4, [p, name] = fileparts(in); name = upper(regexprep(name,' ','_')); end

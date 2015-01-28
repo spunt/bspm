@@ -81,7 +81,7 @@ try
     'DefaultUicontrolFontName',fonts.name,...
     'DefaultUicontrolFontSize',fonts.sz3,...
     'DefaultUicontrolInterruptible','on',...
-    'Visible','on',...
+    'Visible','off',...
     'Toolbar','none');
     set(S.hFig, 'ResizeFcn', @cb_resizegui); 
     uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
@@ -126,21 +126,21 @@ st.cmap     = default_colormaps(64);
 st.vols     = cell(24,1);
 st.ol       = load_overlay(ol, .001, 5);
 bspm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
+
 st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
 bspm_orthviews('MaxBB');
 bspm_orthviews('Register', S.hReg);
 setposition_axes; 
 setxhaircolor;
 put_figmenu; 
-put_axesxyz; 
-put_axesmenu;
 put_upperpane;
 put_lowerpane;
+put_axesxyz; 
+put_axesmenu;
 setthresh(st.ol.C0(3,:), find(strcmpi({'positive', 'negative', 'both'}, st.direct))); 
 setvoxelinfo;
 setcolormap; 
 default_preferences(1); 
-refresh(st.fig); 
 if nargout==1, S.handles = gethandles; end
 catch lasterr
     rethrow(lasterr)
@@ -202,6 +202,7 @@ function prop   = default_properties(varargin)
     prop.darkbg     = {'backg', st.color.bg, 'foreg', st.color.fg};
     prop.lightbg    = {'backg', st.color.fg, 'foreg', [0 0 0]};
     if ~isempty(varargin), prop.darkbg = [varargin{:} prop.darkbg]; prop.lightbg = [varargin{:} prop.lightbg]; end
+%     prop.panel      = [prop.darkbg {'bordertype', 'line', 'titlepos', 'centertop', 'fontw', 'bold'}];
     prop.panel      = [prop.darkbg {'bordertype', 'none', 'titlepos', 'centertop', 'fontw', 'bold'}]; 
     prop.edit       = [prop.lightbg {'style', 'edit', 'horiz', 'center'}];
     prop.text       = [prop.darkbg {'style', 'text', 'horiz', 'center'}]; 
@@ -280,13 +281,19 @@ function put_upperpane(varargin)
 function put_lowerpane(varargin)
 
     global st
+    % | UNITS
+    figpos  = get(st.fig, 'pos')
+    axpos   = get(st.figax, 'pos')
+    figw    = figpos(3);
+    axw     = axpos(3); 
 
-    % | Create the total panel
+    % | PANEL
+    [h,subaxpos] = gethandles_axes;
+    lowpos = subaxpos(1,:);
+    lowpos(1) = subaxpos(3, 1) + .01; 
+    lowpos(3) = 1 - lowpos(1); 
+    
     prop = default_properties('units', 'norm', 'fontn', 'arial', 'fonts', 19);  
-    [h,axpos] = gethandles_axes;
-    lowpos = axpos(1,:);
-    lowpos(1) = axpos(3, 1); 
-    lowpos(3) = 1 - lowpos(1) - axpos(1,2);
     panelh = uipanel('parent', st.figax, prop.panel{:}, 'pos',lowpos, 'tag', 'lowerpanel');
 
     % | Create each subpanel 
@@ -303,6 +310,7 @@ function put_lowerpane(varargin)
     for i = 1:length(panename)
         ph{i} = buipanel(panelh, panelabel{i}{1}, panelabel{i}{2}, relwidth{i}, 'paneltitle', panename{i}, 'panelposition', panepos(i,:), 'tag', tag{i}); 
     end
+    
 
     % | Check valid directions for contrast display
     allh    = findobj(st.fig, 'Tag', 'direct');
@@ -315,7 +323,9 @@ function put_lowerpane(varargin)
     else
         set(allh(strcmpi(allhstr, 'Both')), 'value', 1, 'enable', 'inactive'); 
     end
-
+    
+    allh    = findobj(st.fig, 'Tag', 'text');
+    
     % | Set some values
     arrayset(ph{3}.edit(1:4), 'Callback', @cb_updateoverlay); 
     arrayset(ph{1}.edit(2:4), 'Callback', @cb_directmenu);
@@ -326,7 +336,7 @@ function put_lowerpane(varargin)
     set(ph{2}.edit(3), 'callback', @cb_maxval);
     set(ph{2}.edit(2), 'String', st.cmap(:,2), 'Value', 1, 'callback', @setcolormap);
     Tdefvalues  = [st.ol.K st.ol.U st.ol.P st.ol.DF];
-    Tstrform    = {'%d' '%2.3f' '%d' '%d'}; 
+    Tstrform = {'%d' '%2.2f' '%2.4f' '%d'}; 
     for i = 1:length(Tdefvalues), set(ph{3}.edit(i), 'str', sprintf(Tstrform{i}, Tdefvalues(i))); end
     set(ph{3}.edit(1), 'units', 'pixels'); 
     ptmp = get(ph{3}.edit(1), 'pos'); 
@@ -358,21 +368,19 @@ function put_figmenu
     S.save              = uimenu(st.fig,'Label','Save');
     S.saveintensity     = uimenu(S.save,'Label','Save as intensity image','CallBack', @cb_saveimg);
     S.savemask          = uimenu(S.save,'Label','Save as mask', 'Separator', 'on', 'CallBack', @cb_saveimg);
+    S.saveroi           = uimenu(S.save,'Label','Save ROI at current location', 'Separator', 'on', 'CallBack', @cb_saveroi);
     %% Options Menu
     S.options   = uimenu(st.fig,'Label','Options');
     S.crosshair = uimenu(S.options,'Label','Show Crosshairs','Checked', 'on', 'CallBack', @cb_crosshair);
-    S.reversemap = uimenu(S.options,'Label','Reverse Color Map','Checked', 'off', 'CallBack', @cb_reversemap);
+    S.reversemap = uimenu(S.options,'Label','Reverse Color Map','Separator', 'on', 'Checked', 'off', 'CallBack', @cb_reversemap);
 function put_axesmenu
-    [h,axpos] = gethandles_axes;
-    cmenu = uicontextmenu;
-    ctmax   = uimenu(cmenu, 'Label', 'Go to global max', 'callback', @cb_minmax, 'separator', 'on');
-%     ctmin   = uimenu(cmenu, 'Label', 'Go to global min', 'callback', @cb_minmax);
+    [h,axpos]   = gethandles_axes;
+    cmenu       = uicontextmenu;
+    ctmax       = uimenu(cmenu, 'Label', 'Go to global max', 'callback', @cb_minmax, 'separator', 'off');
     ctclustmax  = uimenu(cmenu, 'Label', 'Go to cluster max', 'callback', @cb_clustminmax);
-%     ctclustmin  = uimenu(cmenu, 'Label', 'Go to cluster min', 'callback', @cb_clustminmax);
-%     ctsavemap   = uimenu(cmenu, 'Label', 'Save as intensity image', 'callback', @cb_saveimg, 'separator', 'on');
-%     ctsavemask  = uimenu(cmenu, 'Label', 'Save as mask image', 'callback', @cb_saveimg);
     ctsavemap   = uimenu(cmenu, 'Label', 'Save cluster', 'callback', @cb_saveclust, 'separator', 'on');
     ctsavemask  = uimenu(cmenu, 'Label', 'Save cluster (binary mask)', 'callback', @cb_saveclust);
+    ctsaveroi   = uimenu(cmenu, 'Label', 'Save ROI at Coordinates', 'callback', @cb_saveroi);
     ctsavergb   = uimenu(cmenu, 'Label', 'Save Screen Capture', 'callback', @cb_savergb, 'separator', 'on');
     ctxhair     = uimenu(cmenu, 'Label', 'Toggle Crosshairs', 'checked', 'on', 'callback', @cb_crosshair, 'separator', 'on'); 
     for a = 1:3
@@ -588,6 +596,53 @@ function cb_saveclust(varargin)
     outhdr.fname = fn; 
     spm_write_vol(outhdr, outimg);
     fprintf('\nCluster image saved to %s\n', fn);     
+function cb_saveroi(varargin)
+    global st
+    [roi, button] = settingsdlg(...  
+    'title'                     ,   'ROI Parameters', ...
+    {'Intersect ROI with Overlay?'; 'intersectflag'}    ,  true, ...
+    {'Shape'; 'shape'}          ,   {'Sphere' 'Box'}, ...
+    {'Size (mm)'; 'size'}       ,   12);
+    if strcmpi(button, 'cancel'), return; end
+    [mm, voxidx] = bspm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm0);
+    refhdr = st.ol.hdr; 
+    roihdr = refhdr;
+    roihdr.pinfo = [1;0;0];
+    roipath = pwd;
+    [R,C,P]  = ndgrid(1:refhdr.dim(1),1:refhdr.dim(2),1:refhdr.dim(3));
+    RCP      = [R(:)';C(:)';P(:)'];
+    clear R C P
+    RCP(4,:)    = 1;
+    XYZmm       = refhdr.mat(1:3,:)*RCP;   
+    Q           = ones(1,size(XYZmm,2));
+    cROI        = zeros(roihdr.dim);
+    switch roi.shape
+        case 'Sphere'
+            j = find(sum((XYZmm - mm*Q).^2) <= roi.size^2);
+        case 'Box'
+            j      = find(all(abs(XYZmm - mm*Q) <= [roi.size roi.size roi.size]'*Q/2));
+    end
+    cROI(j) = 1;
+    if roi.intersectflag
+        T   = getthresh; 
+        di  = strcmpi({'positive' 'negative' 'both'}, T.direct);
+        clidx = st.ol.C0IDX(di,:);
+        clidx = clidx==(clidx(voxidx)); 
+        opt = [1 -1 1]; 
+        img = st.ol.Y*opt(di);
+        img(clidx==0) = 0;
+        cROI = double(cROI & img); 
+    end
+    cHDR            = roihdr;
+    cHDR.descrip    = sprintf('ROI - x=%d, y=%d, z=%d - %s %d', mm, roi.shape, roi.size); 
+    [p,n]   = fileparts(cHDR.fname); 
+    deffn   = sprintf('%s/ROI_x=%d_y=%d_z=%d_%dvoxels_%s%d.nii', p, mm, sum(cROI(:)), roi.shape, roi.size);  
+    putmsg  = 'Save ROI as'; 
+    fn      = uiputvol(deffn, putmsg);
+    if isempty(fn), disp('User cancelled.'); return; end
+    cHDR.fname = fn; 
+    spm_write_vol(cHDR,cROI);
+    fprintf('\nROI image saved to %s\n', fn);     
 function cb_savergb(varargin)
     %% Handles for axes
     % 1 - transverse
@@ -720,7 +775,7 @@ function setthreshinfo(T)
     global st
     Tval = [T.extent T.thresh T.pval T.df]; 
     Tstr = {'Extent' 'Thresh' 'P-Value' 'DF'};
-    Tstrform = {'%d' '%2.3f' '%d' '%d'}; 
+    Tstrform = {'%d' '%2.2f' '%2.4f' '%d'}; 
     for i = 1:length(Tstr)
         set(findobj(st.fig, 'Tag', Tstr{i}), 'String', sprintf(Tstrform{i}, Tval(i)));
     end
@@ -1349,113 +1404,6 @@ else % SPM
 end
 %% get threshold
 u = spm_uc(alpha,df,STAT,R,n,S); 
-function success = bob_spm_save_rois_cluster(in, heightThresh, sizeThresh, mask)
-% BOB_SPM_SAVE_CLUSTER
-%
-% USAGE: success = bob_spm_save_rois_cluster(in, heightThresh, sizeThresh, mask)
-%
-%   INPUTS
-%       in:             image filename (full path if not in current dir)
-%       heightThresh:   intensity threshold for defining clusters
-%       sizeThresh:     extent threshold for defining clusters
-%       mask:           optional mask filename (full path if not in 
-%                       current directory)
-%
-%   OUTPUTS
-%       success:        returns a 0 if no clusters could be identified
-%                       after thresholding, 1 otherwise
-%       
-% ========================================================================%
-if nargin<3, disp('USAGE: success = bob_spm_save_rois_cluster(in, heightThresh, sizeThresh, mask)'); return; end
-if nargin<4, mask = []; end
-    
-% make sure image names are character arrays
-% ------------------------------------------------------
-if iscell(in), in = char(in); end;
-maskflag = 1;
-if isempty(mask) || length(mask)<1, maskflag = 0; mask = 'no mask';
-elseif iscell(mask), mask = char(mask); end;
-
-% write current images to command window
-% ------------------------------------------------------
-bob_display_message('Looking for Cluster');
-fprintf('\nSource Image: %s\nMask Image: %s\nnHeight Threshold: %d\nSizeThreshold: %d\n', in, mask, heightThresh, sizeThresh);
-
-% load images
-% ------------------------------------------------------
-in_hdr = spm_vol(in);
-in = spm_read_vols(in_hdr);
-imdims = size(in);
-% if necessary, calculate critical t
-if ismember(heightThresh,[.10 .05 .01 .005 .001 .0005 .0001]);
-    tmp = in_hdr.descrip;
-    idx1 = regexp(tmp,'[','ONCE');
-    idx2 = regexp(tmp,']','ONCE');
-    df = str2num(tmp(idx1+1:idx2-1));
-    heightThresh = bob_p2t(heightThresh, df);
-end
-if maskflag
-    mask = bob_reslice(mask,in_hdr.fname,1,1);
-else
-    mask = in>0;
-end
-
-
-% apply mask and height threshold
-% ------------------------------------------------------
-in(mask==0) = NaN;
-in(in<heightThresh) = NaN;
-
-% grab voxels
-% ------------------------------------------------------
-[X Y Z] = ind2sub(size(in), find(in > 0));
-voxels = sortrows([X Y Z])';
-
-% get cluster indices of voxels
-% ------------------------------------------------------
-cl_index = spm_clusters(voxels);
-if isempty(cl_index)
-	disp('No clusters found.')
-    success = 0;
-	return
-end
-
-% find index of voxels of sufficient size
-% ------------------------------------------------------
-cidx = unique(cl_index);
-count = 0;
-base_roi = zeros(imdims);
-for i = cidx
-    cluster_vox = voxels(:,cl_index==cidx(i));
-    cluster_vox = cluster_vox';
-    if length(cluster_vox)>=sizeThresh
-        count = count + 1;
-        cc = base_roi;
-        for ii = 1:size(cluster_vox,1)
-            cc(cluster_vox(ii,1),cluster_vox(ii,2),cluster_vox(ii,3)) = 1;
-        end
-        all_roi(:,:,:,count) = cc;
-        all_size(count) = size(cluster_vox,1);
-    end
-end
-if count==0
-	disp('No clusters meet extent threshold.')
-    success = 0;
-	return
-end
-all_roi = double(all_roi);
-
-% write the roi as an image
-% ------------------------------------------------------
-for i = 1:size(all_roi,4)
-    roi_hdr = in_hdr;
-    path = fileparts(in_hdr.fname);
-    fulloutname = [path filesep 'ROI_Cluster' num2str(i) '_k=' num2str(all_size(i)) '.nii'];
-    roi_hdr.fname = fulloutname;
-    spm_write_vol(roi_hdr, all_roi(:,:,:,i));
-    fprintf('\nROI of %d voxels written to:\n%s\n', all_size(i), [path filesep fulloutname]);
-end
-success = 1;
 function [out, outmat] = bob_reslice(in, ref, int, nowrite)
 % BOB_RESLICE 
 %
@@ -1518,520 +1466,6 @@ if ~nowrite
     newname = sprintf('%s_%dx%dx%d%s',n,dim,e);
     OutHead.fname = [p filesep newname];
     spm_write_vol(OutHead,out);
-end
-function [h1 hh1] = bspm_render(im, cmapflag, medialflag, outname)
-% BSPM_RENDER Render 3D intensity map using Aaron Schultz's SurfPlot
-%
-%  USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input
-% __________________________________________________________________________
-%  INPUTS
-%	im:  image filename
-%	cmapflag: flag to include colormap (default = 1)
-%	medialflag:  flag to include medial sections (default = 1)
-%
-
-% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
-%	Created:  2014-10-07
-%	Email:    spunt@caltech.edu
-% __________________________________________________________________________
-if nargin < 1, disp('USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input'); return; end
-if nargin < 2, cmapflag = 1; end
-if nargin < 3, medialflag = 1; end
-[d, h] = bspm_read_vol(im);
-d(isnan(d)) = 0; 
-% obj.colorlims = [ceil(min(d(d>0))) floor(max(d(:)))];
-obj.colorlims = [0 floor(max(d(:)))];
-obj.medialflag = medialflag; 
-obj.input.m = d;
-obj.input.he = h; 
-obj.cmapflag = cmapflag; 
-obj.figno = 0; % Figure number for output plot
-obj.newfig = 1; 
-obj.overlaythresh = 0; 
-obj.colormap = 'hot';
-obj.direction = '+';
-obj.reverse = 0; 
-obj.background = [0 0 0];
-obj.mappingfile = [];  %%% See PreconfigureFSinfo.m for an example of how to create a mapping file.
-obj.round = 0;  % if = 1, rounds all values on the surface to nearest whole number.  Useful for masks
-obj.fsaverage = 'fsaverage';  %% Set which fsaverage to map to e.g. fsaverage, fsaverage3, fsaverage6
-obj.surface = 'inflated';          %% Set the surface: inflated, pial, or white
-obj.shading = 'sulc';          %% Set the shading information for the surface: curv, sulc, or thk
-obj.shadingrange = [.1 .7];    %% Set the min anx max greyscale values for the surface underlay (range of 0 to 1)
-obj.Nsurfs = 4;              %% Choose which hemispheres and surfaces to show:  4=L/R med/lat;  2= L/R lat; 1.9=L med/lat; 2.1 = R med/lat; -1= L lat; 1-R lat;
-ss = get(0, 'ScreenSize');
-ts = floor(ss/2);     
-switch obj.Nsurfs
-case 4
-   ts(4) = ts(4)*.90;
-case 2
-   ts(4) = ts(4)*.60;
-case 'L Lateral'
-   obj.Nsurfs = -1;
-case 1.9
-   ts(4) = ts(4)*.60;
-case 2.1
-   ts(4) = ts(4)*.60;
-otherwise
-end
-obj.position = ts; 
-
-
-
-[h1, hh1] = surfPlot4(obj);
-
-if nargin==4
-    tightfig
-    export_fig(outname, '-jpg', '-m1', '-zbuffer', gcf);
-end
-function out = threshold_image(in, thresh, extent)
-    imdims = size(in);
-    if ismember(thresh,[.10 .05 .01 .005 .001 .0005 .0001]);
-        tmp = in_hdr.descrip;
-        idx1 = regexp(tmp,'[','ONCE');
-        idx2 = regexp(tmp,']','ONCE');
-        df = str2num(tmp(idx1+1:idx2-1));
-        thresh = bob_p2t(thresh, df);
-    end
-    in(in<thresh) = NaN;
-    in(in==0)=NaN;
-%     in(in>thresh(1) & in<thresh(2)) = NaN;
-%     in(in==0) = NaN;s
-    [X Y Z] = ind2sub(size(in), find(in));
-    voxels = sortrows([X Y Z])';
-    cl_index = spm_clusters(voxels);
-    for i = 1:max(cl_index)
-        a(cl_index == i) = sum(cl_index == i);
-    end
-    which_vox = (a >= extent);
-    cluster_vox = voxels(:,which_vox);
-    cluster_vox = cluster_vox';
-    roi_mask = zeros(imdims);
-    for i = 1:size(cluster_vox,1)
-        roi_mask(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3)) = in(cluster_vox(i,1),cluster_vox(i,2),cluster_vox(i,3));
-    end
-    out = double(roi_mask);
-    out(out==0) = NaN;
-function [h, hh] = surfPlot4(obj)
-%%% Written by Aaron P. Schultz - aschultz@martinos.org
-%%%
-%%% Copyright (C) 2014,  Aaron P. Schultz
-%%%
-%%% Supported in part by the NIH funded Harvard Aging Brain Study (P01AG036694) and NIH R01-AG027435 
-%%%
-%%% This program is free software: you can redistribute it and/or modify
-%%% it under the terms of the GNU General Public License as published by
-%%% the Free Software Foundation, either version 3 of the License, or
-%%% any later version.
-%%% 
-%%% This program is distributed in the hope that it will be useful,
-%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%%% GNU General Public License for more details.
-%%%
-
-pth = [fileparts(which('fsaverage.mat')) filesep];
-load([pth obj.fsaverage '.mat']);
-
-switch lower(obj.surface)
-    case 'inflated'
-        lVert = T.inflated.lVert;
-        lFace = T.inflated.lFace;
-        rVert = T.inflated.rVert;
-        rFace = T.inflated.rFace;
-    case 'pial'
-        lVert = T.pial.lVert;
-        lFace = T.pial.lFace;
-        rVert = T.pial.rVert;
-        rFace = T.pial.rFace;
-    case 'white'
-        lVert = T.white.lVert;
-        lFace = T.white.lFace;
-        rVert = T.white.rVert;
-        rFace = T.white.rFace;
-    otherwise
-        error('Surface option Not Found:  Available options are inflated, pial, and white');
-end
-
-switch lower(obj.shading)
-    case 'curv'
-        lShade = -T.lCurv;
-        rShade = -T.rCurv;
-    case 'sulc'
-        %lShade = -round(T.lSulc);
-        %rShade = -round(T.rSulc);
-        lShade = -(T.lSulc);
-        rShade = -(T.rSulc);
-    case 'thk'
-        lShade = T.lThk;
-        rShade = T.rThk;
-    otherwise
-         error('Shading option Not Found:  Available options are curv, sulc, and thk');
-end
-
-if obj.newfig
-    if obj.figno>0
-        figure(obj.figno); clf;
-        set(gcf,'color',obj.background, 'position', obj.position); shg
-    else
-        figure('pos', obj.position); clf;
-        set(gcf,'color',obj.background, 'position', obj.position); shg
-        obj.figno = gcf;
-    end
-    
-    rang = obj.shadingrange;
-    
-    c = lShade;
-    c = demean(c);
-    c = c./spm_range(c);
-    c = c.*diff(rang);
-    c = c-min(c)+rang(1);
-    col1 = [c c c];
-    
-    
-    
- if obj.Nsurfs == 4;
-        
-        subplot(2,12,1:5);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(270,0)
-        
-        subplot(2,12,13:17);
-        h(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(90,0)
-        
-    elseif obj.Nsurfs == 2;
-        
-        subplot(1,11,1:5);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(270,0)
-        
-    elseif obj.Nsurfs == 1.9;
-        
-        subplot(1,24,1:10);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(270,0)
-        
-        subplot(1,24,13:22);
-        h(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(90,0)
-        
-    elseif obj.Nsurfs == -1;    
-        
-        subplot(1,11,1:10);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        if ~obj.medialflag
-            view(270,0)
-        end
-        
-    end
-    
-    c = rShade;
-    c = demean(c);
-    c = c./spm_range(c);
-    c = c.*diff(rang);
-    c = c-min(c)+rang(1);
-    
-    col2 = [c c c];
-    
-    if obj.Nsurfs == 4;
-        
-        subplot(2,12,6:10);
-        h(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-        subplot(2,12,18:22);
-        h(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(270,0)
-        
-    elseif obj.Nsurfs == 2;
-        
-        subplot(1,11,6:10);
-        h(2) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-    elseif obj.Nsurfs == 2.1;
-        
-        subplot(1,24,1:10);
-        h(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-        subplot(1,24,13:22);
-        h(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(270,0)
-        
-    elseif obj.Nsurfs == 1;
-        
-        subplot(1,11,1:10);
-        h(1) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-    end
-        
-else
-    
-    tmp = get(obj.figno,'UserData');
-    col1 = tmp{1};
-    col2 = tmp{2};
-    h = tmp{3};
-    
-end
-
-%%%
-lMNI = T.map.lMNI;
-lv = T.map.lv;
-
-rMNI =T.map.rMNI;
-rv = T.map.rv;
-
-
-if ischar(obj.input);
-    [m he] = openIMG(obj.input);
-else
-    try
-        m = obj.input.m;
-        he = obj.input.he;
-    catch
-        he = obj.input;
-        m = spm_read_vols(he);
-    end
-end
-[x y z] = ind2sub(he.dim,(1:numel(m))');
-mat = [x y z ones(numel(z),1)];
-mni = mat*he.mat';
-mni = mni(:,1:3);
-% mni(:,1) = mni(:,1)+10;
-
-if obj.reverse==1
-    m = m*-1;
-end
-% keyboard;
-if ~isempty(obj.mappingfile);
-    load(obj.mappingfile);
-    lVoxels = MP.lVoxels;
-    rVoxels = MP.rVoxels;
-    lWeights = MP.lWeights;
-    rWeights = MP.rWeights;    
-    
-    lVals = m(lVoxels);
-    lWeights(isnan(lVals))=NaN;
-    lVals = nansum(lVals.*lWeights,2)./nansum(lWeights,2);
-    
-    rVals = m(rVoxels);
-    rWeights(isnan(rVals))=NaN;
-    rVals = nansum(rVals.*rWeights,2)./nansum(rWeights,2);
-else    
-    
-
-%     %%%%%%%%%%%%%%%%%%%%%%
-%     mloc = mloc(:,1:3);
-%     a = sum(1-abs( (mloc-round(mloc)) ),2);
-%     b = sum(1-abs( (mloc-ceil(mloc)) ),2);
-%     c = sum(1-abs( (mloc-floor(mloc)) ),2);
-%     
-%     
-%     w = [a b c];
-%     w = w./repmat(sum(w,2),1,size(w,2));
-%     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    if isfield(obj,'nearestneighbor') && obj.nearestneighbor == 1;
-        mloc = ([T.map.lMNI ones(size(T.map.lMNI,1),1)]*inv(he.mat'));
-        lVoxels = sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)));
-        lWeights = 1;
-        
-        mloc = ([T.map.rMNI ones(size(T.map.rMNI,1),1)]*inv(he.mat'));
-        rVoxels = sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)));
-        rWeights = 1;
-        
-    else
-        mloc = ([T.map.lMNI ones(size(T.map.lMNI,1),1)]*inv(he.mat'));
-        lVoxels = [sub2ind(he.dim,floor(mloc(:,1)),floor(mloc(:,2)),floor(mloc(:,3))) sub2ind(he.dim,ceil(mloc(:,1)),ceil(mloc(:,2)),ceil(mloc(:,3))) sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)))];
-        lWeights = (1/3);
-        
-        mloc = ([T.map.rMNI ones(size(T.map.rMNI,1),1)]*inv(he.mat'));
-        rVoxels = [sub2ind(he.dim,floor(mloc(:,1)),floor(mloc(:,2)),floor(mloc(:,3))) sub2ind(he.dim,ceil(mloc(:,1)),ceil(mloc(:,2)),ceil(mloc(:,3))) sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)))];
-        rWeights = (1/3);
-    end
-    lVals = nansum(m(lVoxels).*lWeights,2);
-    rVals = nansum(m(rVoxels).*rWeights,2);
-end
-
-if isfield(obj,'round') && obj.round == 1;
-    lVals = round(lVals);
-    rVals = round(rVals);
-end
-%%%
-
-% if contains('aschultz',{UserTime})
-% %     keyboard; 
-%     lVals = lVals+(lShade(T.map.lv+1)*2);
-%     rVals = rVals+(rShade(T.map.rv+1)*2);
-% end
-
-if numel(obj.overlaythresh) == 1;
-    if obj.direction == '+'
-        ind1 = find(lVals>obj.overlaythresh);
-        ind2 = find(rVals>obj.overlaythresh);
-    elseif obj.direction == '-'
-        ind1 = find(lVals<obj.overlaythresh);
-        ind2 = find(rVals<obj.overlaythresh);
-    end
-else
-    ind1 = find(lVals<=obj.overlaythresh(1) | lVals>=obj.overlaythresh(2));
-    ind2 = find(rVals<=obj.overlaythresh(1) | rVals>=obj.overlaythresh(2));
-end
-%%%
-
-
-val = max([abs(min([lVals; rVals])) abs(max([lVals; rVals]))]);
-if obj.colorlims(1) == -inf
-    obj.colorlims(1)=-val;
-end
-if obj.colorlims(2) == inf
-    obj.colorlims(2)=val;
-end
-
-
-[cols CD] = cmap(lVals(ind1), obj.colorlims, obj.colormap);
-% col1(lv(ind1)+1,:) = cols;
-% set(h(1),'FaceVertexCdata',col1);
-% set(h(2),'FaceVertexCdata',col1);
-
-col = nan(size(col1));
-col(lv(ind1)+1,:) = cols;
-if obj.Nsurfs == 4;
-    
-    subplot(2,12,1:5);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(2,12,13:17);
-    hh(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp;
-    
-elseif obj.Nsurfs == 1.9;
-    
-    subplot(1,24,1:10);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(1,24,13:22);
-    hh(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp;    
-    
-elseif obj.Nsurfs == 2;
-    
-    subplot(1,11,1:5);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    
-elseif obj.Nsurfs == -1;
-    
-    subplot(1,11,1:10);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    if obj.medialflag
-        view(90,0)
-    end
-    
-end
-
-
-[cols CD] = cmap(rVals(ind2), obj.colorlims ,obj.colormap);
-% col2(rv(ind2)+1,:) = cols;
-% set(h(3),'FaceVertexCdata',col2);
-% set(h(4),'FaceVertexCdata',col2);
-
-col = nan(size(col2));
-col(rv(ind2)+1,:) = cols;
-if obj.Nsurfs == 4;
-    
-    subplot(2,12,6:10);
-    hh(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(2,12,18:22);
-    hh(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp;
-    
-elseif obj.Nsurfs == 2.1;
-    
-    subplot(1,24,1:10);
-    hh(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(1,24,13:22);
-    hh(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp;    
-    
-elseif obj.Nsurfs == 2;
-    
-    subplot(1,11,6:10);
-    hh(2) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-elseif obj.Nsurfs == 1;
-    
-    subplot(1,11,1:10);
-    hh(1) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-end
-
-set(gcf,'UserData',{col1 col2,h});
-
-drawnow;
-if obj.cmapflag
-if obj.Nsurfs == 4
-    subplot(2,12,[12 24])
-elseif obj.Nsurfs == 1.9 || obj.Nsurfs == 2.1;
-    subplot(1, 22, 22);
-else 
-    subplot(1,11,11);
-end
-cla
-
-mp = [];
-mp(1:256,1,1:3) = CD;
-ch = imagesc((1:256)');
-set(ch,'CData',mp)
-
-try
-[cl trash indice] = cmap(obj.overlaythresh,obj.colorlims,obj.colormap);
-catch
-    keyboard; 
-end
-
-tickmark = unique(sort([1 122 255 indice(:)']));
-ticklabel = unique(sort([obj.colorlims(1) mean(obj.colorlims) obj.colorlims(2) obj.overlaythresh])');
-tickmark = tickmark([1 end]);
-ticklabel = ticklabel([1 end]);
-% keyboard;
-set(gca,'YDir','normal','YAxisLocation','right','XTick',[],'YTick',(tickmark),'YTickLabel',(ticklabel),'fontsize',14,'YColor','w');
-shading interp
 end
 
 % | MISC UTILITIES
@@ -2133,6 +1567,27 @@ handles(3) = uicontrol('parent', handles(1), 'units', 'norm', 'style', 'push', '
 if wait4resp, uiwait(handles(1)); end
 function cb_ok(varargin)
 delete(varargin{3}); % Bye-bye figure
+function out = num2pval(in, ndec)
+% NUM2PVAL Convert numeric array of p-values to formatted cell array of p-values
+%
+%  USAGE: out = num2pval(in, ndec)
+% __________________________________________________________________________
+%  INPUTS
+%	in: numeric array of p-values
+%   ndec: number of decimal points to display
+%
+
+% ---------------------- Copyright (C) 2015 Bob Spunt ----------------------
+%	Created:  2015-01-13
+%	Email:    spunt@caltech.edu
+% __________________________________________________________________________
+if nargin < 2, ndec = 3; end
+if nargin < 1, disp('USAGE: out = num2pval(in)'); return; end
+if ~isnumeric(in), error('Input array must be numeric!'); end
+out = num2cell(in); 
+out = cellfun(@num2str, out, repmat({['%2.' num2str(ndec) 'f']}, size(out)), 'Unif', false); 
+out = regexprep(out, '0\.', '\.');
+out(cellfun(@str2double, out)==0) = {['<.' repmat('0', 1, ndec-1) '1']};
 function fitpath(hndl, str)
 %FITPATH Fit a long path string inside a uicontrol by shortening with '...'
 %
@@ -2184,6 +1639,182 @@ while diff(ext([1 3])) > diff(pos([1 3])) && i <= length(ind)
    ext = get(hndl, 'extent');
    i = i + 1;
 end
+function outname = bspm_coords2roi(xyz,roi,labels)
+
+    refhdr = spm_vol(ref);
+    roihdr = refhdr;
+    roihdr.pinfo = [1;0;0];
+    roipath = pwd;
+    [R,C,P]  = ndgrid(1:refhdr.dim(1),1:refhdr.dim(2),1:refhdr.dim(3));
+    RCP      = [R(:)';C(:)';P(:)'];
+    clear R C P
+    RCP(4,:) = 1;
+    XYZmm    = refhdr.mat(1:3,:)*RCP;   
+    Q          = ones(1,size(XYZmm,2));
+    nroi = size(xyz,1);
+    for i = 1:nroi
+
+        mm = xyz(i,:)';
+        cROI = zeros(roihdr.dim);
+        cHDR = roihdr;
+        roidescrip = ['ROI_' roi.shape num2str(roi.size) '_' num2str(round(xyz(i,1))) '_' num2str(round(xyz(i,2))) '_' num2str(round(xyz(i,3))) '_' labels{i}];
+        cHDR.fname = [roipath filesep roidescrip '.nii'];
+        cHDR.descrip = roidescrip;
+        switch roi.shape
+            case 'Sphere'
+            j = find(sum((XYZmm - mm*Q).^2) <= roi.size^2);
+            case 'Box'
+            j      = find(all(abs(XYZmm - mm*Q) <= [roi.size roi.size roi.size]'*Q/2));
+        end
+        cROI(j) = 1;
+        outname = cHDR.fname; 
+        spm_write_vol(cHDR,cROI);
+        fprintf('ROI file created: %s\n', [roidescrip '.nii']);
+
+    end
+function bspm_save_rois(in, thresh, roi, name)
+% BSPM_SAVE_ROIS
+%
+%   USAGE: bspm_save_rois(in, thresh, roi, name)
+%
+%   ARGUMENTS
+%
+%       in = reference image
+%
+%       thresh.cluster = [intensity extent];
+%       thresh.peak = [intensity extent];
+%       thresh.separation = minimum peak separation
+%
+%       roi.shape = 'Sphere' or 'Box'
+%       roi.size = radius of ROI
+%
+%       name = append to file (default = name of input filename)
+%       
+% Created April 8, 2013 - Bob Spunt
+% Uses code authored by:
+% Dr. Robert Welsh (SimpleROIBuilder.m)
+% Drs. Donald McLaren & Aaron Schultz (peak_nii.m)
+
+% --------------------- Copyright (C) 2014 ---------------------
+%	Author: Bob Spunt
+%	Affilitation: Caltech
+%	Email: spunt@caltech.edu
+%
+%	$Revision Date: Aug_20_2014
+if nargin<3, error('USAGE: bspm_save_rois(in, thresh, roi, name)'); end
+if iscell(in), in = char(in); end
+if nargin<4, [p, name] = fileparts(in); name = upper(regexprep(name,' ','_')); end
+
+% pull out fields
+refimage = in;
+
+% get peak information from peak_nii
+% ------------------------------------------------------
+% default structure input to peak_nii
+peaknii.thresh = thresh.peak(1);
+peaknii.cluster = thresh.peak(2);
+peaknii.out = '';
+peaknii.sign = 'pos';
+peaknii.type = 'T';
+peaknii.voxlimit = [];
+peaknii.separation = thresh.separation;
+peaknii.SPM = 1;
+peaknii.conn = [];
+peaknii.mask = [];
+peaknii.df1 = [];
+peaknii.df2 = [];
+peaknii.nearest = 1;
+peaknii.label = 'aal_MNI_V4';
+
+% run peak_nii
+[voxels] = peak_nii(refimage,peaknii);
+
+% get names and coordinates of peaks
+names = voxels{2};
+names = regexprep(names,',','');
+names = regexprep(names,' ','_');
+roi_coords = voxels{1};
+roi_coords = roi_coords(:,3:5);
+
+
+% load reference image and threshold
+% ------------------------------------------------------
+P_HDR = spm_vol(refimage);
+refMASK = bspm_threshold_image(refimage,thresh.cluster(1),thresh.cluster(2),1);
+
+% create empty image and header for ROIs
+% ------------------------------------------------------
+maskIMG = zeros(P_HDR.dim(1:3));
+maskHDR = P_HDR;
+maskHDR.dim = [P_HDR.dim];     % Make it uint8 since it is binary.
+maskHDR.pinfo = [1;0;0];
+maskHDR.mat = P_HDR.mat;
+roiINFO = {};
+nROIS = length(names);
+
+for iROI = 1:nROIS
+    roiINFO{iROI}.center_mm = roi_coords(iROI,:)';
+    tmp = inv(P_HDR.mat)*([roiINFO{iROI}.center_mm; 1]);
+    roiINFO{iROI}.center_vox = tmp(1:3);
+    roiINFO{iROI}.type = roi.shape;
+    roiINFO{iROI}.size = roi.size;
+end
+
+% build an array of coordinates for each and every voxel in the mask
+xOrds = (1:P_HDR.dim(1))'*ones(1,P_HDR.dim(2));
+yOrds = ones(P_HDR.dim(1),1)*(1:P_HDR.dim(2));
+xOrds = xOrds(:)';
+yOrds = yOrds(:)';
+Coords = zeros(3,prod(P_HDR.dim(1:3)));
+for iZ = 1:P_HDR.dim(3)
+    zOrds = iZ*ones(1,length(xOrds));
+    Coords(:,(iZ-1)*length(xOrds)+1:iZ*length(xOrds)) = [xOrds; yOrds; zOrds];
+end
+
+% Now put them into mm's
+mmCoords = P_HDR.mat*[Coords;ones(1,size(Coords,2))];
+mmCoords = mmCoords(1:3,:);
+boxBIT = zeros(4,size(mmCoords,2));
+
+% Now loop on the ROI definitions and drop them
+% into the mask image volume matrix.
+[refpath, refname, refext] = fileparts(maskHDR.fname);
+if isempty(refpath), refpath = pwd; end
+
+for iROI = 1:nROIS
+    % Found the center of this ROI in voxels
+    % and then build it.
+    cx = roiINFO{iROI}.center_mm(1);
+    cy = roiINFO{iROI}.center_mm(2);
+    cz = roiINFO{iROI}.center_mm(3);
+    xs = mmCoords(1,:) - roiINFO{iROI}.center_mm(1);
+    ys = mmCoords(2,:) - roiINFO{iROI}.center_mm(2);
+    zs = mmCoords(3,:) - roiINFO{iROI}.center_mm(3);
+    cROI = zeros(size(maskIMG));
+    cHDR = maskHDR;
+    switch lower(roiINFO{iROI}.type)
+        case 'sphere'
+            radii = sqrt(xs.^2+ys.^2+zs.^2);
+            VOXIdx = find(radii<=roiINFO{iROI}.size);
+        case 'box'
+            xsIDX = find(abs(xs)<=roiINFO{iROI}.size(1));
+            ysIDX = find(abs(ys)<=roiINFO{iROI}.size(1));
+            zsIDX = find(abs(zs)<=roiINFO{iROI}.size(1));
+            boxBIT  = 0*boxBIT;
+            boxBIT(1,xsIDX) = 1;
+            boxBIT(2,ysIDX) = 1;
+            boxBIT(3,zsIDX) = 1;
+            boxBIT(4,:) = boxBIT(1,:).*boxBIT(2,:).*boxBIT(3,:);
+            VOXIdx = find(boxBIT(4,:));
+    end
+    cROI(VOXIdx) = 1;
+    cROI = cROI.*refMASK; % intersect with thresholded image
+    csize = sum(cROI(:));
+    cHDR.fname = [refpath filesep 'ROI_' name '_' names{iROI} '_' num2str(cx) '_' num2str(cy) '_' num2str(cz) '_k='  ... 
+        num2str(csize) '_' upper(roi.shape) num2str(roi.size) '_SEP' num2str(thresh.separation) '.nii'];
+    spm_write_vol(cHDR,cROI);
+end
+
 
 % | MAXIMUM INTENSITY PROJECTION (MIP; FROM SPM8)
 % =========================================================================
@@ -5174,6 +4805,7 @@ case 'initreg'      % Initialise registry in handle h
 % [hReg,xyz] = bspm_XYZreg('InitReg',hReg,M,D,xyz)
 if nargin<5, xyz=[0;0;0]; else, xyz=varargin{5}; end
 if nargin<4, error('Insufficient arguments'), end
+
 D    = varargin{4};
 M    = varargin{3};
 hReg = varargin{2};
@@ -6412,15 +6044,18 @@ defaults = easydefaults(...
             'panelfontweight',  'bold', ...
             'labelfontweight',  'bold', ...
             'relheight',        [6 7], ...
-            'marginsep',        .050, ...
-            'uicontrolsep',     .025);
+            'marginsep',        .01, ...
+            'uicontrolsep',     .01);
 if nargin==0, mfile_showhelp; disp(defaults); return; end
 
 % | UNITS
 unit0 = get(parent, 'units'); 
         
 % | PANEL
-P           = uipanel(parent, 'units', 'norm', 'pos', panelposition, 'title', paneltitle, ...
+set(parent, 'units', 'pixels')
+pp          = get(parent, 'pos'); 
+pp          = [pp(3:4) pp(3:4)]; 
+P           = uipanel(parent, 'units', 'pix', 'pos', panelposition.*pp, 'title', paneltitle, ...
             'backg', panelbackcolor, 'foreg', panelforecolor, 'fontsize', panelfontsize, ...
             'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
 labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight}; 
@@ -6428,6 +6063,7 @@ editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname
 propadd     = {'tag'};
 
 % | UICONTROLS
+
 pos         = getpositions(relwidth, relheight, marginsep, uicontrolsep);
 editpos     = pos(pos(:,1)==1,3:6); 
 labelpos    = pos(pos(:,1)==2, 3:6); 
@@ -6458,6 +6094,7 @@ end
 h.panel = P;
 h.label = hc; 
 h.edit  = he;  
+
 set(parent, 'units', unit0);
 function pos = getpositions(relwidth, relheight, marginsep, uicontrolsep)
     if nargin<2, relheight = [6 7]; end
