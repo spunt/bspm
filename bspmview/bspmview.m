@@ -288,12 +288,15 @@ function preferences = default_preferences(initial)
 % =========================================================================
 function put_upperpane(varargin)
     global st
-    cnamepos = [.01 .01 .98 .90]; 
+    cnamepos = [.01 .01 .98 .98]; 
     prop = default_properties('units', 'pixels', 'fontu', 'norm', 'fonts', .60); 
-    panelh  = uipanel('parent',st.fig, prop.panel{:}, 'pos', st.pos.pane.upper, 'tag', 'upperpanel');
+    panelh  = uipanel('parent',st.fig, prop.panel{:}, 'pos', st.pos.pane.upper, 'tag', 'upperpanel'); 
     set(panelh, 'units', 'norm');
-    prop = default_properties('units', 'norm', 'fontu', 'norm', 'fonts', .60); 
-    uicontrol('parent', panelh, prop.text{:}, 'pos', cnamepos, 'tag', 'ContrastName', 'string', st.ol.descrip); 
+    tmppos = get(panelh, 'pos'); 
+    tmppos(3) = 1-(2*tmppos(1)); 
+    set(panelh, 'pos', tmppos); 
+    prop = default_properties('units', 'norm', 'fontu', 'norm', 'fonts', .50); 
+    uicontrol('parent', panelh, prop.text{:}, 'pos', cnamepos, 'tag', 'ContrastName'); 
 function put_lowerpane(varargin)
 
     global st
@@ -449,7 +452,8 @@ function cb_loadol(varargin)
     setthresh(st.ol.C0(3,:));
     setcolormap; 
     setposition_axes;
-    setcontrastname; 
+    setcontrastname;
+    refresh(st.fig)
 function cb_loadul(varargin)
     global st prevsect
     ul = uigetvol('Select an Image File for Underlay', 0);
@@ -643,8 +647,8 @@ setcolormap;
 % =========================================================================
 function setcontrastname
     global st
-    connamh = findobj(st.fig, 'Tag', 'ContrastName'); 
-    set(connamh, 'String', st.ol.descrip); 
+    connamh = findobj(st.fig, 'Tag', 'ContrastName');
+    fitpath(connamh, st.ol.fname);
 function setposition_axes
     global st
     %% Handles for axes
@@ -2045,6 +2049,57 @@ handles(3) = uicontrol('parent', handles(1), 'units', 'norm', 'style', 'push', '
 if wait4resp, uiwait(handles(1)); end
 function cb_ok(varargin)
 delete(varargin{3}); % Bye-bye figure
+function fitpath(hndl, str)
+%FITPATH Fit a long path string inside a uicontrol by shortening with '...'
+%
+% FITPATH(hndl, str)
+%
+%    hndl is a handle to a uicontrol text object.
+%    str  is a string containing a long path.
+%
+% If you wanted to display a path string into a uicontrol of limited size, then
+% this function will shorten it gracefully by replacing directories with a '...'
+% starting from the root.
+%
+% Example:
+% The path
+% c:\dir1\dir2\dir3\dir4\dir5\dir6\finally_a_file.txt
+%
+% May get shortened (depending on the size of the uicontrol) to:
+% c:\...\dir4\dir5\dir6\finally_a_file.txt
+%
+% The function will also work with unix style paths of the form:
+% /user/bin/dir1/dir2/dir3/dir4/dir5/dir6/finally_a_file.txt
+% Shortens to:
+% /user/.../dir4/dir5/dir6/finally_a_file.txt
+
+%==================================================================================
+%
+%        AUTHOR: Erik Newton (Newtek Software Ltd)
+%
+%           WEB: www.newteksoftware.co.uk
+%
+%         ISSUE: 2 (13-Feb-2007)
+%
+%	Copyright Newtek Software Ltd 2006-2007
+%
+% This function is free for all use, but please leave in my credit.
+% Check out more tutorials & functions at our website.
+%
+%==================================================================================
+if isempty(hndl), error('Handle passed in is empty.'); end
+set(hndl , 'String', str) % Try the full string initially in the label
+set(hndl , 'ToolTipString', str) % Tooltip will contain path in full
+ext = get(hndl, 'extent'); % Contains the screen width of the text string
+pos = get(hndl, 'position'); % Contains the width of the label
+ind = findstr(['-' str(2:end)], filesep);
+i = 2; % Leave the first part of the path intact hence start at 2
+% Loop and gradually knock out directories from the string
+while diff(ext([1 3])) > diff(pos([1 3])) && i <= length(ind)
+   set(hndl, 'string', [str(1:ind(1)) '...' str(ind(i):end)])
+   ext = get(hndl, 'extent');
+   i = i + 1;
+end
 
 % | MAXIMUM INTENSITY PROJECTION (MIP; FROM SPM8)
 % =========================================================================
