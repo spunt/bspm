@@ -121,7 +121,7 @@ st          = struct( ...
             'color',        color,...
             'pos',          pos,...
             'fonts',        fonts,...
-            'direct',       'both',...
+            'direct',       '+/-',...
             'snap',         []);
 default_preferences(1);
 st.cmap     = default_colormaps(64); 
@@ -129,8 +129,8 @@ st.vols     = cell(24,1);
 st.ol       = load_overlay(ol, .001, 5);
 bspm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
 st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
-bspm_orthviews('MaxBB');
 bspm_orthviews('Register', S.hReg);
+bspm_orthviews('MaxBB');
 setposition_axes; 
 setxhaircolor;
 put_figmenu; 
@@ -138,9 +138,10 @@ put_upperpane;
 put_lowerpane;
 put_axesxyz; 
 put_axesmenu;
-setthresh(st.ol.C0(3,:), find(strcmpi({'positive', 'negative', 'both'}, st.direct))); 
+setthresh(st.ol.C0(3,:), find(strcmpi({'+', '-', '+/-'}, st.direct))); 
 setvoxelinfo;
 setcolormap;  
+setunitstonorm
 if nargout==1, S.handles = gethandles; end
 catch lasterr
     rethrow(lasterr)
@@ -166,7 +167,7 @@ function pos    = default_positions
     w1 = 5; 
     w2 = pos.gui(3) - w1; 
     w = w2 - w1; 
-    h1up = round(h*.925);
+    h1up = ceil(h*.915);
     hup = h-h1up; 
     %% PANELS   
     pos.pane.upper     = [w1 h1up w hup]; 
@@ -196,7 +197,9 @@ function fonts  = default_fonts
     fonts.sz1       = 24;
     fonts.sz2       = 18; 
     fonts.sz3       = 16; 
-    fonts.sz4       = 14; 
+    fonts.sz4       = 14;
+    fonts.sz5       = 13; 
+    fonts.sz6       = 12;
 function prop   = default_properties(varargin)
     global st
     prop.darkbg     = {'backg', st.color.bg, 'foreg', st.color.fg};
@@ -271,31 +274,35 @@ function preferences = default_preferences(initial)
 % =========================================================================
 function put_upperpane(varargin)
     global st
-    cnamepos = [.01 .15 .98 .95]; 
-    prop = default_properties('units', 'pixels', 'fontu', 'norm', 'fonts', .60); 
+    cnamepos = [.01 .15 .98 .85]; 
+    prop = default_properties('units', 'pixels', 'fontu', 'norm', 'fonts', .55); 
     panelh       = uipanel('parent',st.fig, prop.panel{:}, 'pos', st.pos.pane.upper, 'tag', 'upperpanel'); 
-    panelabel    = {{'Effect Direction' 'Positive' 'Negative' 'Both' 'Color Map' 'Color Max'}, {'Text' 'Radio' 'Radio' 'Radio' 'Popup' 'Edit'}}; 
-    relwidth     = [4 3 3 2 4 4]; 
+    panelabel    = {{'Effect Direction' '+' '-' '+/-' 'Color Map' 'Color Max'}, {'Text' 'Radio' 'Radio' 'Radio' 'Popup' 'Edit'}}; 
+    relwidth     = [3 1 1 2 3 2]; 
     tag          = {'label' 'direct' 'direct' 'direct' 'colormaplist' 'maxval'};  
-    ph = buipanel(panelh, panelabel{1}, panelabel{2}, relwidth, 'paneltitle', '', 'panelposition', cnamepos, 'tag', tag); 
+    ph = buipanel(panelh, panelabel{1}, panelabel{2}, relwidth, 'paneltitle', '', 'panelposition', cnamepos, 'tag', tag, 'uicontrolsep', .01, 'marginsep', .025, 'panelfontsize', st.fonts.sz4, 'labelfontsize', st.fonts.sz4, 'editfontsize', st.fonts.sz5); 
     
    % | Check valid directions for contrast display
     allh    = findobj(st.fig, 'Tag', 'direct');
     allhstr = get(allh, 'String');
     if any(st.ol.null)
-        opt = {'Positive' 'Negative'}; 
-        set(allh(strcmpi(allhstr, 'Both')), 'Value', 0, 'Enable', 'inactive', 'Visible', 'on');
+        opt = {'+' '-'}; 
+        set(allh(strcmpi(allhstr, '+/-')), 'Value', 0, 'Enable', 'inactive', 'Visible', 'on');
         set(allh(strcmpi(allhstr, opt{st.ol.null})), 'Value', 0, 'Enable', 'inactive',  'Visible', 'on');
         set(allh(strcmpi(allhstr, opt{st.ol.null==0})), 'Value', 1, 'Enable', 'inactive');
     else
-        set(allh(strcmpi(allhstr, 'Both')), 'value', 1, 'enable', 'inactive'); 
+        set(allh(strcmpi(allhstr, '+/-')), 'value', 1, 'enable', 'inactive'); 
     end
-    
+ 
     % | Set some values
+    fs = get(ph.edit(2), 'fontsize'); 
+    arrayset(ph.edit(2:4), 'fontsize', fs*1.25);
     arrayset(ph.edit(2:4), 'Callback', @cb_directmenu);
-    set(ph.edit(1), 'FontSize', st.fonts.sz2); 
+    set(ph.edit(1), 'FontSize', st.fonts.sz3); 
     set(ph.edit(6), 'callback', @cb_maxval);
     set(ph.edit(5), 'String', st.cmap(:,2), 'Value', 1, 'callback', @setcolormap);
+    
+    set(panelh, 'units', 'norm');
 function put_lowerpane(varargin)
 
     global st
@@ -345,6 +352,9 @@ function put_lowerpane(varargin)
     
     set(ph{4}.label, 'FontSize', st.fonts.sz2); 
     set(ph{4}.edit, 'enable', 'inactive', 'str', 'n/a'); 
+    
+    
+    set(panelh, 'units', 'norm');
 function put_figmenu
     global st
     %% Main Menu
@@ -415,7 +425,7 @@ function cb_updateoverlay(varargin)
     T0 = getthresh;
     T = T0; 
     tag = get(varargin{1}, 'tag');
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct); 
+    di = strcmpi({'+' '-' '+/-'}, T.direct); 
     switch tag
         case {'Thresh'}
             T.pval = bob_t2p(T.thresh, T.df);
@@ -503,7 +513,7 @@ function cb_directmenu(varargin)
     set(allh(strcmp(allhstr, str)), 'Value', 1, 'Enable', 'inactive'); 
     set(allh(~strcmp(allhstr, str)), 'Value', 0, 'Enable', 'on');
     T = getthresh;
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct);
+    di = strcmpi({'+' '-' '+/-'}, T.direct);
     [st.ol.C0, st.ol.C0IDX] = getclustidx(st.ol.Y, T.thresh, T.extent);
     C = st.ol.C0(di,:);
     if sum(C>0)==0 
@@ -518,13 +528,6 @@ function cb_directmenu(varargin)
     setthresh(C, find(di));    
 function cb_opencode(varargin)
     open(mfilename('fullpath'));
-function cb_closegui(varargin)
-   if length(varargin)==3
-        h = varargin{3};
-    else
-        h = varargin{1};
-    end
-    delete(h); % Bye-bye figure
 function cb_crosshair(varargin)
     state = get(varargin{1},'Checked');
     if strcmpi(state,'on');
@@ -544,7 +547,7 @@ function cb_saveimg(varargin)
     global st
     lab = get(varargin{1}, 'label');
     T = getthresh; 
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct); 
+    di = strcmpi({'+' '-' '+/-'}, T.direct); 
     clustidx = st.ol.C0(di,:);
     opt = [1 -1 1]; 
     outimg = st.ol.Y*opt(di);
@@ -569,10 +572,10 @@ function cb_saveclust(varargin)
     global st
     str = get(findobj(st.fig, 'tag', 'clustersize'), 'string'); 
     if strcmp(str, 'n/a'), return; end
-    [xyz, voxidx] = bspm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm0);
+    [xyz, voxidx] = bspm_XYZreg('NearestXYZ', bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM), st.ol.XYZmm0);
     lab = get(varargin{1}, 'label');
     T = getthresh; 
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct);
+    di = strcmpi({'+' '-' '+/-'}, T.direct);
     clidx = st.ol.C0IDX(di,:);
     clidx = clidx==(clidx(voxidx)); 
     opt = [1 -1 1]; 
@@ -602,7 +605,7 @@ function cb_saveroi(varargin)
     {'Shape'; 'shape'}          ,   {'Sphere' 'Box'}, ...
     {'Size (mm)'; 'size'}       ,   12);
     if strcmpi(button, 'cancel'), return; end
-    [mm, voxidx] = bspm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm0);
+    [mm, voxidx] = bspm_XYZreg('NearestXYZ', bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM), st.ol.XYZmm0);
     refhdr = st.ol.hdr; 
     roihdr = refhdr;
     roihdr.pinfo = [1;0;0];
@@ -623,7 +626,7 @@ function cb_saveroi(varargin)
     cROI(j) = 1;
     if roi.intersectflag
         T   = getthresh; 
-        di  = strcmpi({'positive' 'negative' 'both'}, T.direct);
+        di  = strcmpi({'+' '-' '+/-'}, T.direct);
         clidx = st.ol.C0IDX(di,:);
         clidx = clidx==(clidx(voxidx)); 
         opt = [1 -1 1]; 
@@ -663,8 +666,7 @@ function cb_changeguisize(varargin)
     F = 0.9; 
     if strcmp(get(varargin{1}, 'Label'), 'Increase'), F = 1.1; end
     guipos = get(st.fig, 'pos');
-    guisize = guipos(3:4)*F; 
-    guipos(3:4) = guipos(3:4)*F;
+    guipos(3:4) = guipos(3:4)*F; 
     set(st.fig, 'pos', guipos);    
 function cb_changefontsize(varargin)
     global st
@@ -679,7 +681,7 @@ function cb_correct(varargin)
     methodstr = str{get(varargin{1}, 'value')};
     T0 = getthresh;
     T = T0; 
-    di = strcmpi({'positive' 'negative' 'both'}, T.direct); 
+    di = strcmpi({'+' '-' '+/-'}, T.direct); 
     switch methodstr
         case {'None'}
             return
@@ -715,9 +717,17 @@ function cb_reversemap(varargin)
        st.cmap{i,1} = st.cmap{i,1}(end:-1:1,:); 
     end
     setcolormap;     
-
+function cb_closegui(varargin)
+   if length(varargin)==3, h = varargin{3};
+   else h = varargin{1}; end
+   delete(h); % Bye-bye figure
+   
 % | SETTERS
 % =========================================================================
+function setunitstonorm
+    global st
+    arrayset(findall(st.fig, '-property', 'units'), 'units', 'norm');
+    set(st.fig, 'units', 'pixels'); 
 function setcontrastname
     global st
     connamh = findobj(st.fig, 'Tag', 'ContrastName');
@@ -796,8 +806,9 @@ function setthresh(C, di)
     bspm_orthviews('Reposition');
 function [voxval, clsize] = setvoxelinfo
     global st
-    [nxyz,voxidx,d] = bspm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm);
-    regionidx = st.ol.atlas(voxidx); 
+    [nxyz,voxidx, d]    = getnearestvoxel; 
+    [xyz, xyzidx, dist] = getroundvoxel;
+    regionidx = st.ol.atlas0(xyzidx); 
     if regionidx
         regionname = st.ol.atlaslabels{regionidx};
     else
@@ -811,7 +822,7 @@ function [voxval, clsize] = setvoxelinfo
         clsize = sprintf('%d', st.ol.C(voxidx));
     end
     set(findobj(st.fig, 'tag', 'Location'), 'string', regionname); 
-    set(findobj(st.fig, 'tag', 'xyz'), 'string', sprintf('%d, %d, %d', round(st.centre)));
+    set(findobj(st.fig, 'tag', 'xyz'), 'string', sprintf('%d, %d, %d', bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM)));
     set(findobj(st.fig, 'tag', 'voxval'), 'string', voxval); 
     set(findobj(st.fig, 'tag', 'clustersize'), 'string', clsize); 
 function setbackgcolor(newcolor)
@@ -895,10 +906,14 @@ function T = getthresh
     tmph = findobj(st.fig, 'Tag', 'direct'); 
     opt = get(tmph, 'String');
     T.direct = opt(find(cell2mat(get(tmph, 'Value'))));
-    if strcmp(T.direct, 'pos/neg'), T.direct = 'both'; end
+    if strcmp(T.direct, 'pos/neg'), T.direct = '+/-'; end   
+function [xyz, xyzidx, dist] = getroundvoxel
+    global st
+    [xyz, dist] = bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM); 
+    xyzidx      = bspm_XYZreg('FindXYZ', xyz, st.ol.XYZmm0); 
 function [xyz, voxidx, dist] = getnearestvoxel 
     global st
-    [xyz, voxidx, dist] = bspm_XYZreg('NearestXYZ', round(st.centre), st.ol.XYZmm);
+    [xyz, voxidx, dist] = bspm_XYZreg('NearestXYZ', bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM), st.ol.XYZmm);
     
 % | COLORBAR STUFF
 % =========================================================================
@@ -1019,12 +1034,12 @@ function OL = load_overlay(fname, pval, k)
     %% CHECK IMAGE
     posneg = [sum(od(:)>0) sum(od(:)<0)]==0; 
     if any(posneg)
-        opt = {'Positive' 'Negative'}; 
+        opt = {'+' '-'}; 
         st.direct = lower(opt{posneg==0}); 
         allh = findobj(st.fig, 'Tag', 'direct'); 
         if ~isempty(allh)
             allhstr = get(allh, 'String');
-            set(allh(strcmp(allhstr, 'Both')), 'Value', 0, 'Enable', 'inactive');
+            set(allh(strcmp(allhstr, '+/-')), 'Value', 0, 'Enable', 'inactive');
             set(allh(strcmp(allhstr, opt{posneg})), 'Value', 0, 'Enable', 'inactive'); 
         end
     end
@@ -1464,27 +1479,27 @@ else
     arrayfun(@set, harray, repmat({propname}, length(harray), 1), propvalue); 
 end
 function vol = uigetvol(message, multitag)
-% UIGETVOL Dialogue for selecting image volume file
-%
-%   USAGE: vol = uigetvol(message, multitag)
-%       
-%       message = to display to user
-%       multitag = (default = 0) tag to allow selecting multiple images
-%
-% EX: img = uigetvol('Select Image to Process'); 
-%
-if nargin < 2, multitag = 0; end
-if nargin < 1, message = 'Select Image File'; end
-if ~multitag
-    [imname, pname] = uigetfile({'*.img; *.nii', 'Image File'; '*.*', 'All Files (*.*)'}, message);
-else
-    [imname, pname] = uigetfile({'*.img; *.nii', 'Image File'; '*.*', 'All Files (*.*)'}, message, 'MultiSelect', 'on');
-end
-if isequal(imname,0) || isequal(pname,0)
-    vol = [];
-else
-    vol = fullfile(pname, strcat(imname));
-end
+    % UIGETVOL Dialogue for selecting image volume file
+    %
+    %   USAGE: vol = uigetvol(message, multitag)
+    %       
+    %       message = to display to user
+    %       multitag = (default = 0) tag to allow selecting multiple images
+    %
+    % EX: img = uigetvol('Select Image to Process'); 
+    %
+    if nargin < 2, multitag = 0; end
+    if nargin < 1, message = 'Select Image File'; end
+    if ~multitag
+        [imname, pname] = uigetfile({'*.img; *.nii; *.nii.gz', 'Image File'; '*.*', 'All Files (*.*)'}, message);
+    else
+        [imname, pname] = uigetfile({'*.img; *.nii', 'Image File'; '*.*', 'All Files (*.*)'}, message, 'MultiSelect', 'on');
+    end
+    if isequal(imname,0) || isequal(pname,0)
+        vol = [];
+    else
+        vol = fullfile(pname, strcat(imname));
+    end
 function vol = uiputvol(defname, prompt)
     if nargin < 1, defname = 'myimage.nii'; end
     if nargin < 2, prompt = 'Save image as'; end
@@ -1510,7 +1525,7 @@ function fn = construct_filename
         n = strtrim(st.ol.descrip(idx+1:end));
         n = regexprep(n, ' ', '_'); 
     end
-    fn = sprintf('%s/%s_x=%d_y=%d_z=%d.png', p, n, round(st.centre));        
+    fn = sprintf('%s/%s_x=%d_y=%d_z=%d.png', p, n, bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM));        
 function handles = headsup(msg, wait4resp)
 % HEADSUP Present message to user and wait for a response
 %
@@ -2494,17 +2509,18 @@ switch lower(action)
         redraw_all;
         callback;
         if isfield(st,'registry')
-            xyz = bspm_XYZreg('SetCoords',st.centre,st.registry.hReg,st.registry.hMe);
+            xyz = bspm_XYZreg('SetCoords',bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM),st.registry.hReg,st.registry.hMe);
         end
         cm_pos;
         xyzstr = num2str([-99; round(xyz)]); 
         xyzstr(1,:) = [];
         axidx = [3 2 1];
-        setvoxelinfo; 
         for a = 1:length(axidx)
             yh = st.vols{1}.ax{axidx(a)}.xyz;
             set(yh, 'string', xyzstr(a,:));
         end
+        setvoxelinfo; 
+
            
     case 'setcoords'
         st.centre = varargin{1};
