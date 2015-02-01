@@ -17,7 +17,6 @@ if nargin < 1, disp('USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional in
 if nargin < 2, cmapflag = 1; end
 if nargin < 3, medialflag = 1; end
 
-
 [d, h] = bspm_read_vol(im);
 d(isnan(d)) = 0; 
 % obj.colorlims = [ceil(min(d(d>0))) floor(max(d(:)))];
@@ -40,8 +39,6 @@ obj.surface = 'inflated';          %% Set the surface: inflated, pial, or white
 obj.shading = 'sulc';          %% Set the shading information for the surface: curv, sulc, or thk
 obj.shadingrange = [.1 .7];    %% Set the min anx max greyscale values for the surface underlay (range of 0 to 1)
 obj.Nsurfs = 4;              %% Choose which hemispheres and surfaces to show:  4=L/R med/lat;  2= L/R lat; 1.9=L med/lat; 2.1 = R med/lat; -1= L lat; 1-R lat;
-
-
 
 ss = get(0, 'ScreenSize');
 ts = floor(ss/2);     
