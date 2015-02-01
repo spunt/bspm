@@ -458,13 +458,14 @@ function cb_loadol(varargin)
     global st
     fname = uigetvol('Select an Image File for Overlay', 0);
     if isempty(fname), disp('Must select an overlay!'); return; end
-    T = getthresh; 
+    T0  = getthresh;
+    T   = T0; 
+    di  = strcmpi({'+' '-' '+/-'}, T.direct); 
     st.ol = load_overlay(fname, T.pval, T.extent);
-    setthresh(st.ol.C0(3,:));
+    setthresh(st.ol.C0(3,:), find(di));
+    setthreshinfo; 
     setcolormap; 
     setposition_axes;
-    setcontrastname;
-    refresh(st.fig)
 function cb_loadul(varargin)
     global st prevsect
     ul = uigetvol('Select an Image File for Underlay', 0);
@@ -790,10 +791,6 @@ function setunitstonorm
     global st
     arrayset(findall(st.fig, '-property', 'units'), 'units', 'norm');
     set(st.fig, 'units', 'pixels'); 
-function setcontrastname
-    global st
-    connamh = findobj(st.fig, 'Tag', 'ContrastName');
-    fitpath(connamh, st.ol.fname);
 function setposition_axes
     global st
     %% Handles for axes
@@ -804,6 +801,7 @@ function setposition_axes
     % st.vols{1}.ax{1}.d    - image
     % st.vols{1}.ax{1}.lx   - crosshair (x)
     % st.vols{1}.ax{1}.ly   - crosshair (y)
+    
     h = gethandles_axes;
     axpos = cell2mat(get(h.ax, 'pos'));
     CBPIXSIZE = 80; 
@@ -837,12 +835,27 @@ function setposition_axes
     HL = round(sum(axpos(3, [1 3])) + CBPIXSIZE); 
     figsize = get(st.fig, 'pos'); 
     figsize(3) = HL; 
-    set(st.fig, 'pos', figsize)
+    set(st.fig, 'pos', figsize);
     for a = 1:3, set(h.ax(a), 'position', axpos(a,:)); end
     set(h.ax, 'units', 'norm');
+    % deal with lower panel
+    p = findobj(st.fig, 'tag', 'lowerpanel');
+    unit0 = get(p, 'units');
+    apos = get(h.ax(1), 'pos'); 
+    ppos = [sum(apos([1 3]))+.01 apos(2) 1-.02-sum(apos([1 3])) apos(4)]; 
+    set(p, 'units', 'norm', 'pos', ppos); 
+    set(p, 'units', unit0); 
     bspm_orthviews('Redraw');
 function setthreshinfo(T)
     global st
+    if nargin==0
+        T = struct( ...
+            'extent',   st.ol.K, ...
+            'thresh',   st.ol.U, ...
+            'pval',     st.ol.P, ...
+            'df',       st.ol.DF, ...
+            'direct',   st.direct);
+    end
     Tval = [T.extent T.thresh T.pval T.df]; 
     Tstr = {'Extent' 'Thresh' 'P-Value' 'DF'};
     Tstrform = {'%d' '%2.2f' '%2.3f' '%d'}; 
@@ -1129,7 +1142,7 @@ function OL = load_overlay(fname, pval, k)
     [C, I] = getclustidx(od, u, k);
     
     if ~any(C(:))
-        headsup('No suprathreshold voxels! Showing unthresholded image.')
+        headsup('No suprathreshold voxels! Showing unthresholded image.'); 
         u = 0; 
         pval = bob_t2p(u, df);
         k = 1; 
@@ -1611,6 +1624,7 @@ handles(1) = figure(...
     'Color', [0.8941    0.1020    0.1098]*.60, ...
     'NumberTitle','off',...
     'DockControls','off',...
+    'Tag', 'headsup', ...
     'MenuBar','none',...
     'Name','Heads Up',...
     'Visible','on',...
@@ -1620,8 +1634,7 @@ handles(2) = uicontrol('parent', handles(1), 'units', 'norm', 'style',  'text', 
 handles(3) = uicontrol('parent', handles(1), 'units', 'norm', 'style', 'push', 'foreg', [0 0 0], 'horiz', 'center', ...
     'pos', [.4 .10 .2 .30], 'fontname', 'arial', 'fontw', 'bold', 'fontsize', 16, 'string', 'OK', 'visible', 'on', 'callback', {@cb_ok, handles});
 if wait4resp, uiwait(handles(1)); end
-function cb_ok(varargin)
-delete(varargin{3}); % Bye-bye figure
+function cb_ok(varargin), delete(findobj(0, 'Tag', 'headsup'));
 function out = num2pval(in, ndec)
 % NUM2PVAL Convert numeric array of p-values to formatted cell array of p-values
 %
