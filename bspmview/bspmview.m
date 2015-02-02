@@ -43,7 +43,8 @@ else
     if iscell(ol), ol = char(ol); end
 end
 if nargin < 2
-    ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
+    ul = fullfile(fileparts(mfilename('fullpath')), 'data', 'IIT_MeanT1_2x2x2.nii'); 
+%     ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
 else
     if iscell(ul), ul = char(ul); end
 end
@@ -237,8 +238,7 @@ function preferences = default_preferences(initial)
     global st
     if ~isfield(st, 'preferences')
         def  = struct( ...
-            'atlas_vol', fullfile(st.guipath, 'data', 'AnatomyToolbox_MacroLabels.nii'), ...
-            'atlas_labels', fullfile(st.guipath, 'data', 'AnatomyToolbox_Macro.mat'), ...
+            'atlasname', 'AnatomyToolbox', ...
             'alphacorrect'  ,   .05, ...
             'separation',   20, ...
             'shape'     ,  'Sphere', ...
@@ -261,8 +261,7 @@ function preferences = default_preferences(initial)
         {'Corrected Alpha'; 'alphacorrect'}, def.alphacorrect, ...
         {'Peak Separation'; 'separation'},   def.separation, ...
         'separator'                 ,   'ATLAS Labeling', ...
-        {'Image'; 'atlas_vol'}          ,  def.atlas_vol, ...
-        {'Labels'; 'atlas_labels'}       ,   def.atlas_labels, ...
+        {'Name'; 'atlasname'}          , {'AnatomyToolbox' 'IIT_GM_Destrieux'}, ...
         'separator'                 ,   'Render', ...
         {'Surfaces to Render'; 'surfshow'}  ,   {'L/R Medial/Lateral' 'L/R Lateral' 'L Medial/Lateral' 'R Medial/Lateral' 'L Lateral' 'R Lateral'}, ...
         {'Surface Type'; 'surface'}      ,   {'Inflated' 'Pial' 'White'}, ...
@@ -275,8 +274,18 @@ function preferences = default_preferences(initial)
     if strcmpi(button, 'cancel'), return; else st.preferences = preferences; end
     opt     = {'L/R Medial/Lateral' 'L/R Lateral' 'L Medial/Lateral' 'R Medial/Lateral' 'L Lateral' 'R Lateral'}; 
     optmap  = [4 2 1.9 2.1 -1 1]; 
+    if ~strcmpi(st.preferences.atlasname, def.atlasname)
+        %% LABEL MAP
+        atlas_vol = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Map.nii', st.preferences.atlasname)); 
+        atlas_labels = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Labels.mat', st.preferences.atlasname)); 
+        atlasvol = reslice_image(atlas_vol, st.ol.fname);
+        atlasvol = single(round(atlasvol(:)))'; 
+        load(atlas_labels);
+        st.ol.atlaslabels = atlas; 
+        st.ol.atlas0 = atlasvol;    
+    end
     st.preferences.surfshow = optmap(strcmpi(opt, st.preferences.surfshow)); 
-
+    
 % | GUI COMPONENTS
 % =========================================================================
 function put_upperpane(varargin)
@@ -876,16 +885,15 @@ function setthresh(C, di)
     bspm_orthviews('RemoveBlobs', st.ho);
     bspm_orthviews('AddBlobs', st.ho, st.ol.XYZ, st.ol.Z, st.ol.M);
     bspm_orthviews('Register', st.registry.hReg);
-%     setposition_axes;
     setcolormap; 
     bspm_orthviews('Reposition');
 function [voxval, clsize] = setvoxelinfo
     global st
     [nxyz,voxidx, d]    = getnearestvoxel; 
     [xyz, xyzidx, dist] = getroundvoxel;
-    regionidx = st.ol.atlas0(xyzidx); 
+    regionidx = st.ol.atlas0(xyzidx);
     if regionidx
-        regionname = st.ol.atlaslabels{regionidx};
+        regionname = st.ol.atlaslabels.label{st.ol.atlaslabels.id==regionidx};
     else
         regionname = 'n/a'; 
     end
@@ -1174,11 +1182,13 @@ function OL = load_overlay(fname, pval, k)
                 'XYZmm0',    XYZmm,...
                 'XYZ0',      XYZ);    
     %% LABEL MAP
-    atlas = reslice_image(st.preferences.atlas_vol, fname);
-    atlas = single(round(atlas(:)))'; 
-    load(st.preferences.atlas_labels);
-    OL.atlaslabels = Labels; 
-    OL.atlas0 = atlas;    
+    atlas_vol = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Map.nii', st.preferences.atlasname)); 
+    atlas_labels = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Labels.mat', st.preferences.atlasname)); 
+    atlasvol = reslice_image(atlas_vol, fname);
+    atlasvol = single(round(atlasvol(:)))'; 
+    load(atlas_labels);
+    OL.atlaslabels = atlas; 
+    OL.atlas0 = atlasvol;    
 function t = bob_p2t(alpha, df)
 % BOB_P2T Get t-value from p-value + df
 %
