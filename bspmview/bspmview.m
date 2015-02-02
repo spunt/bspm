@@ -67,7 +67,7 @@ try
             'NumberTitle','off',...
             'DockControls','off',...
             'MenuBar','none',...
-            'Name', ol,...
+            'Name', abridgepath(ol),...
             'Tag', 'bspmview', ...
             'CloseRequestFcn', @cb_closegui, ...
             'DefaultTextColor',color.fg,...
@@ -1315,6 +1315,8 @@ function OL = load_overlay(fname, pval, k)
     load(atlas_labels);
     OL.atlaslabels = atlas; 
     OL.atlas0 = atlasvol;    
+    
+    set(st.fig, 'Name', abridgepath(OL.fname)); 
 function t = bob_p2t(alpha, df)
 % BOB_P2T Get t-value from p-value + df
 %
@@ -1793,57 +1795,24 @@ out = num2cell(in);
 out = cellfun(@num2str, out, repmat({['%2.' num2str(ndec) 'f']}, size(out)), 'Unif', false); 
 out = regexprep(out, '0\.', '\.');
 out(cellfun(@str2double, out)==0) = {['<.' repmat('0', 1, ndec-1) '1']};
-function fitpath(hndl, str)
-%FITPATH Fit a long path string inside a uicontrol by shortening with '...'
-%
-% FITPATH(hndl, str)
-%
-%    hndl is a handle to a uicontrol text object.
-%    str  is a string containing a long path.
-%
-% If you wanted to display a path string into a uicontrol of limited size, then
-% this function will shorten it gracefully by replacing directories with a '...'
-% starting from the root.
-%
-% Example:
-% The path
-% c:\dir1\dir2\dir3\dir4\dir5\dir6\finally_a_file.txt
-%
-% May get shortened (depending on the size of the uicontrol) to:
-% c:\...\dir4\dir5\dir6\finally_a_file.txt
-%
-% The function will also work with unix style paths of the form:
-% /user/bin/dir1/dir2/dir3/dir4/dir5/dir6/finally_a_file.txt
-% Shortens to:
-% /user/.../dir4/dir5/dir6/finally_a_file.txt
-
-%==================================================================================
-%
-%        AUTHOR: Erik Newton (Newtek Software Ltd)
-%
-%           WEB: www.newteksoftware.co.uk
-%
-%         ISSUE: 2 (13-Feb-2007)
-%
-%	Copyright Newtek Software Ltd 2006-2007
-%
-% This function is free for all use, but please leave in my credit.
-% Check out more tutorials & functions at our website.
-%
-%==================================================================================
-if isempty(hndl), error('Handle passed in is empty.'); end
-set(hndl , 'String', str) % Try the full string initially in the label
-set(hndl , 'ToolTipString', str) % Tooltip will contain path in full
-ext = get(hndl, 'extent'); % Contains the screen width of the text string
-pos = get(hndl, 'position'); % Contains the width of the label
-ind = findstr(['-' str(2:end)], filesep);
-i = 2; % Leave the first part of the path intact hence start at 2
-% Loop and gradually knock out directories from the string
-while diff(ext([1 3])) > diff(pos([1 3])) && i <= length(ind)
-   set(hndl, 'string', [str(1:ind(1)) '...' str(ind(i):end)])
-   ext = get(hndl, 'extent');
-   i = i + 1;
+function out = abridgepath(str, maxchar)
+if nargin<2, maxchar =  85; end
+if iscell(str), str = char(str); end
+if length(str) <= maxchar, out = str; return; end
+s   = regexp(str, filesep, 'split');
+s(cellfun('isempty', s)) = [];
+p1 = fullfile(s{1}, '...'); 
+s(1) = []; 
+badpath = 1;
+count = 0; 
+while badpath
+    count = count + 1; 
+    testpath = s; 
+    testpath(1:count) = []; 
+    testpath = fullfile(p1, testpath{:}); 
+    if length(testpath)<=maxchar, badpath = 0; end
 end
+out = testpath; 
 function [h, hh] = surfPlot4(obj)
 %%% Written by Aaron P. Schultz - aschultz@martinos.org
 %%%
