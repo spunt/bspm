@@ -14,8 +14,8 @@ function S = bspmview(ol, ul)
 %
 % _________________________________________________________________________
 %  EXAMPLES
-%   >> bspmview('spmT_0001.img', 'T1.nii')  
-%   >> bspmview('spmT_0001.img')   % uses default underlay
+%   >> bspmview('spmT_0001.img', 'T1.nii')  % overlays on 'T1.nii'
+%   >> bspmview('spmT_0001.img')   % overlays on default underlay
 %	>> bspmview                    % opens dialogue for selecting overlay
 %   
 % _________________________________________________________________________
@@ -34,6 +34,12 @@ function S = bspmview(ol, ul)
 %	Email:    spunt@caltech.edu
 % _________________________________________________________________________
 
+% | UTILITIES FOLDER
+% | =======================================================================
+supportdir = fullfile(fileparts(mfilename('fullpath')), 'supportfiles');
+if ~exist(supportdir, 'dir'), printmsg('The folder "supportfiles" was not found', 'ERROR'); return; end
+addpath(supportdir); 
+
 % | CHECK INPUTS
 % | =======================================================================
 if nargin < 1 
@@ -43,113 +49,16 @@ else
     if iscell(ol), ol = char(ol); end
 end
 if nargin < 2
-    ul = fullfile(fileparts(mfilename('fullpath')), 'data', 'IIT_MeanT1_2x2x2.nii'); 
-%     ul=fullfile(fileparts(which('spm.m')), 'canonical', 'single_subj_T1.nii'); 
+    ul = fullfile(supportdir, 'IIT_MeanT1_2x2x2.nii');
 else
     if iscell(ul), ul = char(ul); end
 end
-
-% | GUI FIGURE
-% | =======================================================================
-try
-    % | Check for open GUI, close if one is found
-    delete(findobj(0, 'tag', 'bspmview')); 
-    % | Setup new fig
-    fonts   = default_fonts; 
-    pos     = default_positions; 
-    color   = default_colors; 
-    S.hFig  = figure(...
-            'Units', 'pixels', ...
-            'Position',pos.gui,...
-            'Resize','off',...
-            'Color',color.bg,...
-            'ColorMap',gray(64),...
-            'NumberTitle','off',...
-            'DockControls','off',...
-            'MenuBar','none',...
-            'Name', abridgepath(ol),...
-            'Tag', 'bspmview', ...
-            'CloseRequestFcn', @cb_closegui, ...
-            'DefaultTextColor',color.fg,...
-            'DefaultTextInterpreter','none',...
-            'DefaultTextFontName','Arial',...
-            'DefaultTextFontSize',12,...
-            'DefaultAxesColor',color.border,...
-            'DefaultAxesXColor',color.border,...
-            'DefaultAxesYColor',color.border,...
-            'DefaultAxesZColor',color.border,...
-            'DefaultAxesFontName','Arial',...
-            'DefaultPatchFaceColor',color.fg,...
-            'DefaultPatchEdgeColor',color.fg,...
-            'DefaultSurfaceEdgeColor',color.fg,...
-            'DefaultLineColor',color.border,...
-            'DefaultUicontrolFontName',fonts.name,...
-            'DefaultUicontrolFontSize',fonts.sz3,...
-            'DefaultUicontrolInterruptible','on',...
-            'Visible','off',...
-            'Toolbar','none');
-    uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
-    'pos', [0 0 1 .001], 'backg', color.blues(8,:));
-    uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
-    'pos', [0 .001 .001 1], 'backg', color.blues(10,:));
-    uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
-    'pos', [.999 .001 .001 .999], 'backg', color.blues(10,:));
-catch lasterr
-    rethrow(lasterr); 
-end
-
-% | INITIALIZE SPM REGISTRY & ORTHVIEWS
-% | =======================================================================
-try
-% | REGISTRY OBJECT (HREG)
-S.hReg = uipanel('Parent',S.hFig,'Units','Pixels','Position',pos.pane.axes,...
-        'BorderType', 'none', 'BackgroundColor',color.bg);
-set(S.hReg, 'units', 'norm');
-global st prevsect
+global prevsect
 prevsect    = ul;
-% | CREATE GLOBAL VARIABLE ST, PREVSECT
-bspm_orthviews('Reset');
-st          = struct( ...
-            'fig',          S.hFig,...
-            'figax',        S.hReg,...
-            'guipath',      fileparts(mfilename('fullpath')),...
-            'n',            0,...
-            'bb',           [],...
-            'callback',     {';'}, ...
-            'Space',        eye(4),...
-            'centre',       [],...
-            'xhairs',       1,...
-            'plugins',      {''},...
-            'hld',          1,...
-            'mode',         [],...
-            'color',        color,...
-            'pos',          pos,...
-            'fonts',        fonts,...
-            'direct',       '+/-',...
-            'snap',         []);
-default_preferences(1);
-st.cmap     = default_colormaps(64); 
-st.vols     = cell(24,1);
-st.ol       = load_overlay(ol, .001, 5);
-bspm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
-st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
-bspm_orthviews('Register', S.hReg);
-bspm_orthviews('MaxBB');
-setposition_axes; 
-setxhaircolor;
-put_figmenu; 
-put_upperpane;
-put_lowerpane;
-put_axesxyz; 
-put_axesmenu;
-setthresh(st.ol.C0(3,:), find(strcmpi({'+', '-', '+/-'}, st.direct))); 
-setvoxelinfo;
-setcolormap;  
-setunitstonorm
-if nargout==1, S.handles = gethandles; end
-catch lasterr
-    rethrow(lasterr)
-end
+
+% | INITIALIZE FIGURE, SPM REGISTRY, & ORTHVIEWS
+% | =======================================================================
+S = put_figure(ol, ul); 
 % =========================================================================
 % *
 % * SUBFUNCTIONS
@@ -261,8 +170,12 @@ function preferences = default_preferences(initial)
     else
         def = st.preferences; 
     end
+    pos = get(st.fig, 'pos'); 
+    w = pos(3)*.65; 
     [preferences, button] = settingsdlg(...
-        'title'                     ,   'Preferences', ...
+        'title'                     ,   'Settings', ...
+        'WindowWidth'               ,   w,    ...
+        'ControlWidth'              ,   w/2,    ...
         'separator'                 ,   'Thresholding Options', ...
         {'Corrected Alpha'; 'alphacorrect'}, def.alphacorrect, ...
         {'Peak Separation'; 'separation'},   def.separation, ...
@@ -273,17 +186,17 @@ function preferences = default_preferences(initial)
         {'Surface Type'; 'surface'}      ,   {'Inflated' 'Pial' 'White'}, ...
         {'Shading Type'; 'shading'}      ,   {'Sulc' 'Curv' 'Thk'}, ...
         {'N Vertices'; 'nverts'}    ,   num2cell([40962 642 2562 10242 163842]), ...
-        {'Add Color Bar'; 'colorbar'},      logical(def.colorbar), ...
-        {'Round Values?'; 'round'}   ,      logical(def.round), ...
         {'Shading Min'; 'shadingmin'},      def.shadingmin, ...
-        {'Shading Max'; 'shadingmax'},      def.shadingmax); 
+        {'Shading Max'; 'shadingmax'},      def.shadingmax, ...
+        {'Add Color Bar'; 'colorbar'},      logical(def.colorbar), ...
+        {'Round Values?'; 'round'}   ,      logical(def.round)); 
     if strcmpi(button, 'cancel'), return; else st.preferences = preferences; end
     opt     = {'L/R Medial/Lateral' 'L/R Lateral' 'L Medial/Lateral' 'R Medial/Lateral' 'L Lateral' 'R Lateral'}; 
     optmap  = [4 2 1.9 2.1 -1 1]; 
     if ~strcmpi(st.preferences.atlasname, def.atlasname)
         %% LABEL MAP
-        atlas_vol = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Map.nii', st.preferences.atlasname)); 
-        atlas_labels = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Labels.mat', st.preferences.atlasname)); 
+        atlas_vol = fullfile(st.supportpath, sprintf('%s_Atlas_Map.nii', st.preferences.atlasname)); 
+        atlas_labels = fullfile(st.supportpath, sprintf('%s_Atlas_Labels.mat', st.preferences.atlasname)); 
         atlasvol = reslice_image(atlas_vol, st.ol.fname);
         atlasvol = single(round(atlasvol(:)))'; 
         load(atlas_labels);
@@ -294,6 +207,98 @@ function preferences = default_preferences(initial)
     
 % | GUI COMPONENTS
 % =========================================================================
+function S = put_figure(ol, ul)
+
+    global st
+
+    % | Check for open GUI, close if one is found
+    delete(findobj(0, 'tag', 'bspmview')); 
+    
+    % | Setup new fig
+    fonts   = default_fonts; 
+    pos     = default_positions; 
+    color   = default_colors; 
+    S.hFig  = figure(...
+            'Name', abridgepath(ol), ...
+            'Units', 'pixels', ...
+            'Position',pos.gui,...
+            'Resize','off',...
+            'Color',color.bg,...
+            'ColorMap',gray(64),...
+            'NumberTitle','off',...
+            'DockControls','off',...
+            'MenuBar','none',...
+            'Tag', 'bspmview', ...
+            'CloseRequestFcn', @cb_closegui, ...
+            'DefaultTextColor',color.fg,...
+            'DefaultTextInterpreter','none',...
+            'DefaultTextFontName','Arial',...
+            'DefaultTextFontSize',12,...
+            'DefaultAxesColor',color.border,...
+            'DefaultAxesXColor',color.border,...
+            'DefaultAxesYColor',color.border,...
+            'DefaultAxesZColor',color.border,...
+            'DefaultAxesFontName','Arial',...
+            'DefaultPatchFaceColor',color.fg,...
+            'DefaultPatchEdgeColor',color.fg,...
+            'DefaultSurfaceEdgeColor',color.fg,...
+            'DefaultLineColor',color.border,...
+            'DefaultUicontrolFontName',fonts.name,...
+            'DefaultUicontrolFontSize',fonts.sz3,...
+            'DefaultUicontrolInterruptible','on',...
+            'Visible','off',...
+            'Toolbar','none');
+    uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
+    'pos', [0 0 1 .001], 'backg', color.blues(8,:));
+    uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
+    'pos', [0 .001 .001 1], 'backg', color.blues(10,:));
+    uicontrol('Parent', S.hFig, 'Units', 'Normal', 'Style', 'Text', ...
+    'pos', [.999 .001 .001 .999], 'backg', color.blues(10,:));
+
+    % | REGISTRY OBJECT (HREG)
+    S.hReg = uipanel('Parent',S.hFig,'Units','Pixels','Position',pos.pane.axes,...
+            'BorderType', 'none', 'BackgroundColor',color.bg);
+    set(S.hReg, 'units', 'norm');
+    bspm_orthviews('Reset');
+    st          = struct( ...
+                'fig',          S.hFig,...
+                'figax',        S.hReg,...
+                'guipath',      fileparts(mfilename('fullpath')),...
+                'supportpath',  fullfile(fileparts(mfilename('fullpath')), 'supportfiles'),...
+                'n',            0,...
+                'bb',           [],...
+                'callback',     {';'}, ...
+                'Space',        eye(4),...
+                'centre',       [],...
+                'xhairs',       1,...
+                'plugins',      {''},...
+                'hld',          1,...
+                'mode',         [],...
+                'color',        color,...
+                'pos',          pos,...
+                'fonts',        fonts,...
+                'direct',       '+/-',...
+                'snap',         []);
+    default_preferences(1);
+    st.cmap     = default_colormaps(64); 
+    st.vols     = cell(24,1);
+    st.ol       = load_overlay(ol, .001, 5);
+    bspm_XYZreg('InitReg',S.hReg,st.ol.M,st.ol.DIM,[0;0;0]); % initialize registry object
+    st.ho = bspm_orthviews('Image', ul, [.025 .025 .95 .95]);
+    bspm_orthviews('Register', S.hReg);
+    bspm_orthviews('MaxBB');
+    setposition_axes; 
+    setxhaircolor;
+    put_figmenu; 
+    put_upperpane;
+    put_lowerpane;
+    put_axesxyz; 
+    put_axesmenu;
+    setthresh(st.ol.C0(3,:), find(strcmpi({'+', '-', '+/-'}, st.direct))); 
+    setvoxelinfo;
+    setcolormap;  
+    setunitstonorm;
+    if nargout==1, S.handles = gethandles; end
 function put_upperpane(varargin)
     global st
     cnamepos     = [.01 .15 .98 .85]; 
@@ -377,7 +382,8 @@ function put_figmenu
     
     %% Main Menu
     S.menu1         = uimenu('Parent', st.fig, 'Label', 'bspmVIEW');
-    S.appear        = uimenu(S.menu1, 'Label','Appearance'); 
+    S.prefs         = uimenu(S.menu1, 'Label','Settings', 'Callback', @cb_preferences); 
+    S.appear        = uimenu(S.menu1, 'Label','Appearance', 'Separator', 'on'); 
     S.skin          = uimenu(S.appear, 'Label', 'Skin');
     S.changeskin(1) = uimenu(S.skin, 'Label', 'Dark', 'Checked', 'on', 'Callback', @cb_changeskin);
     S.changeskin(2) = uimenu(S.skin, 'Label', 'Light', 'Separator', 'on', 'Callback',@cb_changeskin);
@@ -387,8 +393,8 @@ function put_figmenu
     S.fontsize      = uimenu(S.appear, 'Label','Font Size', 'Separator', 'on'); 
     S.font(1)       = uimenu(S.fontsize, 'Label', 'Increase', 'Accelerator', 'i', 'Callback', @cb_changefontsize);
     S.font(2)       = uimenu(S.fontsize, 'Label', 'Decrease', 'Accelerator', 'd', 'Separator', 'on', 'Callback',@cb_changefontsize);
-    S.opencode      = uimenu(S.menu1, 'Label','Open GUI M-File', 'Callback', @cb_opencode); 
-    S.exit          = uimenu(S.menu1, 'Label', 'Exit', 'Callback', {@cb_closegui, st.fig});
+    S.opencode      = uimenu(S.menu1, 'Label','Open GUI M-File', 'Separator', 'on', 'Callback', @cb_opencode); 
+    S.exit          = uimenu(S.menu1, 'Label', 'Exit', 'Separator', 'on', 'Callback', {@cb_closegui, st.fig});
     
     %% Load Menu
     S.load = uimenu(st.fig,'Label','Load');
@@ -404,10 +410,9 @@ function put_figmenu
     
     %% Options Menu
     S.options       = uimenu(st.fig,'Label','Options');
-    S.prefs         = uimenu(S.options, 'Label','Defaults', 'Callback', @cb_preferences); 
-    S.report        = uimenu(S.options,'Label','Show Report', 'Separator', 'on', 'CallBack', @cb_report);
+    S.report        = uimenu(S.options,'Label','Show Report', 'CallBack', @cb_report);
     S.render        = uimenu(S.options,'Label','Show Rendering', 'Separator', 'on', 'CallBack', @cb_render);
-    S.crosshair     = uimenu(S.options,'Label','Show Crosshairs','Separator', 'on','Checked', 'on', 'CallBack', @cb_crosshair);
+    S.crosshair     = uimenu(S.options,'Label','Show Crosshairs', 'Tag', 'Crosshairs', 'Separator', 'on','Checked', 'on', 'CallBack', @cb_crosshair);
     S.reversemap    = uimenu(S.options,'Label','Reverse Color Map', 'Tag', 'reversemap', 'Separator', 'on', 'Checked', 'off', 'CallBack', @cb_reversemap);
 function put_axesmenu
     [h,axpos]   = gethandles_axes;
@@ -418,7 +423,7 @@ function put_axesmenu
     ctsavemask  = uimenu(cmenu, 'Label', 'Save cluster (binary mask)', 'callback', @cb_saveclust);
     ctsaveroi   = uimenu(cmenu, 'Label', 'Save ROI at Coordinates', 'callback', @cb_saveroi);
     ctsavergb   = uimenu(cmenu, 'Label', 'Save Screen Capture', 'callback', @cb_savergb, 'separator', 'on');
-    ctxhair     = uimenu(cmenu, 'Label', 'Toggle Crosshairs', 'checked', 'on', 'callback', @cb_crosshair, 'separator', 'on'); 
+    ctxhair     = uimenu(cmenu, 'Label', 'Toggle Crosshairs', 'checked', 'on', 'Tag', 'Crosshairs', 'callback', @cb_crosshair, 'separator', 'on'); 
     for a = 1:3
         set(h.ax(a), 'uicontextmenu', cmenu); 
     end
@@ -506,6 +511,9 @@ function cb_loadul(varargin)
     setxhaircolor;
     put_axesxyz;
     put_axesmenu;
+    h = findall(st.fig, 'Tag', 'Crosshairs'); 
+    set(h,'Checked','on');
+    bspm_orthviews('Xhairs','on') 
 function cb_clustminmax(varargin)
 global st
 str = get(findobj(st.fig, 'tag', 'clustersize'), 'string'); 
@@ -563,14 +571,16 @@ function cb_directmenu(varargin)
 function cb_opencode(varargin)
     open(mfilename('fullpath'));
 function cb_crosshair(varargin)
+    global st
     state = get(varargin{1},'Checked');
+    h = findall(st.fig, 'Tag', 'Crosshairs'); 
     if strcmpi(state,'on');
         bspm_orthviews('Xhairs','off')
-        set(varargin{1},'Checked','off');
+        set(h,'Checked','off');
     end
     if strcmpi(state,'off');
         bspm_orthviews('Xhairs','on')
-        set(varargin{1},'Checked','on');
+        set(h,'Checked','on');
     end
 function cb_saveimg(varargin)
     global st
@@ -711,9 +721,13 @@ function cb_changeskin(varargin)
     h       = gethandles; 
     switch lower(skin)
         case {'dark'}
-            st.color = default_colors(1)
+            st.color = default_colors(1);
+            set(findobj(st.fig, 'Label', 'Dark'), 'Checked', 'on'); 
+            set(findobj(st.fig, 'Label', 'Light'), 'Checked', 'off'); 
         case {'light'}
-            st.color = default_colors(0)
+            st.color = default_colors(0);
+            set(findobj(st.fig, 'Label', 'Dark'), 'Checked', 'off'); 
+            set(findobj(st.fig, 'Label', 'Light'), 'Checked', 'on'); 
     end
     set(st.fig, 'color', st.color.bg); 
     set(findall(st.fig, '-property', 'ycolor'), 'ycolor', st.color.bg);
@@ -774,6 +788,7 @@ function cb_reversemap(varargin)
 function cb_closegui(varargin)
    if length(varargin)==3, h = varargin{3};
    else h = varargin{1}; end
+   rmpath(fullfile(fileparts(mfilename('fullpath')), 'supportfiles')); 
    delete(h); % Bye-bye figure
 function cb_render(varargin)
     global st
@@ -800,7 +815,7 @@ function cb_render(varargin)
     obj.background      = [0 0 0];
     
     obj.mappingfile     = [];         
-    obj.fsaverage       = fullfile(st.guipath, 'data', obj.fsaverage); 
+    obj.fsaverage       = fullfile(st.supportpath, obj.fsaverage); 
     obj.medialflag      = 1; 
     obj.direction       = direct; 
     obj.surface         = st.preferences.surface; 
@@ -844,8 +859,8 @@ function cb_report(varargin)
     di = strcmpi({'+' '-' '+/-'}, T.direct);
     opt = {'pos' 'neg' 'pos'}; 
     peaknii  = struct( ...
-        'thresh', st.ol.U, ...
-        'cluster'  ,   st.ol.K, ...
+        'thresh', T.thresh, ...
+        'cluster'  ,   T.extent, ...
         'separation',   st.preferences.separation, ...
         'sign',  opt{di}, ...
         'nearest',   1, ...
@@ -871,31 +886,39 @@ function cb_report(varargin)
     end
     ts([2 4]) = fs([2 4]);
     
-    % table
-    figure(666); clf;
-    set(666, 'Position', ts, 'Name', 'Report', 'Color', [1 1 1], 'NumberTitle', 'off'); 
-    tabHand = uitable('Parent',666,...
-    'ColumnName', {'Region Name' 'Extent' 'Stat' 'X' 'Y' 'Z'}, ...
-    'data', voxels, ...
-    'Units','Normalized','Position', [0 0 1 1],...
-    'RearrangeableColumns','on','CellSelectionCallback',@cb_tablexyz, 'Visible', 'off');
-    tmpdata = get(tabHand, 'data');
-    colwidth = repmat({'auto'}, 1, size(get(tabHand, 'data'), 2));
+    % create table
+    tfig  = figure('pos', ts, 'DockControls','off', 'MenuBar', 'none', 'Name', 'Report', 'Color', [1 1 1], 'NumberTitle', 'off', 'Visible', 'off'); 
+    tfigmenu  = uimenu(tfig,'Label','Options');
+    uimenu(tfigmenu,'Label','Save Report to CSV', 'CallBack', @cb_savetable);
+    header  = {'Region Name' 'Extent' 'Stat' 'X' 'Y' 'Z'}; 
+    colwidth = repmat({'auto'}, 1, length(header)); 
     colwidth{1} = floor(ss(3)/10);
-    set(tabHand, 'ColumnWidth', colwidth, 'FontName', 'Arial', 'FontUnits', 'Points', 'FontSize', floor(ss(4)/100)); 
-    ptmp = get(tabHand, 'Extent');
-    
-    ptmp(2) = 1-ptmp(4);
-    set(tabHand, 'Position', ptmp);
-    set(tabHand, 'Visible', 'on');
+    th = uitable('Parent', tfig, ...
+        'Data', voxels, ...
+        'Units', 'norm', ...
+        'ColumnName', header, ...
+        'Pos', [0 0 1 1], ...
+        'RearrangeableColumns', 'on', ...
+        'ColumnWidth', colwidth, ...
+        'FontName', 'Arial', ...
+        'FontUnits', 'Points', ...
+        'FontSize', floor(ss(4)/100), ...
+        'CellSelectionCallback',@cb_tablexyz);
+    set(th, 'units', 'pix'); 
+    tpos    = get(th, 'extent');
+    fpos    = get(tfig, 'pos'); 
+    set(tfig, 'pos', [fpos(1:2) tpos(3:4)]);
+    set(th, 'units', 'norm');
+    set(th, 'pos', [0 0 1 1]); 
+    set(tfig, 'vis', 'on');
 function cb_savetable(varargin)
     global st
     T = getthresh;
     di = strcmpi({'+' '-' '+/-'}, T.direct);
     opt = {'pos' 'neg' 'pos'}; 
     peaknii  = struct( ...
-        'thresh', st.ol.U, ...
-        'cluster'  ,   st.ol.K, ...
+        'thresh', T.thresh, ...
+        'cluster'  ,   T.extent, ...
         'separation',   st.preferences.separation, ...
         'sign',  opt{di}, ...
         'nearest',   1, ...
@@ -913,12 +936,23 @@ function cb_savetable(varargin)
     headers2 = {'Region Name' 'Extent' 't-value' 'x' 'y' 'z'};
     allcell = [headers1; headers2; voxels];
     [p, imname] = fileparts(st.ol.fname);
-    outname = ['save_table_' imname '_I' num2str(peaknii.thresh) '_C' num2str(peaknii.cluster) '_S' num2str(peaknii.separation) '.xlsx'];
-    [imname, pname] = uiputfile({'*.xls; *.xlsx', 'Spreadsheet Table'; '*.*', 'All Files (*.*)'}, 'Save Table As', outname);
-    xlwrite(outname, allcell);
+    outname = ['save_table_' imname '_I' num2str(peaknii.thresh) '_C' num2str(peaknii.cluster) '_S' num2str(peaknii.separation) '.csv'];
+    [fname, pname] = uiputfile({'*.csv', 'Spreadsheet Table'; '*.*', 'All Files (*.*)'}, 'Save Table As', outname);
+    writereport(allcell, fullfile(pname, fname)); 
 
 % | SETTERS
 % =========================================================================
+function setcolormap(varargin)
+    global st
+    val = get(findobj(st.fig, 'Tag', 'colormaplist'), 'Value'); 
+    newmap = st.cmap{val, 1}; 
+    interval = [st.vols{1}.blobs{1}.min st.vols{1}.blobs{1}.max]; 
+    cbh = st.vols{1}.blobs{1}.cbar; 
+    cmap = [gray(64); newmap];
+    set(findobj(cbh, 'type', 'image'), 'CData', (65:128)', 'CdataMapping', 'direct');
+    set(st.fig,'Colormap', cmap);
+    bspm_orthviews('SetBlobsMax', 1, 1, max(st.ol.Z))
+    set(findobj(st.fig, 'tag', 'maxval'), 'str',  sprintf('%2.3f',max(st.ol.Z)));
 function setunitstonorm
     global st
     arrayset(findall(st.fig, '-property', 'units'), 'units', 'norm');
@@ -1123,103 +1157,151 @@ function [xyz, voxidx, dist] = getnearestvoxel
     global st
     [xyz, voxidx, dist] = bspm_XYZreg('NearestXYZ', bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM), st.ol.XYZmm);
     
-% | COLORBAR STUFF
+% | BUIPANEL
 % =========================================================================
-function setcolormap(varargin)
-    global st
-    val = get(findobj(st.fig, 'Tag', 'colormaplist'), 'Value'); 
-    newmap = st.cmap{val, 1}; 
-    interval = [st.vols{1}.blobs{1}.min st.vols{1}.blobs{1}.max]; 
-    cbh = st.vols{1}.blobs{1}.cbar; 
-    cmap = [gray(64); newmap];
-    set(findobj(cbh, 'type', 'image'), 'CData', (65:128)', 'CdataMapping', 'direct');
-    set(st.fig,'Colormap', cmap);
-    bspm_orthviews('SetBlobsMax', 1, 1, max(st.ol.Z))
-    set(findobj(st.fig, 'tag', 'maxval'), 'str',  sprintf('%2.3f',max(st.ol.Z)));
-function addcolourbar(vh,bh)
-    global st
-    axpos = zeros(3, 4);
-    for a = 1:3
-        axpos(a,:) = get(st.vols{vh}.ax{a}.ax, 'position');
-    end
-    cbpos = axpos(3,:); 
-    cbpos(4) = cbpos(4)*.9; 
-    cbpos(2) = cbpos(2) + (axpos(3,4)-cbpos(4))/2; 
-    cbpos(1) = sum(cbpos([1 3])); 
-    cbpos(3) = (1 - cbpos(1))/2; 
-    cbpos(3) = min([cbpos(3) .30]); 
-    cbpos(1) = cbpos(1) + (cbpos(3)/4); 
-    yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max];
-    if range(yl) < 1
-        yltick = [min(yl) max(yl)]; 
-    else
-        yltick = [ceil(min(yl)) floor(max(yl))];
-    end
-    st.vols{vh}.blobs{bh}.cbar = axes('Parent', st.figax, 'ycolor', st.color.fg, ...
-        'position', cbpos, 'YAxisLocation', 'right', 'fontsize', 12, ...
-        'ytick', yltick, 'tag', 'colorbar', ...
-        'Box','on', 'YDir','normal', 'XTickLabel',[], 'XTick',[]); 
-    set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 'fontname', st.fonts.name); 
-    if isfield(st.vols{vh}.blobs{bh},'name')
-        ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
-    end    
-function cmap = getcmap(acmapname)
-% get colormap of name acmapname
-if ~isempty(acmapname)
-    cmap = evalin('base',acmapname,'[]');
-    if isempty(cmap) % not a matrix, is .mat file?
-        acmat = spm_file(acmapname, 'ext','.mat');
-        if exist(acmat, 'file')
-            s    = struct2cell(load(acmat));
-            cmap = s{1};
-        end
-    end
-end
-if size(cmap, 2)~=3
-    warning('Colormap was not an N by 3 matrix')
-    cmap = [];
-end
-function redraw_colourbar(vh,bh,interval,cdata)
-    global st
-    axpos = zeros(3, 4);
-    for a = 1:3
-        axpos(a,:) = get(st.vols{vh}.ax{a}.ax, 'position');
-    end
-    cbpos = axpos(3,:); 
-    cbpos(4) = cbpos(4)*.9; 
-    cbpos(2) = cbpos(2) + (axpos(3,4)-cbpos(4))/2; 
-    cbpos(1) = sum(cbpos([1 3])); 
-    cbpos(3) = (1 - cbpos(1))/2; 
-    cbpos(1) = cbpos(1) + (cbpos(3)/4);
-    % only scale cdata if we have out-of-range truecolour values
-    if ndims(cdata)==3 && max(cdata(:))>1
-        cdata=cdata./max(cdata(:));
-    end
-    % yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max]; 
-    yl = interval;
-    if range(yl) < 1
-        yltick = [min(yl) max(yl)]; 
-    else
-        yltick = [ceil(min(yl)) floor(max(yl))];
-    end
-    image([0 1],interval,cdata,'Parent',st.vols{vh}.blobs{bh}.cbar);
-    set(st.vols{vh}.blobs{bh}.cbar, 'ycolor', st.color.fg, ...
-        'position', cbpos, 'YAxisLocation', 'right', ...
-        'ytick', yltick, ...
-        'Box','on', 'YDir','normal', 'XTickLabel',[], 'XTick',[]); 
-    set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 'fontname', st.fonts.name); 
-    if isfield(st.vols{vh}.blobs{bh},'name')
-        ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
-    end
-function out = cmap_upsample(in, N)
-    num = size(in,1);
-    ind = repmat(1:num, ceil(N/num), 1);
-    rem = numel(ind) - N; 
-    if rem, ind(end,end-rem+1:end) = NaN; end
-    ind = ind(:); ind(isnan(ind)) = [];
-    out = in(ind(:),:);
+function h      = buipanel(parent, uilabels, uistyles, relwidth, varargin)
+% BUIPANEL Create a panel and populate it with uicontrols
+%
+%  USAGE: h = buipanel(parent, uilabels, uistyles, uiwidths, varargin)
+% __________________________________________________________________________
+%  INPUTS 
+%
 
-% | IMAGE MANIPULATION UTILITIES
+% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
+%	Created:  2014-10-08
+%	Email:    spunt@caltech.edu
+% __________________________________________________________________________
+global st
+easyparse(varargin, ... 
+            { ...
+            'panelposition', ...
+            'paneltitleposition', ...
+            'paneltitle', ...
+            'panelborder', ... 
+            'panelbackcolor',  ...
+            'panelforecolor', ...
+            'panelfontsize',  ...
+            'panelfontname' ...
+            'panelfontweight', ...
+            'editbackcolor',  ...
+            'editforecolor', ...
+            'editfontsize',  ...
+            'editfontname', ...
+            'labelbackcolor',  ...
+            'labelforecolor', ...
+            'labelfontsize',  ...
+            'labelfontname', ...
+            'labelfontweight', ...
+            'relheight', ...
+            'marginsep', ...
+            'uicontrolsep', ...
+            'tag'}); 
+defaults = easydefaults(...
+            'paneltitleposition', 'centertop', ...
+            'panelborder',      'none', ... 
+            'panelbackcolor',   st.color.bg, ...
+            'editbackcolor',    st.color.fg, ...
+            'labelbackcolor',   st.color.bg, ...
+            'panelforecolor',   st.color.fg, ...
+            'editforecolor',    [0 0 0], ...
+            'labelforecolor',   st.color.fg, ...
+            'panelfontname',    st.fonts.name, ...
+            'editfontname',     'fixed-width', ...
+            'labelfontname',    st.fonts.name, ...
+            'panelfontsize',    st.fonts.sz2, ...
+            'editfontsize',     st.fonts.sz3, ...
+            'labelfontsize',    st.fonts.sz3, ...
+            'panelfontweight',  'bold', ...
+            'labelfontweight',  'bold', ...
+            'relheight',        [6 7], ...
+            'marginsep',        .025, ...
+            'uicontrolsep',     .025);
+if nargin==0, mfile_showhelp; disp(defaults); return; end
+
+% | UNITS
+unit0 = get(parent, 'units'); 
+        
+% | PANEL
+set(parent, 'units', 'pixels')
+pp          = get(parent, 'pos'); 
+pp          = [pp(3:4) pp(3:4)]; 
+P           = uipanel(parent, 'units', 'pix', 'pos', panelposition.*pp, 'title', paneltitle, ...
+            'backg', panelbackcolor, 'foreg', panelforecolor, 'fontsize', panelfontsize, ...
+            'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
+labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight, 'tag', 'uilabel'}; 
+editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname', editfontname, 'foreg', editforecolor, 'backg', editbackcolor}; 
+propadd     = {'tag'};
+
+% | UICONTROLS
+
+pos         = getpositions(relwidth, relheight, marginsep, uicontrolsep);
+editpos     = pos(pos(:,1)==1,3:6); 
+labelpos    = pos(pos(:,1)==2, 3:6); 
+hc          = zeros(length(uilabels), 1); 
+he          = gobjects(length(uilabels), 1); 
+
+for i = 1:length(uilabels)
+    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox', 'popup'}, uistyles{i}));
+    ttag = ~cellfun('isempty', regexpi({'text'}, uistyles{i}));
+    if sum(ctag)==1
+        hc(i) = uibutton(labelprop{:}, 'pos', labelpos(i,:), 'str', uilabels{i}); 
+        he(i) = uicontrol(editprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:));
+    elseif ttag
+        editpos(i,4) = 1 - marginsep*2; 
+        he(i) = uibutton(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i}); 
+    else
+        editpos(i,4) = 1 - marginsep*2; 
+        he(i) = uicontrol(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i});  
+    end
+    for ii = 1:length(propadd)
+           if ~isempty(propadd{ii})
+                tmp = eval(sprintf('%s', propadd{ii})); 
+                set(he(i), propadd{ii}, tmp{i}); 
+           end
+    end
+end
+% | HANDLES
+h.panel = P;
+h.label = hc; 
+h.edit  = he;  
+
+set(parent, 'units', unit0);
+function pos    = getpositions(relwidth, relheight, marginsep, uicontrolsep)
+    if nargin<2, relheight = [6 7]; end
+    if nargin<3, marginsep = .025; end
+    if nargin<4, uicontrolsep = .01; end
+    ncol = length(relwidth);
+    nrow = length(relheight); 
+
+    % width
+    rowwidth    = 1-(marginsep*2)-(uicontrolsep*(ncol-1));  
+    uiwidths    = (relwidth/sum(relwidth))*rowwidth;
+    allsep      = [marginsep repmat(uicontrolsep, 1, ncol-1)];
+    uilefts     = ([0 cumsum(uiwidths(1:end-1))]) + cumsum(allsep); 
+
+    % height
+    colheight   = 1-(marginsep*2)-(uicontrolsep*(nrow-1));
+    uiheights   = (relheight/sum(relheight))*colheight;
+    allsep      = [marginsep repmat(uicontrolsep, 1, nrow-1)];
+    uibottoms   = ([0 cumsum(uiheights(1:end-1))]) + cumsum(allsep);
+
+    % combine
+    pos = zeros(ncol, 4, nrow);
+    pos(:,1,:)  = repmat(uilefts', 1, nrow); 
+    pos(:,2,:)  = repmat(uibottoms, ncol, 1);
+    pos(:,3,:)  = repmat(uiwidths', 1, nrow);
+    pos(:,4,:)  = repmat(uiheights, ncol, 1);
+
+    % test
+    pos = zeros(ncol*nrow, 6);
+    pos(:,1) = reshape(repmat(1:nrow, ncol, 1), size(pos,1), 1);
+    pos(:,2) = reshape(repmat(1:ncol, 1, nrow), size(pos,1), 1);
+    pos(:,3) = uilefts(pos(:,2)); 
+    pos(:,4) = uibottoms(pos(:,1)); 
+    pos(:,5) = uiwidths(pos(:,2)); 
+    pos(:,6) = uiheights(pos(:,1)); 
+
+% | IMAGE PROCESSING UTILITIES
 % =========================================================================
 function OL = load_overlay(fname, pval, k)
     global st
@@ -1308,16 +1390,15 @@ function OL = load_overlay(fname, pval, k)
                 'XYZ0',      XYZ);    
             
     %% LABEL MAP
-    atlas_vol = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Map.nii', st.preferences.atlasname)); 
-    atlas_labels = fullfile(st.guipath, 'data', sprintf('%s_Atlas_Labels.mat', st.preferences.atlasname)); 
+    atlas_vol = fullfile(st.supportpath, sprintf('%s_Atlas_Map.nii', st.preferences.atlasname)); 
+    atlas_labels = fullfile(st.supportpath, sprintf('%s_Atlas_Labels.mat', st.preferences.atlasname)); 
     atlasvol = reslice_image(atlas_vol, fname);
     atlasvol = single(round(atlasvol(:)))'; 
     load(atlas_labels);
     OL.atlaslabels = atlas; 
     OL.atlas0 = atlasvol;    
-    
     set(st.fig, 'Name', abridgepath(OL.fname)); 
-function t = bob_p2t(alpha, df)
+function t  = bob_p2t(alpha, df)
 % BOB_P2T Get t-value from p-value + df
 %
 %   USAGE: t = bob_p2t(alpha, df)
@@ -1332,7 +1413,7 @@ function t = bob_p2t(alpha, df)
 % =========================================
 if nargin<2, disp('USAGE: bob_p2t(p, df)'); return, end
 t = tinv(1-alpha, df);
-function p = bob_t2p(t, df)
+function p  = bob_t2p(t, df)
 % BOB_T2P Get p-value from t-value + df
 %
 %   USAGE: p = bob_t2p(t, df)
@@ -1348,7 +1429,70 @@ function p = bob_t2p(t, df)
 if nargin<2, disp('USAGE: bob_t2p(p, df)'); return, end
 p = tcdf(t, df);
 p = 1 - p;
-function [extent, info] = cluster_correct(im,u,alpha,range)
+function u  = voxel_correct(im,alpha)
+if nargin < 1, error('USAGE: u = voxel_correct(im,alpha)'); end
+if nargin < 2, alpha = .05; end
+if iscell(im), im = char(im); end
+
+%% Get Design Variable %%
+[impath imname] = fileparts(im);
+if exist([impath filesep 'I.mat'],'file') 
+    matfile = [impath filesep 'I.mat']; 
+    maskfile = [impath filesep 'mask.nii'];
+elseif exist([impath filesep 'SPM.mat'],'file') 
+    matfile = [impath filesep 'SPM.mat'];
+else
+    disp('Could not find an SPM.mat or I.mat variable, exiting.'); return
+end
+
+%% Defaults %%
+STAT = 'T';    % Test statistic
+n = 1; % number of conjoint SPMs
+
+%% Determime SPM or GLMFLEX %%
+if strfind(matfile,'SPM.mat'), flexflag = 0; else flexflag = 1; end
+
+%% Load and Compute Params %%
+if flexflag % GLMFLEX
+    load(matfile);
+    try
+        mask.hdr = spm_vol([I.OutputDir filesep 'mask.nii']);
+    catch
+        [p mf] = fileparts(im);
+        mask.hdr = spm_vol([p filesep 'mask.nii']);
+    end
+    mask.data = spm_read_vols(mask.hdr);
+    img.hdr = spm_vol(im);
+    img.data = spm_read_vols(img.hdr);
+    tmp = img.hdr.descrip; i1 = find(tmp=='['); i2 = find(tmp==']');
+    df = str2num(tmp(i1(1)+1:i2(1)-1));
+    df = [1 df];    
+    
+    FWHM = I.FWHM{1};
+    R = spm_resels_vol(mask.hdr,FWHM)';
+    S = sum(mask.data(:)==1);
+    M = I.v.mat;
+    VOX  = sqrt(diag(M(1:3,1:3)'*M(1:3,1:3)))';
+    FWHMmm= FWHM.*VOX; % FWHM {mm}
+    v2r  = 1/prod(FWHM(~isinf(FWHM)));% voxels to resels
+
+else % SPM
+    
+    load(matfile)
+    df   = [1 SPM.xX.erdf];
+    n    = 1;
+    R    = SPM.xVol.R;
+    S    = SPM.xVol.S;
+    M    = SPM.xVol.M;
+    VOX  = sqrt(diag(M(1:3,1:3)'*M(1:3,1:3)))';
+    FWHM = SPM.xVol.FWHM;
+    FWHMmm= FWHM.*VOX; 				% FWHM {mm}
+    v2r  = 1/prod(FWHM(~isinf(FWHM))); %-voxels to resels
+    
+end
+%% get threshold
+u = spm_uc(alpha,df,STAT,R,n,S); 
+function k  = cluster_correct(im,u,alpha,range)
 % BOB_SPM_CLUSTER_CORRECT Computer extent for cluster-level correction
 %
 % USAGE: [k info] = bob_spm_cluster_correct(im,u,alpha,range)
@@ -1580,69 +1724,6 @@ info.extent = k;
 info.alpha = alpha;
 info.u = u;
 info.Pc = Pc;
-function u = voxel_correct(im,alpha)
-if nargin < 1, error('USAGE: u = voxel_correct(im,alpha)'); end
-if nargin < 2, alpha = .05; end
-if iscell(im), im = char(im); end
-
-%% Get Design Variable %%
-[impath imname] = fileparts(im);
-if exist([impath filesep 'I.mat'],'file') 
-    matfile = [impath filesep 'I.mat']; 
-    maskfile = [impath filesep 'mask.nii'];
-elseif exist([impath filesep 'SPM.mat'],'file') 
-    matfile = [impath filesep 'SPM.mat'];
-else
-    disp('Could not find an SPM.mat or I.mat variable, exiting.'); return
-end
-
-%% Defaults %%
-STAT = 'T';    % Test statistic
-n = 1; % number of conjoint SPMs
-
-%% Determime SPM or GLMFLEX %%
-if strfind(matfile,'SPM.mat'), flexflag = 0; else flexflag = 1; end
-
-%% Load and Compute Params %%
-if flexflag % GLMFLEX
-    load(matfile);
-    try
-        mask.hdr = spm_vol([I.OutputDir filesep 'mask.nii']);
-    catch
-        [p mf] = fileparts(im);
-        mask.hdr = spm_vol([p filesep 'mask.nii']);
-    end
-    mask.data = spm_read_vols(mask.hdr);
-    img.hdr = spm_vol(im);
-    img.data = spm_read_vols(img.hdr);
-    tmp = img.hdr.descrip; i1 = find(tmp=='['); i2 = find(tmp==']');
-    df = str2num(tmp(i1(1)+1:i2(1)-1));
-    df = [1 df];    
-    
-    FWHM = I.FWHM{1};
-    R = spm_resels_vol(mask.hdr,FWHM)';
-    S = sum(mask.data(:)==1);
-    M = I.v.mat;
-    VOX  = sqrt(diag(M(1:3,1:3)'*M(1:3,1:3)))';
-    FWHMmm= FWHM.*VOX; % FWHM {mm}
-    v2r  = 1/prod(FWHM(~isinf(FWHM)));% voxels to resels
-
-else % SPM
-    
-    load(matfile)
-    df   = [1 SPM.xX.erdf];
-    n    = 1;
-    R    = SPM.xVol.R;
-    S    = SPM.xVol.S;
-    M    = SPM.xVol.M;
-    VOX  = sqrt(diag(M(1:3,1:3)'*M(1:3,1:3)))';
-    FWHM = SPM.xVol.FWHM;
-    FWHMmm= FWHM.*VOX; 				% FWHM {mm}
-    v2r  = 1/prod(FWHM(~isinf(FWHM))); %-voxels to resels
-    
-end
-%% get threshold
-u = spm_uc(alpha,df,STAT,R,n,S); 
 function [out, outmat] = reslice_image(in, ref, int)
 % Most of the code is adapted from rest_Reslice in REST toolbox:
 % Written by YAN Chao-Gan 090302 for DPARSF. Referenced from spm_reslice.
@@ -1676,22 +1757,67 @@ outmat = mat;
 
 % | MISC UTILITIES
 % =========================================================================
-function arrayset(harray, propname, propvalue) 
-% ARRAYGET Set property values for array of handles
+function outmsg = printmsg(msg, msgtitle, msgborder, msgwidth, hideoutput)
+% PRINTMSG Create and print a formatted message with title
 %
-% USAGE: arrayset(harray, propname, propvalue) 
+%	USAGE: fmtmessage = printmsg(message, msgtitle, msgborder, msgwidth)
 %
-% ==============================================
-if nargin<2, error('USAGE: arrayset(harray, propname, propvalue) '); end
-if size(harray, 1)==1, harray = harray'; end
-if ~iscell(propvalue)
-    arrayfun(@set, harray, repmat({propname}, length(harray), 1), ...
-            repmat({propvalue}, length(harray), 1)); 
-else
-    if size(propvalue, 1)==1, propvalue = propvalue'; end
-    arrayfun(@set, harray, repmat({propname}, length(harray), 1), propvalue); 
+%
+
+% --------------------------- Copyright (C) 2014 ---------------------------
+%	Author: Bob Spunt
+%	Email: bobspunt@gmail.com
+% 
+%	$Created: 2014_09_27
+% _________________________________________________________________________
+if nargin<5, hideoutput = 0; end
+if nargin<4, msgwidth   = 75; end
+if nargin<3, msgborder  = {'_' '_'}; end
+if nargin<2, msgtitle   = ''; end
+if nargin<1,
+    msg = 'USAGE: fmtmessage = printmsg(msg, [msgtitle], [msgborder], [msgwidth])';
+    msgtitle = 'I NEED MORE INPUT FROM YOU';
 end
-function vol = uigetvol(message, multitag)
+if ischar(msgborder), msgborder = cellstr(msgborder); end
+if length(msgborder)==1, msgborder = [msgborder msgborder]; end
+if iscell(msg), msg = char(msg); end
+if iscell(msgtitle), msgtitle = char(msgtitle); end
+msgtop          = repmat(msgborder{1},1,msgwidth);
+msgbottom       = repmat(msgborder{2},1,msgwidth);
+if ~isempty(msgtitle), msgtitle = sprintf('%s %s %s', msgborder{1}, strtrim(msgtitle), msgborder{1}); end
+titleln         = length(msgtitle);
+msgln           = length(msg); 
+msgtop(floor(.5*msgwidth-.5*titleln):floor(.5*msgwidth-.5*titleln) + titleln-1) = msgtitle;
+outmsg      = repmat(' ', 1, msgwidth);
+outmsg(floor(.5*msgwidth-.5*msgln):floor(.5*msgwidth-.5*msgln) + msgln-1) = msg;
+outmsg      = sprintf('%s\n\n%s\n%s', msgtop, outmsg, msgbottom);
+if ~hideoutput, disp(outmsg); end
+function out    = abridgepath(str, maxchar)
+if nargin<2, maxchar =  85; end
+if iscell(str), str = char(str); end
+if length(str) <= maxchar, out = str; return; end
+s   = regexp(str, filesep, 'split');
+s(cellfun('isempty', s)) = [];
+p1 = fullfile(s{1}, '...'); 
+s(1) = []; 
+badpath = 1;
+count = 0; 
+while badpath
+    count = count + 1; 
+    testpath = s; 
+    testpath(1:count) = []; 
+    testpath = fullfile(p1, testpath{:}); 
+    if length(testpath)<=maxchar, badpath = 0; end
+end
+out = testpath; 
+function out    = cmap_upsample(in, N)
+    num = size(in,1);
+    ind = repmat(1:num, ceil(N/num), 1);
+    rem = numel(ind) - N; 
+    if rem, ind(end,end-rem+1:end) = NaN; end
+    ind = ind(:); ind(isnan(ind)) = [];
+    out = in(ind(:),:);
+function vol    = uigetvol(message, multitag)
     % UIGETVOL Dialogue for selecting image volume file
     %
     %   USAGE: vol = uigetvol(message, multitag)
@@ -1713,7 +1839,7 @@ function vol = uigetvol(message, multitag)
     else
         vol = fullfile(pname, strcat(imname));
     end
-function vol = uiputvol(defname, prompt)
+function vol    = uiputvol(defname, prompt)
     if nargin < 1, defname = 'myimage.nii'; end
     if nargin < 2, prompt = 'Save image as'; end
     [imname, pname] = uiputfile({'*.img; *.nii', 'Image File'; '*.*', 'All Files (*.*)'}, prompt, defname);
@@ -1722,7 +1848,7 @@ function vol = uiputvol(defname, prompt)
     else
         vol = fullfile(pname, imname); 
     end
-function out = adjustbrightness(in)
+function out    = adjustbrightness(in)
     lim = .5;
     dat.min = min(in(in>0)); 
     dat.max = max(in(in>0));
@@ -1730,7 +1856,7 @@ function out = adjustbrightness(in)
     out = double(in)./255; 
     out(out>0) = out(out>0) + (lim-nanmean(nanmean(out(out>0))))*(1 - out(out>0)); 
     out(out>0) = scaledata(out(out>0), [dat.min dat.max]);
-function fn = construct_filename
+function fn     = construct_filename
     global st
     [p,n]   = fileparts(st.ol.hdr.fname);
     idx     = regexp(st.ol.descrip, ': ');
@@ -1739,7 +1865,138 @@ function fn = construct_filename
         n = regexprep(n, ' ', '_'); 
     end
     fn = sprintf('%s/%s_x=%d_y=%d_z=%d.png', p, n, bspm_XYZreg('RoundCoords',st.centre,st.ol.M,st.ol.DIM));        
-function handles = headsup(msg, wait4resp)
+function s      = easydefaults(varargin)
+% easydefaults  Set many default arguments quick and easy.
+%
+%   - For input arguments x1,x2,x3, set default values x1def,x2def,x3def
+%     using easydefaults as parameter-value pairs:
+%       easydefaults('x1',x1def,'x2',x2def,'x3',x3def);
+%   
+%   - Defaults can be set for any input argument, whether explicit or as 
+%     part of a parameter-value pair:
+%       function dummy_function(x,varargin)
+%           easydefaults('x',1,'y',2);
+%           ...   
+%       end
+%
+%   - easydefaults and easyparse can in principle be used in either order, 
+%     but it is usually better to parse first and fill in defaults after:
+%       function dummy_function(x,varargin)
+%           easyparse(varargin,'y')
+%           easydefaults('x',1,'y',2);
+%           ...   
+%       end
+%
+%   CAVEAT UTILITOR: this function relies on evals and assignin statements.
+%   Input checking is performed to limit potential damage, but use at your 
+%   own risk.
+%
+%   Author: Jared Schwede 
+%   Last update: Jan 14, 2013
+
+    % Check that all inputs come in parameter-value pairs.
+    if mod(length(varargin),2)
+        error('Default arguments must be specified in pairs!');
+    end
+    
+    for i=1:2:length(varargin)
+        if ~ischar(varargin{i})
+            error('Variables to easydefaults must be written as strings!');
+        end
+        
+        % We'll check that the varargin is a valid variable name. This
+        % should hopefully avoid any nasty code...
+        if ~isvarname(varargin{i})
+            error('Invalid variable name!');
+        end
+        
+        if exist(varargin{i},'builtin') || (exist(varargin{i},'file') == 2) || exist(varargin{i},'class')
+            warning('MATLAB:defined_function',['''' varargin{i} ''' conflicts with the name of a function, m-file, or class along the MATLAB path and will be ignored by easydefaults.' ...
+                                        ' Please rename the variable, or use a temporary variable with easydefaults and explicitly define ''' varargin{i} ...
+                                        ''' within your function.']);
+        else
+            if ~evalin('caller',['exist(''' varargin{i} ''',''var'')'])
+                % We assign the arguments to a struct, s, which allows us to
+                % check that the evalin statement will not either throw an 
+                % error or execute some nasty code.
+                s.(varargin{i}) = varargin{i+1};
+                assignin('caller',varargin{i},varargin{i+1});
+            end
+        end
+end
+function s      = easyparse(caller_varargin,allowed_names)
+% easyparse    Parse parameter-value pairs without using inputParser
+%   easyparse is called by a function which takes parameter value pairs and
+%   creates individual variables in that function. It can also be used to
+%   generate a struct like inputParser.
+%
+%   - To create variables in the function workspace according to the
+%     varargin of parameter-value pairs, use this syntax in your function:
+%       easyparse(varargin)
+%
+%   - To create only variables with allowed_names, create a cell array of
+%     allowed names and use this syntax:
+%       easyparse(varargin, allowed_names);
+%
+%   - To create a struct with fields specified by the names in varargin,
+%     (similar to the output of inputParser) ask for an output argument:
+%       s = easyparse(...);
+%  
+%   CAVEAT UTILITOR: this function relies on assignin statements. Input
+%   checking is performed to limit potential damage, but use at your own 
+%   risk.
+%
+%   Author: Jared Schwede
+%   Last update: January 14, 2013
+
+    % We assume all inputs come in parameter-value pairs. We'll also assume
+    % that there aren't enough of them to justify using a containers.Map. 
+    for i=1:2:length(caller_varargin)
+        if nargin == 2 && ~any(strcmp(caller_varargin{i},allowed_names))
+            error(['Unknown input argument: ' caller_varargin{i}]);
+        end
+        
+        if ~isvarname(caller_varargin{i})
+            error('Invalid variable name!');
+        end
+        
+        
+        % We assign the arguments to the struct, s, which allows us to
+        % check that the assignin statement will not either throw an error 
+        % or execute some nasty code.
+        s.(caller_varargin{i}) = caller_varargin{i+1};
+        % ... but if we ask for the struct, don't write all of the
+        % variables to the function as well.
+        if ~nargout
+            if exist(caller_varargin{i},'builtin') || (exist(caller_varargin{i},'file') == 2) || exist(caller_varargin{i},'class')
+                warning('MATLAB:defined_function',['''' caller_varargin{i} ''' conflicts with the name of a function, m-file, or class along the MATLAB path and will be ignored by easyparse.' ...
+                                            ' Please rename the variable, or use a temporary variable with easyparse and explicitly define ''' caller_varargin{i} ...
+                                            ''' within your function.']);
+            else
+                assignin('caller',caller_varargin{i},caller_varargin{i+1});
+            end
+        end
+    end
+function out    = scaledata(in, minmax)
+% SCALEDATA
+%
+% USAGE: out = scaledata(in, minmax)
+%
+% Example:
+% a = [1 2 3 4 5];
+% a_out = scaledata(a,0,1);
+% 
+% Output obtained: 
+%            0    0.1111    0.2222    0.3333    0.4444
+%       0.5556    0.6667    0.7778    0.8889    1.0000
+%
+% Program written by:
+% Aniruddha Kembhavi, July 11, 2007
+if nargin<2, minmax = [0 1]; end
+if nargin<1, error('USAGE: out = scaledata(in, minmax)'); end
+out = in - repmat(min(in), size(in, 1), 1); 
+out = ((out./repmat(range(out), size(out,1), 1))*(minmax(2)-minmax(1))) + minmax(1); 
+function h      = headsup(msg, wait4resp)
 % HEADSUP Present message to user and wait for a response
 %
 %  USAGE: handles = headsup(msg, *wait4resp)    *optional input
@@ -1755,7 +2012,7 @@ function handles = headsup(msg, wait4resp)
 if nargin < 1, disp('USAGE: handles = headsup(msg, *wait4resp)'); return; end
 if nargin < 2, wait4resp = 1; end
 if ~iscell(msg), msg = char(msg); end
-handles(1) = figure(...
+h(1) = figure(...
     'Units', 'norm', ...
     'Position',[.425 .45 .15 .10],...
     'Resize','off',...
@@ -1767,454 +2024,69 @@ handles(1) = figure(...
     'Name','Heads Up',...
     'Visible','on',...
     'Toolbar','none');
-handles(2) = uicontrol('parent', handles(1), 'units', 'norm', 'style',  'text', 'backg', [0.8941    0.1020    0.1098]*.60,'foreg', [248/255 248/255 248/255], 'horiz', 'center', ...
+h(2) = uicontrol('parent', h(1), 'units', 'norm', 'style',  'text', 'backg', [0.8941    0.1020    0.1098]*.60,'foreg', [248/255 248/255 248/255], 'horiz', 'center', ...
     'pos', [.1 .40 .8 .40], 'fontname', 'arial', 'fontw', 'bold', 'fontsize', 16, 'string', msg, 'visible', 'on'); 
-handles(3) = uicontrol('parent', handles(1), 'units', 'norm', 'style', 'push', 'foreg', [0 0 0], 'horiz', 'center', ...
-    'pos', [.4 .10 .2 .30], 'fontname', 'arial', 'fontw', 'bold', 'fontsize', 16, 'string', 'OK', 'visible', 'on', 'callback', {@cb_ok, handles});
-if wait4resp, uiwait(handles(1)); end
+h(3) = uicontrol('parent', h(1), 'units', 'norm', 'style', 'push', 'foreg', [0 0 0], 'horiz', 'center', ...
+    'pos', [.4 .10 .2 .30], 'fontname', 'arial', 'fontw', 'bold', 'fontsize', 16, 'string', 'OK', 'visible', 'on', 'callback', {@cb_ok, h});
+if wait4resp, uiwait(h(1)); end
 function cb_ok(varargin)
-delete(findobj(0, 'Tag', 'headsup'));
-function out = num2pval(in, ndec)
-% NUM2PVAL Convert numeric array of p-values to formatted cell array of p-values
+    delete(findobj(0, 'Tag', 'headsup'));
+function writereport(incell, outname)
+% WRITEREPORT Write cell array to CSV file
 %
-%  USAGE: out = num2pval(in, ndec)
+%  USAGE: outname = writereport(incell, outname)	*optional input
 % __________________________________________________________________________
 %  INPUTS
-%	in: numeric array of p-values
-%   ndec: number of decimal points to display
+%	incell:     cell array of character arrays
+%	outname:   base name for output csv file 
 %
 
 % ---------------------- Copyright (C) 2015 Bob Spunt ----------------------
-%	Created:  2015-01-13
+%	Created:  2015-02-02
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 2, ndec = 3; end
-if nargin < 1, disp('USAGE: out = num2pval(in)'); return; end
-if ~isnumeric(in), error('Input array must be numeric!'); end
-out = num2cell(in); 
-out = cellfun(@num2str, out, repmat({['%2.' num2str(ndec) 'f']}, size(out)), 'Unif', false); 
-out = regexprep(out, '0\.', '\.');
-out(cellfun(@str2double, out)==0) = {['<.' repmat('0', 1, ndec-1) '1']};
-function out = abridgepath(str, maxchar)
-if nargin<2, maxchar =  85; end
-if iscell(str), str = char(str); end
-if length(str) <= maxchar, out = str; return; end
-s   = regexp(str, filesep, 'split');
-s(cellfun('isempty', s)) = [];
-p1 = fullfile(s{1}, '...'); 
-s(1) = []; 
-badpath = 1;
-count = 0; 
-while badpath
-    count = count + 1; 
-    testpath = s; 
-    testpath(1:count) = []; 
-    testpath = fullfile(p1, testpath{:}); 
-    if length(testpath)<=maxchar, badpath = 0; end
-end
-out = testpath; 
-function [h, hh] = surfPlot4(obj)
-%%% Written by Aaron P. Schultz - aschultz@martinos.org
-%%%
-%%% Copyright (C) 2014,  Aaron P. Schultz
-%%%
-%%% Supported in part by the NIH funded Harvard Aging Brain Study (P01AG036694) and NIH R01-AG027435 
-%%%
-%%% This program is free software: you can redistribute it and/or modify
-%%% it under the terms of the GNU General Public License as published by
-%%% the Free Software Foundation, either version 3 of the License, or
-%%% any later version.
-%%% 
-%%% This program is distributed in the hope that it will be useful,
-%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%%% GNU General Public License for more details.
-%%%
+if nargin < 2, disp('USAGE: outname = writereport(incell, outname)'); return; end
 
-load(obj.fsaverage);
-switch lower(obj.surface)
-    case 'inflated'
-        lVert = T.inflated.lVert;
-        lFace = T.inflated.lFace;
-        rVert = T.inflated.rVert;
-        rFace = T.inflated.rFace;
-    case 'pial'
-        lVert = T.pial.lVert;
-        lFace = T.pial.lFace;
-        rVert = T.pial.rVert;
-        rFace = T.pial.rFace;
-    case 'white'
-        lVert = T.white.lVert;
-        lFace = T.white.lFace;
-        rVert = T.white.rVert;
-        rFace = T.white.rFace;
-    otherwise
-        error('Surface option Not Found:  Available options are inflated, pial, and white');
+% | Convert all cell contents to character arrays
+% | ========================================================================
+[nrow, ncol] = size(incell);
+for i = 1:numel(incell)
+    if isnumeric(incell{i}), incell{i} = num2str(incell{i}); end
+    if strcmp(incell{i},'NaN'), incell{i} = ''; end
 end
-switch lower(obj.shading)
-    case 'curv'
-        lShade = -T.lCurv;
-        rShade = -T.rCurv;
-    case 'sulc'
-        %lShade = -round(T.lSulc);
-        %rShade = -round(T.rSulc);
-        lShade = -(T.lSulc);
-        rShade = -(T.rSulc);
-    case 'thk'
-        lShade = T.lThk;
-        rShade = T.rThk;
-    otherwise
-         error('Shading option Not Found:  Available options are curv, sulc, and thk');
+incell = regexprep(incell, ',', '');
+
+% | Write to file
+% | ========================================================================
+fid = fopen(outname,'w');
+for r = 1:nrow
+    fprintf(fid,['%s' repmat(',%s',1,ncol-1) '\n'],incell{r,:});
 end
-if obj.newfig
-    if obj.figno>0
-        figure(obj.figno); clf;
-        set(gcf,'color',obj.background, 'position', obj.position); shg
-    else
-        figure('pos', obj.position); clf;
-        set(gcf,'color',obj.background, 'position', obj.position); shg
-        obj.figno = gcf;
-    end
-    rang = obj.shadingrange;
-    c = lShade;
-    c = demean(c);
-    c = c./spm_range(c);
-    c = c.*diff(rang);
-    c = c-min(c)+rang(1);
-    col1 = [c c c];
- if obj.Nsurfs == 4;
-        subplot(2,12,1:5);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(270,0)
-        subplot(2,12,13:17);
-        h(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(90,0)   
-    elseif obj.Nsurfs == 2;
-        subplot(1,11,1:5);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(270,0)
-    elseif obj.Nsurfs == 1.9;
-        
-        subplot(1,24,1:10);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(270,0)
-        
-        subplot(1,24,13:22);
-        h(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        view(90,0)
-        
-    elseif obj.Nsurfs == -1;    
-        
-        subplot(1,11,1:10);
-        h(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col1);
-        shading interp;
-        axis equal; axis tight; axis off;
-        if ~obj.medialflag
-            view(270,0)
-        end
-        
- end
-    c = rShade;
-    c = demean(c);
-    c = c./spm_range(c);
-    c = c.*diff(rang);
-    c = c-min(c)+rang(1);
-    
-    col2 = [c c c];
-    
-    if obj.Nsurfs == 4;
-        
-        subplot(2,12,6:10);
-        h(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-        subplot(2,12,18:22);
-        h(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(270,0)
-        
-    elseif obj.Nsurfs == 2;
-        
-        subplot(1,11,6:10);
-        h(2) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-    elseif obj.Nsurfs == 2.1;
-        
-        subplot(1,24,1:10);
-        h(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-        subplot(1,24,13:22);
-        h(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(270,0)
-        
-    elseif obj.Nsurfs == 1;
-        
-        subplot(1,11,1:10);
-        h(1) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col2);
-        shading interp;
-        axis equal; axis tight; axis off
-        view(90,0)
-        
-    end
-        
+fclose(fid);
+function mfile_showhelp(varargin)
+% MFILE_SHOWHELP
+%
+% ------------------------------------------------------------------------
+ST = dbstack('-completenames');
+if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; end
+eval(sprintf('help %s', ST(2).file));  
+function arrayset(harray, propname, propvalue) 
+% ARRAYGET Set property values for array of handles
+%
+% USAGE: arrayset(harray, propname, propvalue) 
+%
+% ==============================================
+if nargin<2, error('USAGE: arrayset(harray, propname, propvalue) '); end
+if size(harray, 1)==1, harray = harray'; end
+if ~iscell(propvalue)
+    arrayfun(@set, harray, repmat({propname}, length(harray), 1), ...
+            repmat({propvalue}, length(harray), 1)); 
 else
-    
-    tmp = get(obj.figno,'UserData');
-    col1 = tmp{1};
-    col2 = tmp{2};
-    h = tmp{3};
-    
+    if size(propvalue, 1)==1, propvalue = propvalue'; end
+    arrayfun(@set, harray, repmat({propname}, length(harray), 1), propvalue); 
 end
 
-%%%
-lMNI = T.map.lMNI;
-lv = T.map.lv;
-rMNI =T.map.rMNI;
-rv = T.map.rv;
-if ischar(obj.input);
-    [m he] = openIMG(obj.input);
-else
-    try
-        m = obj.input.m;
-        he = obj.input.he;
-    catch
-        he = obj.input;
-        m = spm_read_vols(he);
-    end
-end
-[x y z] = ind2sub(he.dim,(1:numel(m))');
-mat = [x y z ones(numel(z),1)];
-mni = mat*he.mat';
-mni = mni(:,1:3);
-
-if obj.reverse==1
-    m = m*-1;
-end
-% keyboard;
-if ~isempty(obj.mappingfile);
-    load(obj.mappingfile);
-    lVoxels = MP.lVoxels;
-    rVoxels = MP.rVoxels;
-    lWeights = MP.lWeights;
-    rWeights = MP.rWeights;    
-    
-    lVals = m(lVoxels);
-    lWeights(isnan(lVals))=NaN;
-    lVals = nansum(lVals.*lWeights,2)./nansum(lWeights,2);
-    
-    rVals = m(rVoxels);
-    rWeights(isnan(rVals))=NaN;
-    rVals = nansum(rVals.*rWeights,2)./nansum(rWeights,2);
-else    
-    
-    if isfield(obj,'nearestneighbor') && obj.nearestneighbor == 1;
-        mloc = ([T.map.lMNI ones(size(T.map.lMNI,1),1)]*inv(he.mat'));
-        lVoxels = sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)));
-        lWeights = 1;
-        
-        mloc = ([T.map.rMNI ones(size(T.map.rMNI,1),1)]*inv(he.mat'));
-        rVoxels = sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)));
-        rWeights = 1;
-        
-    else
-        mloc = ([T.map.lMNI ones(size(T.map.lMNI,1),1)]*inv(he.mat'));
-        lVoxels = [sub2ind(he.dim,floor(mloc(:,1)),floor(mloc(:,2)),floor(mloc(:,3))) sub2ind(he.dim,ceil(mloc(:,1)),ceil(mloc(:,2)),ceil(mloc(:,3))) sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)))];
-        lWeights = (1/3);
-        
-        mloc = ([T.map.rMNI ones(size(T.map.rMNI,1),1)]*inv(he.mat'));
-        rVoxels = [sub2ind(he.dim,floor(mloc(:,1)),floor(mloc(:,2)),floor(mloc(:,3))) sub2ind(he.dim,ceil(mloc(:,1)),ceil(mloc(:,2)),ceil(mloc(:,3))) sub2ind(he.dim,round(mloc(:,1)),round(mloc(:,2)),round(mloc(:,3)))];
-        rWeights = (1/3);
-    end
-    lVals = nansum(m(lVoxels).*lWeights,2);
-    rVals = nansum(m(rVoxels).*rWeights,2);
-end
-if isfield(obj,'round') && obj.round == 1;
-    lVals = round(lVals);
-    rVals = round(rVals);
-end
-if numel(obj.overlaythresh) == 1;
-    if obj.direction == '+'
-        ind1 = find(lVals>obj.overlaythresh);
-        ind2 = find(rVals>obj.overlaythresh);
-    elseif obj.direction == '-'
-        ind1 = find(lVals>obj.overlaythresh);
-        ind2 = find(rVals>obj.overlaythresh);
-    end
-else
-    ind1 = find(lVals<=obj.overlaythresh(1) | lVals>=obj.overlaythresh(2));
-    ind2 = find(rVals<=obj.overlaythresh(1) | rVals>=obj.overlaythresh(2));
-end
-%%%
-val = max([abs(min([lVals; rVals])) abs(max([lVals; rVals]))]);
-if obj.colorlims(1) == -inf
-    obj.colorlims(1)=-val;
-end
-if obj.colorlims(2) == inf
-    obj.colorlims(2)=val;
-end
-
-% obj.colormap = cmap_upsample(obj.colormap, length(ind1)); 
-[cols, CD] = cmap(lVals(ind1), obj.colorlims, obj.colormap);
-col = nan(size(col1));
-col(lv(ind1)+1,:) = cols;
-if obj.Nsurfs == 4;
-    
-    subplot(2,12,1:5);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(2,12,13:17);
-    hh(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp;
-    
-elseif obj.Nsurfs == 1.9;
-    
-    subplot(1,24,1:10);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(1,24,13:22);
-    hh(2) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp;    
-    
-elseif obj.Nsurfs == 2;
-    
-    subplot(1,11,1:5);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    
-elseif obj.Nsurfs == -1;
-    
-    subplot(1,11,1:10);
-    hh(1) = patch('vertices',lVert,'faces', lFace,'FaceVertexCdata',col);
-    shading interp
-    if obj.medialflag
-        view(90,0)
-    end
-    
-end
-[cols CD] = cmap(rVals(ind2), obj.colorlims ,obj.colormap);
-col = nan(size(col2));
-col(rv(ind2)+1,:) = cols;
-if obj.Nsurfs == 4;
-    
-    subplot(2,12,6:10);
-    hh(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(2,12,18:22);
-    hh(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp;
-    
-elseif obj.Nsurfs == 2.1;
-    
-    subplot(1,24,1:10);
-    hh(3) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-    subplot(1,24,13:22);
-    hh(4) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp;    
-    
-elseif obj.Nsurfs == 2;
-    
-    subplot(1,11,6:10);
-    hh(2) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-elseif obj.Nsurfs == 1;
-    
-    subplot(1,11,1:10);
-    hh(1) = patch('vertices',rVert,'faces', rFace,'FaceVertexCdata',col);
-    shading interp
-    
-    
-end
-set(gcf,'UserData',{col1 col2,h});
-drawnow;
-if obj.cmapflag
-if obj.Nsurfs == 4
-    subplot(2,12,[12 24])
-elseif obj.Nsurfs == 1.9 || obj.Nsurfs == 2.1;
-    subplot(1, 22, 22);
-else 
-    subplot(1,11,11);
-end
-cla
-mp = [];
-mp(1:256,1,1:3) = CD;
-ch = imagesc((1:256)');
-set(ch,'CData',mp)
-try
-[cl trash indice] = cmap(obj.overlaythresh,obj.colorlims,obj.colormap);
-catch
-    keyboard; 
-end
-tickmark = unique(sort([1 122 255 indice(:)']));
-ticklabel = unique(sort([obj.colorlims(1) mean(obj.colorlims) obj.colorlims(2) obj.overlaythresh])');
-tickmark = tickmark([1 end]);
-ticklabel = ticklabel([1 end]);
-set(gca,'YDir','normal','YAxisLocation','right','XTick',[],'YTick',(tickmark),'YTickLabel',(ticklabel),'fontsize',14,'YColor','w');
-shading interp
-end
-function [cols, cm ,cc] = cmap(X, lims, cm)
-    %%% Written by Aaron P. Schultz - aschultz@martinos.org
-    %%%
-    %%% Copyright (C) 2014,  Aaron P. Schultz
-    %%%
-    %%% Supported in part by the NIH funded Harvard Aging Brain Study (P01AG036694) and NIH R01-AG027435 
-    %%%
-    %%% This program is free software: you can redistribute it and/or modify
-    %%% it under the terms of the GNU General Public License as published by
-    %%% the Free Software Foundation, either version 3 of the License, or
-    %%% any later version.
-    %%% 
-    %%% This program is distributed in the hope that it will be useful,
-    %%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-    %%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    %%% GNU General Public License for more details.X = X(:);
-    lims = sort(lims);
-    nBins = 256;
-    if ischar(cm)
-        eval(['cm = colmap(''' cm ''',' num2str(nBins) ');']);
-    elseif size(cm, 1)~=nBins
-        cm = cmap_upsample(cm, nBins);  
-    end
-    X(find(X<lims(1)))=lims(1);
-    X(find(X>lims(2)))=lims(2);
-    cc = [X(:); lims(:)];
-    cc = cc/(diff(lims));
-    cc = (cc*(nBins));
-    dd = cc;
-    cc = cc+(nBins-max(cc));
-    cc = floor(cc(1:end-2))+1;
-    cc(cc>nBins)=nBins;
-    cc(cc<1)=1;
-    cols = nan(numel(cc),3);
-    cols(~isnan(cc),:) = cm(cc(~isnan(cc)),:);
-
-% | BSPM_OPTHVIEWS (MODIFIED FROM ORIGINAL SPM8 CODE)
+% | BSPM_OPTHVIEWS (MODIFIED FROM SPM8 SPM_OPTHVIEWS)
 % =========================================================================
 function varargout = bspm_orthviews(action,varargin)
 % John Ashburner et al% Display orthogonal views of a set of images
@@ -4084,8 +3956,83 @@ for i = 1:numel(cm_handles)
         set(findobj(z_handle,'Label',sprintf('%dx%d mm', 2*zoom, 2*zoom)),'Checked','on');
     end % leave all unchecked if either bounding box option was chosen
 end
+function addcolourbar(vh,bh)
+    global st
+    axpos = zeros(3, 4);
+    for a = 1:3
+        axpos(a,:) = get(st.vols{vh}.ax{a}.ax, 'position');
+    end
+    cbpos = axpos(3,:); 
+    cbpos(4) = cbpos(4)*.9; 
+    cbpos(2) = cbpos(2) + (axpos(3,4)-cbpos(4))/2; 
+    cbpos(1) = sum(cbpos([1 3])); 
+    cbpos(3) = (1 - cbpos(1))/2; 
+    cbpos(3) = min([cbpos(3) .30]); 
+    cbpos(1) = cbpos(1) + (cbpos(3)/4); 
+    yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max];
+    if range(yl) < 1
+        yltick = [min(yl) max(yl)]; 
+    else
+        yltick = [ceil(min(yl)) floor(max(yl))];
+    end
+    st.vols{vh}.blobs{bh}.cbar = axes('Parent', st.figax, 'ycolor', st.color.fg, ...
+        'position', cbpos, 'YAxisLocation', 'right', 'fontsize', 12, ...
+        'ytick', yltick, 'tag', 'colorbar', ...
+        'Box','on', 'YDir','normal', 'XTickLabel',[], 'XTick',[]); 
+    set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 'fontname', st.fonts.name); 
+    if isfield(st.vols{vh}.blobs{bh},'name')
+        ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
+    end    
+function cmap = getcmap(acmapname)
+% get colormap of name acmapname
+if ~isempty(acmapname)
+    cmap = evalin('base',acmapname,'[]');
+    if isempty(cmap) % not a matrix, is .mat file?
+        acmat = spm_file(acmapname, 'ext','.mat');
+        if exist(acmat, 'file')
+            s    = struct2cell(load(acmat));
+            cmap = s{1};
+        end
+    end
+end
+if size(cmap, 2)~=3
+    warning('Colormap was not an N by 3 matrix')
+    cmap = [];
+end
+function redraw_colourbar(vh,bh,interval,cdata)
+    global st
+    axpos = zeros(3, 4);
+    for a = 1:3
+        axpos(a,:) = get(st.vols{vh}.ax{a}.ax, 'position');
+    end
+    cbpos = axpos(3,:); 
+    cbpos(4) = cbpos(4)*.9; 
+    cbpos(2) = cbpos(2) + (axpos(3,4)-cbpos(4))/2; 
+    cbpos(1) = sum(cbpos([1 3])); 
+    cbpos(3) = (1 - cbpos(1))/2; 
+    cbpos(1) = cbpos(1) + (cbpos(3)/4);
+    % only scale cdata if we have out-of-range truecolour values
+    if ndims(cdata)==3 && max(cdata(:))>1
+        cdata=cdata./max(cdata(:));
+    end
+    % yl = [st.vols{vh}.blobs{bh}.min st.vols{vh}.blobs{bh}.max]; 
+    yl = interval;
+    if range(yl) < 1
+        yltick = [min(yl) max(yl)]; 
+    else
+        yltick = [ceil(min(yl)) floor(max(yl))];
+    end
+    image([0 1],interval,cdata,'Parent',st.vols{vh}.blobs{bh}.cbar);
+    set(st.vols{vh}.blobs{bh}.cbar, 'ycolor', st.color.fg, ...
+        'position', cbpos, 'YAxisLocation', 'right', ...
+        'ytick', yltick, ...
+        'Box','on', 'YDir','normal', 'XTickLabel',[], 'XTick',[]); 
+    set(st.vols{vh}.blobs{bh}.cbar, 'fontweight', 'bold', 'fontsize', st.fonts.sz3, 'fontname', st.fonts.name); 
+    if isfield(st.vols{vh}.blobs{bh},'name')
+        ylabel(st.vols{vh}.blobs{bh}.name,'parent',st.vols{vh}.blobs{bh}.cbar);
+    end
 
-% | bspm_XYZreg (MODIFIED FROM ORIGINAL SPM8 CODE)
+% | BSPM_XYZREG (MODIFIED FROM SPM8 SPM_XYXREG)
 % =========================================================================
 function varargout = bspm_XYZreg(varargin)
 % Registry for GUI XYZ locations, and point list utility functions
@@ -4829,1558 +4776,6 @@ warning('Unknown action string')
 %=======================================================================
 end
 
-% | peak_nii (MODIFIED FROM ORIGINAL CODE)
-% =========================================================================
-function [voxels, regions, invar]=peak_nii(image,mapparameters)
-%%
-% peak_nii will write out the maximum T (or F) of the local maxima that are
-% not closer than a specified separation distance.  
-% SPM=0: Those that are closer are collapsed based on the COG using number 
-%   of voxels at each collapsing point. The maximum T 
-%   (or F) is retained. This program should be similar to peak_4dfp in use at
-%   WashU (although I haven't seen their code).
-% SPM=1: Eliminates the peaks closer than a specified distance to mimic
-%   result tables.
-%
-% INPUTS:
-% image string required. This should be a nii or img file.
-% mapparameters is either a .mat file or a pre-load structure with the
-% following fields:
-%           out: output prefix, default is to define using imagefile
-%          sign: 'pos' or 'neg', default is 'pos' NOTE: only can do one
-%                direction at a time
-%          type: statistic type, 'T' or 'F' or 'none'
-%      voxlimit: number of peak voxels in image
-%    separation: distance to collapse or eliminate peaks
-%           SPM: 0 or 1, see above for details
-%          conn: connectivity radius, either 6,18, or 26
-%       cluster: cluster extent threshold in voxels
-%          mask: optional to mask your data
-%           df1: numerator degrees of freedom for T/F-test (if 0<thresh<1)
-%           df2: denominator degrees of freedom for F-test (if 0<thresh<1)
-%       nearest: 0 or 1, 0 for leaving some clusters/peaks undefined, 1 for finding the
-%                nearest label
-%         label: optional to label clusters, options are 'aal_MNI_V4';
-%                'Nitschke_Lab'; FSL ATLASES: 'JHU_tracts', 'JHU_whitematter',
-%                'Thalamus', 'Talairach', 'MNI', 'HarvardOxford_cortex', 'Cerebellum-flirt', 'Cerebellum-fnirt', and 'Juelich'. 
-%                'HarvardOxford_subcortical' is not available at this time because
-%                the labels don't match the image.
-%                Other atlas labels may be added in the future
-%        thresh: T/F statistic or p-value to threshold the data or 0
-%
-% OUTPUTS:
-%   voxels  -- table of peaks
-%       cell{1}-
-%         col. 1 - Cluster size
-%         col. 2 - T/F-statistic
-%         col. 3 - X coordinate
-%         col. 4 - Y coordinate
-%         col. 5 - Z coordinate
-%         col. 6 - number of peaks collapsed
-%         col. 7 - sorted cluster number
-%       cell{2}- region names
-%   regions -- region of each peak -- optional
-%
-% NIFTI FILES SAVED:
-%   *_clusters.nii:                     
-%                               contains the clusters and their numbers (column 7)
-%   (image)_peaks_date_thresh*_cluster*.nii:             
-%                               contains the thresholded data
-%   (image)_peaks_date_thresh*_cluster*peaknumber.nii:   
-%                               contains the peaks of the data,
-%                               peaks are numbered by their order
-%                               in the table (voxels)
-%   (image)_peaks_date_thresh*_cluster*peakcluster.nii:  
-%                               contains the peaks of the data,
-%                               peaks are numbered by their cluster (column 7)
-%   *(image) is the image name with the the path or extension
-%
-% MAT-FILES SAVED:
-%   Peak_(image)_peaks_date.mat:        contains voxelsT variable and regions, if applicable 
-%   (image)_peaks_date_structure:       contains parameter variable with
-%                                       parameters used
-%   *(image) is the image name with the the path or extension
-%
-% EXAMPLE: voxels=peak_nii('imagename',mapparameters)
-%
-% License:
-%   Copyright (c) 2011, Donald G. McLaren and Aaron Schultz
-%   All rights reserved.
-%
-%    Redistribution, with or without modification, is permitted provided that the following conditions are met:
-%    1. Redistributions must reproduce the above copyright
-%        notice, this list of conditions and the following disclaimer in the
-%        documentation and/or other materials provided with the distribution.
-%    2. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-%        This product includes software developed by the Harvard Aging Brain Project.
-%    3. Neither the Harvard Aging Brain Project nor the
-%        names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-%    4. You are not permitted under this Licence to use these files
-%        commercially. Use for which any financial return is received shall be defined as commercial use, and includes (1) integration of all 	
-%        or part of the source code or the Software into a product for sale or license by or on behalf of Licensee to third parties or (2) use 	
-%        of the Software or any derivative of it for research with the final aim of developing software products for sale or license to a third 	
-%        party or (3) use of the Software or any derivative of it for research with the final aim of developing non-software products for sale 
-%        or license to a third party, or (4) use of the Software to provide any service to an external organisation for which payment is received.
-%
-%   THIS SOFTWARE IS PROVIDED BY DONALD G. MCLAREN (mclaren@nmr.mgh.harvard.edu) AND AARON SCHULTZ (aschultz@nmr.mgh.harvard.edu)
-%   ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND 
-%   FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
-%   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
-%   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR 
-%   TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-%   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-%
-%   peak_nii.v3 -- Last modified on 12/10/2010 by Donald G. McLaren, PhD
-%   (mclaren@nmr.mgh.harvard.edu)
-%   Wisconsin Alzheimer's Disease Research Center - Imaging Core, Univ. of
-%   Wisconsin - Madison
-%   Neuroscience Training Program and Department of Medicine, Univ. of
-%   Wisconsin - Madison
-%   GRECC, William S. Middleton Memorial Veteren's Hospital, Madison, WI
-%   GRECC, Bedford VAMC
-%   Department of Neurology, Massachusetts General Hospital and Havard
-%   Medical School
-%
-%   In accordance with the licences of the atlas sources as being distibuted solely
-%   for non-commercial use; neither this program, also soley being distributed for non-commercial use,
-%   nor the atlases containe herein should therefore not be used for commercial purposes; for such
-%   purposes please contact the primary co-ordinator for the relevant
-%   atlas:
-%       Harvard-Oxford: steve@fmrib.ox.ac.uk
-%       JHU: susumu@mri.jhu.edu
-%       Juelich: S.Eickhoff@fz-juelich.de
-%       Thalamus: behrens@fmrib.ox.ac.uk
-%       Cerebellum: j.diedrichsen@bangor.ac.uk
-%       AAL_MNI_V4: maldjian@wfubmc.edu and/or bwagner@wfubmc.edu
-%
-%   For the program in general, please contact mclaren@nmr.mgh.harvard.edu
-%
 
-global st
 
-%% make sure image is char
-if iscell(image), image = char(image); end
-
-%% Check inputs
-if exist(image,'file')==2
-    I1=spm_vol(image);
-    infoI1=I1;
-    [I1,voxelcoord]=spm_read_vols(I1);
-    if nansum(nansum(nansum(abs(I1))))==0
-        error(['Error: ' image ' is all zeros or all NaNs'])        
-    end
-else
-    error(['File ' image ' does not exist'])
-end
-try
-if exist(mapparameters,'file')==2
-    mapparameters=load(mapparameters);
-end
-end
-invar=peak_nii_inputs(mapparameters,infoI1.fname,nargout);
-if strcmpi(invar.sign,'neg')
-    I1=-1.*I1;
-end
-I=I1; 
-
-% Find significant voxels
-ind=find(I>invar.thresh);
-if isempty(ind)
-    voxels=[]; regions={};
-    display(['NO MAXIMA ABOVE ' num2str(invar.thresh) '.'])
-    return
-else
-   [L(1,:),L(2,:),L(3,:)]=ind2sub(infoI1.dim,ind);
-end
-
-% Cluster signficant voxels
-A=peakcluster(L,invar.conn,infoI1); % A is the cluster of each voxel
-% A=transpose(A);
-n=hist(A,1:max(A));
-for ii=1:size(A,1)
-    if n(A(ii))<invar.cluster % removes clusters smaller than extent threshold
-        A(ii,1:2)=NaN;
-    else
-        A(ii,1:2)=[n(A(ii)) A(ii,1)];
-    end
-end
-
-% Combine A (cluster labels) and L (voxel indicies)
-L=L';
-A(:,3:5)=L(:,1:3);
-
-% Remove voxels that are in small clusters
-A(any(isnan(A),2),:) = [];
-
-% Save clusters
-[T, Iclust]=peakcluster(transpose(A(:,3:5)),invar.conn,infoI1);
-A(:,2)=T(:,1); clear T
-
-% Find all peaks, only look at current cluster to determine the peak
-Ic=zeros(infoI1.dim(1),infoI1.dim(2),infoI1.dim(3),max(A(:,2)));
-for ii=1:max(A(:,2))
-    Ic(:,:,:,ii)=I.*(Iclust==ii);
-end
-N=0;
-voxelsT=zeros(size(A,1),7);
-for ii=1:size(A,1)
-    if A(ii,3)==1 || A(ii,4)==1 || A(ii,5)==1 || A(ii,3)==size(Ic,1) || A(ii,4)==size(Ic,2) || A(ii,5)==size(Ic,3)
-    else
-        if I(A(ii,3),A(ii,4),A(ii,5))==max(max(max(Ic(A(ii,3)-1:A(ii,3)+1,A(ii,4)-1:A(ii,4)+1,A(ii,5)-1:A(ii,5)+1,A(ii,2)))))
-            N=N+1;
-            voxind=sub2ind(infoI1.dim,A(ii,3),A(ii,4),A(ii,5));
-            voxelsT(N,1)=A(ii,1);
-            voxelsT(N,2)=I(voxind);
-            voxelsT(N,3)=voxelcoord(1,voxind);
-            voxelsT(N,4)=voxelcoord(2,voxind);
-            voxelsT(N,5)=voxelcoord(3,voxind);
-            voxelsT(N,6)=1;
-            voxelsT(N,7)=A(ii,2);
-        end
-    end
-end
-
-%Remove empty rows
-voxelsT=voxelsT(any(voxelsT'),:);
-if isempty(voxelsT)
-    voxels=[]; regions={};
-    display(['NO CLUSTERS LARGER THAN ' num2str(invar.cluster) ' voxels.'])
-    return
-end
-
-%Check number of peaks
-if size(voxelsT,1)>invar.voxlimit
-    voxelsT=sortrows(voxelsT,-2);
-    voxelsT=voxelsT(1:invar.voxlimit,:); % Limit peak voxels to invar.voxlimit
-end
-
-% Sort table by cluster w/ max T then by T value within cluster (negative
-% data was inverted at beginning, so we are always looking for the max).
-uniqclust=unique(voxelsT(:,7));
-maxT=zeros(length(uniqclust),2);
-for ii=1:length(uniqclust)
-    maxT(ii,1)=uniqclust(ii);
-    maxT(ii,2)=max(voxelsT(voxelsT(:,7)==uniqclust(ii),2));
-end
-maxT=sortrows(maxT,-2);
-for ii=1:size(maxT,1)
-    voxelsT(voxelsT(:,7)==maxT(ii,1),8)=ii;
-end
-voxelsT=sortrows(voxelsT,[8 -2]);
-[cluster,uniq,ind]=unique(voxelsT(:,8)); % get rows of each cluster
-
-%Collapse or elimintate peaks closer than a specified distance
-voxelsF=zeros(size(voxelsT,1),size(voxelsT,2));
-nn=[1 zeros(1,length(cluster)-1)];
-for numclust=1:length(cluster)
-    Distance=eps;
-    voxelsC=voxelsT(ind==numclust,:);
-    while min(min(Distance(Distance>0)))<invar.separation
-            [voxelsC,Distance]=vox_distance(voxelsC);
-            minD=min(min(Distance(Distance>0)));
-            if minD<invar.separation
-               min_ind=find(Distance==(min(min(Distance(Distance>0)))));
-               [ii,jj]=ind2sub(size(Distance),min_ind(1));
-               if invar.SPM==1
-                    voxelsC(ii,:)=NaN; % elimate peak
-               else
-                    voxelsC(jj,1)=voxelsC(jj,1);
-                    voxelsC(jj,2)=voxelsC(jj,2);
-                    voxelsC(jj,3)=((voxelsC(jj,3).*voxelsC(jj,6))+(voxelsC(ii,3).*voxelsC(ii,6)))/(voxelsC(jj,6)+voxelsC(ii,6)); % avg coordinate
-                    voxelsC(jj,4)=((voxelsC(jj,4).*voxelsC(jj,6))+(voxelsC(ii,4).*voxelsC(ii,6)))/(voxelsC(jj,6)+voxelsC(ii,6)); % avg coordinate
-                    voxelsC(jj,5)=((voxelsC(jj,5).*voxelsC(jj,6))+(voxelsC(ii,5).*voxelsC(ii,6)))/(voxelsC(jj,6)+voxelsC(ii,6)); % avg coordinate
-                    voxelsC(jj,6)=voxelsC(jj,6)+voxelsC(ii,6);
-                    voxelsC(jj,7)=voxelsC(jj,7);
-                    voxelsC(jj,8)=voxelsC(jj,8);
-                    voxelsC(ii,:)=NaN; % eliminate second peak
-               end
-               voxelsC(any(isnan(voxelsC),2),:) = [];
-            end
-    end
-    try
-        nn(numclust+1)=nn(numclust)+size(voxelsC,1);
-    end
-    voxelsF(nn(numclust):nn(numclust)+size(voxelsC,1)-1,:)=voxelsC;
-end
-voxelsT=voxelsF(any(voxelsF'),:);
-clear voxelsF voxelsC nn
-
-% Modify T-values for negative
-if strcmpi(invar.sign,'neg')
-    voxelsT(:,2)=-1*voxelsT(:,2);
-end
-voxelsT(:,7)=[];
-
-% Label Peaks
-allxyz = voxelsT(:,3:5);
-regionname = cell(size(allxyz,1),1); 
-for i = 1:size(allxyz,1)
-    xyzidx      = bspm_XYZreg('FindXYZ', allxyz(i,:), st.ol.XYZmm0); 
-    regionidx   = st.ol.atlas0(xyzidx);
-    if regionidx
-        regionname{i} = st.ol.atlaslabels.label{st.ol.atlaslabels.id==regionidx};
-    else
-        regionname{i} = 'Unknown Label'; 
-    end
-end
-voxels = [regionname num2cell(voxelsT(:,1:5))]; 
-function [N,Distance] = vox_distance(voxelsT)
-% vox_distance compute the distance between local maxima in an image
-% The input is expected to be an N-M matrix with columns 2,3,4 being X,Y,Z
-% coordinates
-%
-% pdist is only available with Statistics Toolbox in recent versions of
-% MATLAB, thus, the slower code is secondary if the toolbox is unavailable.
-% Speed difference is dependent on cluster sizes, 3x at 1000 peaks.
-N=sortrows(voxelsT,-1);
-try
-    Distance=squareform(pdist(N(:,3:5)));
-catch
-    Distance = zeros(size(N,1),size(N,1));
-    for ii = 1:size(N,1);
-        TmpD = zeros(size(N,1),3);
-        for kk = 1:3;
-            TmpD(:,kk) = (N(:,kk+2)-N(ii,kk+2)).^2;
-        end
-        TmpD = sqrt(sum(TmpD,2));
-        Distance(:,ii) = TmpD;
-    end
-end
-%Distance=zeros(length(N(:,1)),length(N(:,1)))*NaN;
-%for ii=1:length(N(:,1))
-%    for jj=ii+1:length(N(:,1))
-%           Distance(ii,jj)=((N(jj,2)-N(ii,2)).^2)+((N(jj,3)-N(ii,3)).^2)+((N(jj,4)-N(ii,4)).^2);
-%    end
-%end
-return
-function [A, vol]=peakcluster(L,conn,infoI1)
-    dim = infoI1.dim;
-    vol = zeros(dim(1),dim(2),dim(3));
-    indx = sub2ind(dim,L(1,:)',L(2,:)',L(3,:)');
-    vol(indx) = 1;
-    [cci,num] = spm_bwlabel(vol,conn);
-    A = cci(indx');
-    A=transpose(A);
-    L=transpose(L);
-    A(:,2:4)=L(:,1:3);
-    vol=zeros(dim(1),dim(2),dim(3));
-    for ii=1:size(A,1)
-        vol(A(ii,2),A(ii,3),A(ii,4))=A(ii,1);
-    end
-function outstructure=peak_nii_inputs(instructure,hdrname,outputargs)
-% Checks whether inputs are valid or not.
-%   
-%   ppi_nii_inputs.v2 last modified by Donald G. McLaren, PhD
-%   (mclaren@nmr.mgh.harvard.edu)
-%   GRECC, Bedford VAMC
-%   Department of Neurology, Massachusetts General Hospital and Havard
-%   Medical School
-%
-% License:
-%   Copyright (c) 2011, Donald G. McLaren and Aaron Schultz
-%   All rights reserved.
-%
-%    Redistribution, with or without modification, is permitted provided that the following conditions are met:
-%    1. Redistributions must reproduce the above copyright
-%        notice, this list of conditions and the following disclaimer in the
-%        documentation and/or other materials provided with the distribution.
-%    2. All advertising materials mentioning features or use of this software must display the following acknowledgement:
-%        This product includes software developed by the Harvard Aging Brain Project.
-%    3. Neither the Harvard Aging Brain Project nor the
-%        names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-%    4. You are not permitted under this Licence to use these files
-%        commercially. Use for which any financial return is received shall be defined as commercial use, and includes (1) integration of all 	
-%        or part of the source code or the Software into a product for sale or license by or on behalf of Licensee to third parties or (2) use 	
-%        of the Software or any derivative of it for research with the final aim of developing software products for sale or license to a third 	
-%        party or (3) use of the Software or any derivative of it for research with the final aim of developing non-software products for sale 
-%        or license to a third party, or (4) use of the Software to provide any service to an external organisation for which payment is received.
-%
-%   THIS SOFTWARE IS PROVIDED BY DONALD G. MCLAREN (mclaren@nmr.mgh.harvard.edu) AND AARON SCHULTZ (aschultz@nmr.mgh.harvard.edu)
-%   ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND 
-%   FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
-%   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
-%   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR 
-%   TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-%   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-%   
-%   In accordance with the licences of the atlas sources as being distibuted solely
-%   for non-commercial use; neither this program, also soley being distributed for non-commercial use,
-%   nor the atlases containe herein should therefore not be used for commercial purposes; for such
-%   purposes please contact the primary co-ordinator for the relevant
-%   atlas:
-%       Harvard-Oxford: steve@fmrib.ox.ac.uk
-%       JHU: susumu@mri.jhu.edu
-%       Juelich: S.Eickhoff@fz-juelich.de
-%       Thalamus: behrens@fmrib.ox.ac.uk
-%       Cerebellum: j.diedrichsen@bangor.ac.uk
-%       AAL_MNI_V4: maldjian@wfubmc.edu and/or bwagner@wfubmc.edu
-%
-%   For the program in general, please contact mclaren@nmr.mgh.harvard.edu
-%
-%   Change Log:
-%     4/11/2001: Allows threshold to be -Inf
-
-%% Format input instructure
-while numel(fields(instructure))==1
-    F=fieldnames(instructure);
-    instructure=instructure.(F{1}); %Ignore coding error flag.
-end
-
-%% outfile
-try
-    outstructure.out=instructure.out;
-    if isempty(outstructure.out)
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    [path,file]=fileparts(hdrname);
-    if ~isempty(path)
-        outstructure.out=[path filesep file '_peaks_' date];
-    else
-        outstructure.out=[file '_peaks_' date];
-    end
-end
-
-%% sign of data
-try
-    outstructure.sign=instructure.sign;
-    if ~strcmpi(outstructure.sign,'pos') && ~strcmpi(outstructure.sign,'neg')
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.sign='pos';
-end
-
-%% threshold
-try
-    outstructure.thresh=instructure.thresh;
-    if ~isnumeric(outstructure.thresh)
-        vardoesnotexist; % triggers catch statement
-    end
-    if outstructure.thresh<0
-        if strcmpi(outstructure.sign,'neg')  
-            outstructure.thresh=outstructure.thresh*-1;
-        elseif outstructure.thresh==-Inf
-        else
-            vardoesnotexist; % triggers catch statement
-        end
-    end
-catch
-    outstructure.thresh=0;
-end
-
-%% statistic type (F or T)
-try 
-    outstructure.type=instructure.type;
-    if ~strcmpi(outstructure.type,'T') && ~strcmpi(outstructure.type,'F') && ~strcmpi(outstructure.type,'none') && ~strcmpi(outstructure.type,'Z')
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    if outstructure.thresh<1 && outstructure.thresh>0
-        error(['Statistic must defined using: ' instructure.type])
-    else
-        outstructure.type='none';
-    end
-end
-
-%% voxel limit
-try
-    outstructure.voxlimit=instructure.voxlimit;
-    if ~isnumeric(outstructure.voxlimit) || outstructure.voxlimit<0
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.voxlimit=1000;
-end
-
-%% separation distance for peaks
-try
-    outstructure.separation=instructure.separation;
-    if ~isnumeric(outstructure.separation) || outstructure.separation<0
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.separation=20;
-end
-
-%% Output peaks or collapse peaks within a cluster (0 collapse peaks closer
-% than separation distance, 1 remove peaks closer than separation distance
-% to mirror SPM)
-try
-    outstructure.SPM=instructure.SPM;
-    if ~isnumeric(outstructure.SPM) || (outstructure.SPM~=0 && outstructure.SPM~=1)
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.SPM=1;
-end
-%% Connectivity radius
-try
-    outstructure.conn=instructure.conn;
-    if ~isnumeric(outstructure.conn) || (outstructure.conn~=6 && outstructure.conn~=18 && outstructure.conn~=26)
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.conn=18;
-end
-%% Cluster extent threshold
-try
-    outstructure.cluster=instructure.cluster;
-    if ~isnumeric(outstructure.cluster) || outstructure.cluster<0
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.cluster=0;
-end
-%% mask file
-try
-    outstructure.mask=instructure.mask;
-    if ~isempty(outstructure.mask) && ~exist(outstructure.mask,'file')
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    outstructure.mask={};
-end
-
-%% degrees of freedom numerator
-try
-    outstructure.df1=instructure.df1;
-    if ~isnumeric(outstructure.df1) || outstructure.df1<1
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    if (strcmpi(outstructure.type,'T') || strcmpi(outstructure.type,'F')) && (outstructure.thresh>0 && outstructure.thresh<1)
-        disp('Using numerator degrees of freedom in image header')
-        tmp = instructure.df1;
-        hdr = spm_vol(hdrname);
-        d = hdr.descrip;
-        pos1 = regexp(d,'[','ONCE');
-        pos2 = regexp(d,']','ONCE');
-        tmpdf = str2num(d(pos1+1:pos2-1));
-        outstructure.df1 = tmpdf;
-    else
-    outstructure.df1=[];
-    end
-end
-
-%% degrees of freedom denominator
-try
-    outstructure.df2=instructure.df2;
-    if ~isnumeric(outstructure.df2) || outstructure.df2<1
-        vardoesnotexist; % triggers catch statement
-    end
-catch
-    if (strcmpi(outstructure.type,'F')) && (outstructure.thresh>0 && outstructure.thresh<1)
-        error('degrees of freedom numerator must be defined using df2 field; can be gotten from SPM')
-    else
-    outstructure.df2=[];
-    end
-end
-
-%% Make threshold a non-decimal
-if (strcmpi(outstructure.type,'T') || strcmpi(outstructure.type,'F') || strcmpi(outstructure.type,'Z')) && (outstructure.thresh>0 && outstructure.thresh<1)
-    if strcmpi(outstructure.type,'T')
-        outstructure.thresh = spm_invTcdf(1-outstructure.thresh,outstructure.df1);
-    elseif strcmpi(outstructure.type,'F')
-        outstructure.thresh = spm_invFcdf(1-outstructure.thresh,outstructure.df1,outstructure.df2);
-    else 
-        outstructure.thresh=norminv(1-outstructure.thresh,0,1);
-    end
-end
-parameters=outstructure;
-try
-	parameters.label=instructure.label;
-end
-try
-	parameters.nearest=instructure.nearest;
-end
-
-% | screencapture (file exchange)
-% ========================================================================= 
-function imageData = screencapture(varargin)
-% screencapture - get a screen-capture of a figure frame, component handle, or screen area rectangle
-%
-% ScreenCapture gets a screen-capture of any Matlab GUI handle (including desktop, 
-% figure, axes, image or uicontrol), or a specified area rectangle located relative to
-% the specified handle. Screen area capture is possible by specifying the root (desktop)
-% handle (=0). The output can be either to an image file or to a Matlab matrix (useful
-% for displaying via imshow() or for further processing) or to the system clipboard.
-% This utility also enables adding a toolbar button for easy interactive screen-capture.
-%
-% Syntax:
-%    imageData = screencapture(handle, position, target, 'PropName',PropValue, ...)
-%
-% Input Parameters:
-%    handle   - optional handle to be used for screen-capture origin.
-%                 If empty/unsupplied then current figure (gcf) will be used.
-%    position - optional position array in pixels: [x,y,width,height].
-%                 If empty/unsupplied then the handle's position vector will be used.
-%                 If both handle and position are empty/unsupplied then the position
-%                   will be retrieved via interactive mouse-selection.
-%                 If handle is an image, then position is in data (not pixel) units, so the
-%                   captured region remains the same after figure/axes resize (like imcrop)
-%    target   - optional filename for storing the screen-capture, or the 'clipboard' string.
-%                 If empty/unsupplied then no output to file will be done.
-%                 The file format will be determined from the extension (JPG/PNG/...).
-%                 Supported formats are those supported by the imwrite function.
-%    'PropName',PropValue - 
-%               optional list of property pairs (e.g., 'target','myImage.png','pos',[10,20,30,40],'handle',gca)
-%               PropNames may be abbreviated and are case-insensitive.
-%               PropNames may also be given in whichever order.
-%               Supported PropNames are:
-%                 - 'handle'    (default: gcf handle)
-%                 - 'position'  (default: gcf position array)
-%                 - 'target'    (default: '')
-%                 - 'toolbar'   (figure handle; default: gcf)
-%                      this adds a screen-capture button to the figure's toolbar
-%                      If this parameter is specified, then no screen-capture
-%                        will take place and the returned imageData will be [].
-%
-% Output parameters:
-%    imageData - image data in a format acceptable by the imshow function
-%                  If neither target nor imageData were specified, the user will be
-%                    asked to interactively specify the output file.
-%
-% Examples:
-%    imageData = screencapture;  % interactively select screen-capture rectangle
-%    imageData = screencapture(hListbox);  % capture image of a uicontrol
-%    imageData = screencapture(0,  [20,30,40,50]);  % capture a small desktop region
-%    imageData = screencapture(gcf,[20,30,40,50]);  % capture a small figure region
-%    imageData = screencapture(gca,[10,20,30,40]);  % capture a small axes region
-%      imshow(imageData);  % display the captured image in a matlab figure
-%      imwrite(imageData,'myImage.png');  % save the captured image to file
-%    img = imread('cameraman.tif');
-%      hImg = imshow(img);
-%      screencapture(hImg,[60,35,140,80]);  % capture a region of an image
-%    screencapture(gcf,[],'myFigure.jpg');  % capture the entire figure into file
-%    screencapture('handle',gcf,'target','myFigure.jpg');  % same as previous
-%    screencapture('handle',gcf,'target','clipboard');     % copy to clipboard
-%    screencapture('toolbar',gcf);  % adds a screen-capture button to gcf's toolbar
-%    screencapture('toolbar',[],'target','sc.bmp'); % same with default output filename
-%
-% Technical description:
-%    http://UndocumentedMatlab.com/blog/screencapture-utility/
-%
-% Bugs and suggestions:
-%    Please send to Yair Altman (altmany at gmail dot com)
-%
-% See also:
-%    imshow, imwrite, print
-%
-% Release history:
-%    1.7 2014-04-28: Fixed bug when capturing interactive selection
-%    1.6 2014-04-22: Only enable image formats when saving to an unspecified file via uiputfile
-%    1.5 2013-04-18: Fixed bug in capture of non-square image; fixes for Win64
-%    1.4 2013-01-27: Fixed capture of Desktop (root); enabled rbbox anywhere on desktop (not necesarily in a Matlab figure); enabled output to clipboard (based on Jiro Doke's imclipboard utility); edge-case fixes; added Java compatibility check
-%    1.3 2012-07-23: Capture current object (uicontrol/axes/figure) if w=h=0 (e.g., by clicking a single point); extra input args sanity checks; fix for docked windows and image axes; include axes labels & ticks by default when capturing axes; use data-units position vector when capturing images; many edge-case fixes
-%    1.2 2011-01-16: another performance boost (thanks to Jan Simon); some compatibility fixes for Matlab 6.5 (untested)
-%    1.1 2009-06-03: Handle missing output format; performance boost (thanks to Urs); fix minor root-handle bug; added toolbar button option
-%    1.0 2009-06-02: First version posted on <a href="http://www.mathworks.com/matlabcentral/fileexchange/authors/27420">MathWorks File Exchange</a>
-
-% License to use and modify this code is granted freely to all interested, as long as the original author is
-% referenced and attributed as such. The original author maintains the right to be solely associated with this work.
-
-% Programmed and Copyright by Yair M. Altman: altmany(at)gmail.com
-% $Revision: 1.7 $  $Date: 2014/04/28 21:10:12 $
-
-    % Ensure that java awt is enabled...
-    if ~usejava('awt')
-        error('YMA:screencapture:NeedAwt','ScreenCapture requires Java to run.');
-    end
-
-    % Ensure that our Java version supports the Robot class (requires JVM 1.3+)
-    try
-        robot = java.awt.Robot; %#ok<NASGU>
-    catch
-        uiwait(msgbox({['Your Matlab installation is so old that its Java engine (' version('-java') ...
-                        ') does not have a java.awt.Robot class. '], ' ', ...
-                        'Without this class, taking a screen-capture is impossible.', ' ', ...
-                        'So, either install JVM 1.3 or higher, or use a newer Matlab release.'}, ...
-                        'ScreenCapture', 'warn'));
-        if nargout, imageData = [];  end
-        return;
-    end
-
-    % Process optional arguments
-    paramsStruct = processArgs(varargin{:});
-    
-    % If toolbar button requested, add it and exit
-    if ~isempty(paramsStruct.toolbar)
-        
-        % Add the toolbar button
-        addToolbarButton(paramsStruct);
-        
-        % Return the figure to its pre-undocked state (when relevant)
-        redockFigureIfRelevant(paramsStruct);
-        
-        % Exit immediately (do NOT take a screen-capture)
-        if nargout,  imageData = [];  end
-        return;
-    end
-    
-    % Convert position from handle-relative to desktop Java-based pixels
-    [paramsStruct, msgStr] = convertPos(paramsStruct);
-    
-    % Capture the requested screen rectangle using java.awt.Robot
-    imgData = getScreenCaptureImageData(paramsStruct.position);
-    
-    % Return the figure to its pre-undocked state (when relevant)
-    redockFigureIfRelevant(paramsStruct);
-    
-    % Save image data in file or clipboard, if specified
-    if ~isempty(paramsStruct.target)
-        if strcmpi(paramsStruct.target,'clipboard')
-            if ~isempty(imgData)
-                imclipboard(imgData);
-            else
-                msgbox('No image area selected - not copying image to clipboard','ScreenCapture','warn');
-            end
-        else  % real filename
-            if ~isempty(imgData)
-                imwrite(imgData,paramsStruct.target);
-            else
-                msgbox(['No image area selected - not saving image file ' paramsStruct.target],'ScreenCapture','warn');
-            end
-        end
-    end
-
-    % Return image raster data to user, if requested
-    if nargout
-        imageData = imgData;
-        
-    % If neither output formats was specified (neither target nor output data)
-    elseif isempty(paramsStruct.target) & ~isempty(imgData)  %#ok ML6
-        % Ask the user to specify a file
-        %error('YMA:screencapture:noOutput','No output specified for ScreenCapture: specify the output filename and/or output data');
-        %format = '*.*';
-        formats = imformats;
-        for idx = 1 : numel(formats)
-            ext = sprintf('*.%s;',formats(idx).ext{:});
-            format(idx,1:2) = {ext(1:end-1), formats(idx).description}; %#ok<AGROW>
-        end
-        [filename,pathname] = uiputfile(format,'Save screen capture as');
-        if ~isequal(filename,0) & ~isequal(pathname,0)  %#ok Matlab6 compatibility
-            imwrite(imgData,fullfile(pathname,filename));
-        else
-            % TODO - copy to clipboard
-        end
-    end
-
-    % Display msgStr, if relevant
-    if ~isempty(msgStr)
-        uiwait(msgbox(msgStr,'ScreenCapture'));
-        drawnow; pause(0.05);  % time for the msgbox to disappear
-    end
-
-    return;  % debug breakpoint
-function paramsStruct = processArgs(varargin)
-
-    % Get the properties in either direct or P-V format
-    [regParams, pvPairs] = parseparams(varargin);
-
-    % Now process the optional P-V params
-    try
-        % Initialize
-        paramName = [];
-        paramsStruct = [];
-        paramsStruct.handle = [];
-        paramsStruct.position = [];
-        paramsStruct.target = '';
-        paramsStruct.toolbar = [];
-        paramsStruct.wasDocked = 0;       % no false available in ML6
-        paramsStruct.wasInteractive = 0;  % no false available in ML6
-
-        % Parse the regular (non-named) params in recption order
-        if ~isempty(regParams) & (isempty(regParams{1}) | ishandle(regParams{1}(1)))  %#ok ML6
-            paramsStruct.handle = regParams{1};
-            regParams(1) = [];
-        end
-        if ~isempty(regParams) & isnumeric(regParams{1}) & (length(regParams{1}) == 4)  %#ok ML6
-            paramsStruct.position = regParams{1};
-            regParams(1) = [];
-        end
-        if ~isempty(regParams) & ischar(regParams{1})  %#ok ML6
-            paramsStruct.target = regParams{1};
-        end
-
-        % Parse the optional param PV pairs
-        supportedArgs = {'handle','position','target','toolbar'};
-        while ~isempty(pvPairs)
-
-            % Disregard empty propNames (may be due to users mis-interpretting the syntax help)
-            while ~isempty(pvPairs) & isempty(pvPairs{1})  %#ok ML6
-                pvPairs(1) = [];
-            end
-            if isempty(pvPairs)
-                break;
-            end
-
-            % Ensure basic format is valid
-            paramName = '';
-            if ~ischar(pvPairs{1})
-                error('YMA:screencapture:invalidProperty','Invalid property passed to ScreenCapture');
-            elseif length(pvPairs) == 1
-                if isempty(paramsStruct.target)
-                    paramsStruct.target = pvPairs{1};
-                    break;
-                else
-                    error('YMA:screencapture:noPropertyValue',['No value specified for property ''' pvPairs{1} '''']);
-                end
-            end
-
-            % Process parameter values
-            paramName  = pvPairs{1};
-            if strcmpi(paramName,'filename')  % backward compatibility
-                paramName = 'target';
-            end
-            paramValue = pvPairs{2};
-            pvPairs(1:2) = [];
-            idx = find(strncmpi(paramName,supportedArgs,length(paramName)));
-            if ~isempty(idx)
-                %paramsStruct.(lower(supportedArgs{idx(1)})) = paramValue;  % incompatible with ML6
-                paramsStruct = setfield(paramsStruct, lower(supportedArgs{idx(1)}), paramValue);  %#ok ML6
-
-                % If 'toolbar' param specified, then it cannot be left empty - use gcf
-                if strncmpi(paramName,'toolbar',length(paramName)) & isempty(paramsStruct.toolbar)  %#ok ML6
-                    paramsStruct.toolbar = getCurrentFig;
-                end
-
-            elseif isempty(paramsStruct.target)
-                paramsStruct.target = paramName;
-                pvPairs = {paramValue, pvPairs{:}};  %#ok (more readable this way, although a bit less efficient...)
-
-            else
-                supportedArgsStr = sprintf('''%s'',',supportedArgs{:});
-                error('YMA:screencapture:invalidProperty','%s \n%s', ...
-                      'Invalid property passed to ScreenCapture', ...
-                      ['Supported property names are: ' supportedArgsStr(1:end-1)]);
-            end
-        end  % loop pvPairs
-
-    catch
-        if ~isempty(paramName),  paramName = [' ''' paramName ''''];  end
-        error('YMA:screencapture:invalidProperty','Error setting ScreenCapture property %s:\n%s',paramName,lasterr); %#ok<LERR>
-    end
-function [paramsStruct, msgStr] = convertPos(paramsStruct)
-    msgStr = '';
-    try
-        % Get the screen-size for later use
-        screenSize = get(0,'ScreenSize');
-
-        % Get the containing figure's handle
-        hParent = paramsStruct.handle;
-        if isempty(paramsStruct.handle)
-            paramsStruct.hFigure = getCurrentFig;
-            hParent = paramsStruct.hFigure;
-        else
-            paramsStruct.hFigure = ancestor(paramsStruct.handle,'figure');
-        end
-
-        % To get the acurate pixel position, the figure window must be undocked
-        try
-            if strcmpi(get(paramsStruct.hFigure,'WindowStyle'),'docked')
-                set(paramsStruct.hFigure,'WindowStyle','normal');
-                drawnow; pause(0.25);
-                paramsStruct.wasDocked = 1;  % no true available in ML6
-            end
-        catch
-            % never mind - ignore...
-        end
-
-        % The figure (if specified) must be in focus
-        if ~isempty(paramsStruct.hFigure) & ishandle(paramsStruct.hFigure)  %#ok ML6
-            isFigureValid = 1;  % no true available in ML6
-            figure(paramsStruct.hFigure);
-        else
-            isFigureValid = 0;  % no false available in ML6
-        end
-
-        % Flush all graphic events to ensure correct rendering
-        drawnow; pause(0.01);
-
-        % No handle specified
-        wasPositionGiven = 1;  % no true available in ML6
-        if isempty(paramsStruct.handle)
-            
-            % Set default handle, if not supplied
-            paramsStruct.handle = paramsStruct.hFigure;
-            
-            % If position was not specified, get it interactively using RBBOX
-            if isempty(paramsStruct.position)
-                [paramsStruct.position, jFrameUsed, msgStr] = getInteractivePosition(paramsStruct.hFigure); %#ok<ASGLU> jFrameUsed is unused
-                paramsStruct.wasInteractive = 1;  % no true available in ML6
-                wasPositionGiven = 0;  % no false available in ML6
-            end
-            
-        elseif ~ishandle(paramsStruct.handle)
-            % Handle was supplied - ensure it is a valid handle
-            error('YMA:screencapture:invalidHandle','Invalid handle passed to ScreenCapture');
-            
-        elseif isempty(paramsStruct.position)
-            % Handle was supplied but position was not, so use the handle's position
-            paramsStruct.position = getPixelPos(paramsStruct.handle);
-            paramsStruct.position(1:2) = 0;
-            wasPositionGiven = 0;  % no false available in ML6
-            
-        elseif ~isnumeric(paramsStruct.position) | (length(paramsStruct.position) ~= 4)  %#ok ML6
-            % Both handle & position were supplied - ensure a valid pixel position vector
-            error('YMA:screencapture:invalidPosition','Invalid position vector passed to ScreenCapture: \nMust be a [x,y,w,h] numeric pixel array');
-        end
-        
-        % Capture current object (uicontrol/axes/figure) if w=h=0 (single-click in interactive mode)
-        if paramsStruct.position(3)<=0 | paramsStruct.position(4)<=0  %#ok ML6
-            %TODO - find a way to single-click another Matlab figure (the following does not work)
-            %paramsStruct.position = getPixelPos(ancestor(hittest,'figure'));
-            paramsStruct.position = getPixelPos(paramsStruct.handle);
-            paramsStruct.position(1:2) = 0;
-            paramsStruct.wasInteractive = 0;  % no false available in ML6
-            wasPositionGiven = 0;  % no false available in ML6
-        end
-
-        % First get the parent handle's desktop-based Matlab pixel position
-        parentPos = [0,0,0,0];
-        dX = 0;
-        dY = 0;
-        dW = 0;
-        dH = 0;
-        if ~isgraphics(hParent,'figure')
-            % Get the reguested component's pixel position
-            parentPos = getPixelPos(hParent, 1);  % no true available in ML6
-
-            % Axes position inaccuracy estimation
-            deltaX = 3;
-            deltaY = -1;
-            
-            % Fix for images
-            %isAxes  = isa(handle(hParent),'axes');
-            isImage = isgraphics(hParent,'image');
-            if isImage  % | (isAxes & strcmpi(get(hParent,'YDir'),'reverse'))  %#ok ML6
-
-                % Compensate for resized image axes
-                hAxes = get(hParent,'Parent');
-                if all(get(hAxes,'DataAspectRatio')==1)  % sanity check: this is the normal behavior
-                    % Note 18/4/2013: the following fails for non-square images
-                    %actualImgSize = min(parentPos(3:4));
-                    %dX = (parentPos(3) - actualImgSize) / 2;
-                    %dY = (parentPos(4) - actualImgSize) / 2;
-                    %parentPos(3:4) = actualImgSize;
-
-                    % The following should work for all types of images
-                    actualImgSize = size(get(hParent,'CData'));
-                    dX = (parentPos(3) - min(parentPos(3),actualImgSize(2))) / 2;
-                    dY = (parentPos(4) - min(parentPos(4),actualImgSize(1))) / 2;
-                    parentPos(3:4) = actualImgSize([2,1]);
-                    %parentPos(3) = max(parentPos(3),actualImgSize(2));
-                    %parentPos(4) = max(parentPos(4),actualImgSize(1));
-                end
-
-                % Fix user-specified img positions (but not auto-inferred ones)
-                if wasPositionGiven
-
-                    % In images, use data units rather than pixel units
-                    % Reverse the YDir
-                    ymax = max(get(hParent,'YData'));
-                    paramsStruct.position(2) = ymax - paramsStruct.position(2) - paramsStruct.position(4);
-
-                    % Note: it would be best to use hgconvertunits, but:
-                    % ^^^^  (1) it fails on Matlab 6, and (2) it doesn't accept Data units
-                    %paramsStruct.position = hgconvertunits(hFig, paramsStruct.position, 'Data', 'pixel', hParent);  % fails!
-                    xLims = get(hParent,'XData');
-                    yLims = get(hParent,'YData');
-                    xPixelsPerData = parentPos(3) / (diff(xLims) + 1);
-                    yPixelsPerData = parentPos(4) / (diff(yLims) + 1);
-                    paramsStruct.position(1) = round((paramsStruct.position(1)-xLims(1)) * xPixelsPerData);
-                    paramsStruct.position(2) = round((paramsStruct.position(2)-yLims(1)) * yPixelsPerData + 2*dY);
-                    paramsStruct.position(3) = round( paramsStruct.position(3) * xPixelsPerData);
-                    paramsStruct.position(4) = round( paramsStruct.position(4) * yPixelsPerData);
-
-                    % Axes position inaccuracy estimation
-                    if strcmpi(computer('arch'),'win64')
-                        deltaX = 7;
-                        deltaY = -7;
-                    else
-                        deltaX = 3;
-                        deltaY = -3;
-                    end
-                    
-                else  % axes/image position was auto-infered (entire image)
-                    % Axes position inaccuracy estimation
-                    if strcmpi(computer('arch'),'win64')
-                        deltaX = 6;
-                        deltaY = -6;
-                    else
-                        deltaX = 2;
-                        deltaY = -2;
-                    end
-                    dW = -2*dX;
-                    dH = -2*dY;
-                end
-            end
-
-            %hFig = ancestor(hParent,'figure');
-            hParent = paramsStruct.hFigure;
-
-        elseif paramsStruct.wasInteractive  % interactive figure rectangle
-
-            % Compensate for 1px rbbox inaccuracies
-            deltaX = 2;
-            deltaY = -2;
-
-        else  % non-interactive figure
-
-            % Compensate 4px figure boundaries = difference betweeen OuterPosition and Position
-            deltaX = -1;
-            deltaY = 1;
-        end
-        %disp(paramsStruct.position)  % for debugging
-        
-        % Now get the pixel position relative to the monitor
-        figurePos = getPixelPos(hParent);
-        desktopPos = figurePos + parentPos;
-
-        % Now convert to Java-based pixels based on screen size
-        % Note: multiple monitors are automatically handled correctly, since all
-        % ^^^^  Java positions are relative to the main monitor's top-left corner
-        javaX  = desktopPos(1) + paramsStruct.position(1) + deltaX + dX;
-        javaY  = screenSize(4) - desktopPos(2) - paramsStruct.position(2) - paramsStruct.position(4) + deltaY + dY;
-        width  = paramsStruct.position(3) + dW;
-        height = paramsStruct.position(4) + dH;
-        paramsStruct.position = round([javaX, javaY, width, height]);
-        %paramsStruct.position
-
-        % Ensure the figure is at the front so it can be screen-captured
-        if isFigureValid
-            figure(hParent);
-            drawnow;
-            pause(0.02);
-        end
-    catch
-        % Maybe root/desktop handle (root does not have a 'Position' prop so getPixelPos croaks
-        if isequal(double(hParent),0)  % =root/desktop handle;  handles case of hParent=[]
-            javaX = paramsStruct.position(1) - 1;
-            javaY = screenSize(4) - paramsStruct.position(2) - paramsStruct.position(4) - 1;
-            paramsStruct.position = [javaX, javaY, paramsStruct.position(3:4)];
-        end
-    end
-function [positionRect, jFrameUsed, msgStr] = getInteractivePosition(hFig)
-    msgStr = '';
-    try
-        % First try the invisible-figure approach, in order to
-        % enable rbbox outside any existing figure boundaries
-        f = figure('units','pixel','pos',[-100,-100,10,10],'HitTest','off');
-        drawnow; pause(0.01);
-        jf = get(handle(f),'JavaFrame');
-        try
-            jWindow = jf.fFigureClient.getWindow;
-        catch
-            try
-                jWindow = jf.fHG1Client.getWindow;
-            catch
-                jWindow = jf.getFigurePanelContainer.getParent.getTopLevelAncestor;
-            end
-        end
-        com.sun.awt.AWTUtilities.setWindowOpacity(jWindow,0.05);  %=nearly transparent (not fully so that mouse clicks are captured)
-        jWindow.setMaximized(1);  % no true available in ML6
-        jFrameUsed = 1;  % no true available in ML6
-        msg = {'Mouse-click and drag a bounding rectangle for screen-capture ' ...
-               ... %'or single-click any Matlab figure to capture the entire figure.' ...
-               };
-    catch
-        try delete(f); drawnow; catch, end  %Cleanup...
-        jFrameUsed = 0;  % no false available in ML6
-        msg = {'Mouse-click within any Matlab figure and then', ...
-               'drag a bounding rectangle for screen-capture,', ...
-               'or single-click to capture the entire figure'};
-    end
-    uiwait(msgbox(msg,'ScreenCapture'));
-    pause; 
-    positionRect = rbbox;
-    if jFrameUsed
-        jFrameOrigin = getPixelPos(f);
-        delete(f); drawnow;
-        try
-            figOrigin = getPixelPos(hFig);
-        catch  % empty/invalid hFig handle
-            figOrigin = [0,0,0,0];
-        end
-    else
-        if isempty(hFig)
-            jFrameOrigin = getPixelPos(gcf);
-        else
-            jFrameOrigin = [0,0,0,0];
-        end
-        figOrigin = [0,0,0,0];
-    end
-    positionRect(1:2) = positionRect(1:2) + jFrameOrigin(1:2) - figOrigin(1:2);
-
-    if prod(positionRect(3:4)) > 0
-        msgStr = sprintf('%dx%d area captured',positionRect(3),positionRect(4));
-    end
-function hFig = getCurrentFig
-    oldState = get(0,'showHiddenHandles');
-    set(0,'showHiddenHandles','on');
-    hFig = get(0,'CurrentFigure');
-    set(0,'showHiddenHandles',oldState);
-function hObj = ancestor(hObj,type)
-    if ~isempty(hObj) & ishandle(hObj)  %#ok for Matlab 6 compatibility
-        try
-            hObj = get(hObj,'Ancestor');
-        catch
-            % never mind...
-        end
-        try
-            %if ~isa(handle(hObj),type)  % this is best but always returns 0 in Matlab 6!
-            %if ~isprop(hObj,'type') | ~strcmpi(get(hObj,'type'),type)  % no isprop() in ML6!
-            try
-                objType = get(hObj,'type');
-            catch
-                objType = '';
-            end
-            if ~strcmpi(objType,type)
-                try
-                    parent = get(handle(hObj),'parent');
-                catch
-                    parent = hObj.getParent;  % some objs have no 'Parent' prop, just this method...
-                end
-                if ~isempty(parent)  % empty parent means root ancestor, so exit
-                    hObj = ancestor(parent,type);
-                end
-            end
-        catch
-            % never mind...
-        end
-    end
-function pos = getPos(hObj,field,units)
-    % Matlab 6 did not have hgconvertunits so use the old way...
-    oldUnits = get(hObj,'units');
-    if strcmpi(oldUnits,units)  % don't modify units unless we must!
-        pos = get(hObj,field);
-    else
-        set(hObj,'units',units);
-        pos = get(hObj,field);
-        set(hObj,'units',oldUnits);
-    end
-function pos = getPixelPos(hObj,varargin)
-    persistent originalObj
-    try
-        stk = dbstack;
-        if ~strcmp(stk(2).name,'getPixelPos')
-            originalObj = hObj;
-        end
-
-        if isgraphics(hObj,'figure') %| isa(handle(hObj),'axes')
-        %try
-            pos = getPos(hObj,'OuterPosition','pixels');
-        else  %catch
-            % getpixelposition is unvectorized unfortunately!
-            pos = getpixelposition(hObj,varargin{:});
-
-            % add the axes labels/ticks if relevant (plus a tiny margin to fix 2px label/title inconsistencies)
-            if isgraphics(hObj,'axes') & ~isgraphics(originalObj,'image')  %#ok ML6
-                tightInsets = getPos(hObj,'TightInset','pixel');
-                pos = pos + tightInsets.*[-1,-1,1,1] + [-1,1,1+tightInsets(1:2)];
-            end
-        end
-    catch
-        try
-            % Matlab 6 did not have getpixelposition nor hgconvertunits so use the old way...
-            pos = getPos(hObj,'Position','pixels');
-        catch
-            % Maybe the handle does not have a 'Position' prop (e.g., text/line/plot) - use its parent
-            pos = getPixelPos(get(hObj,'parent'),varargin{:});
-        end
-    end
-
-    % Handle the case of missing/invalid/empty HG handle
-    if isempty(pos)
-        pos = [0,0,0,0];
-    end
-function addToolbarButton(paramsStruct)
-    % Ensure we have a valid toolbar handle
-    hFig = ancestor(paramsStruct.toolbar,'figure');
-    if isempty(hFig)
-        error('YMA:screencapture:badToolbar','the ''Toolbar'' parameter must contain a valid GUI handle');
-    end
-    set(hFig,'ToolBar','figure');
-    hToolbar = findall(hFig,'type','uitoolbar');
-    if isempty(hToolbar)
-        error('YMA:screencapture:noToolbar','the ''Toolbar'' parameter must contain a figure handle possessing a valid toolbar');
-    end
-    hToolbar = hToolbar(1);  % just in case there are several toolbars... - use only the first
-
-    % Prepare the camera icon
-    icon = ['3333333333333333'; ...
-            '3333333333333333'; ...
-            '3333300000333333'; ...
-            '3333065556033333'; ...
-            '3000000000000033'; ...
-            '3022222222222033'; ...
-            '3022220002222033'; ...
-            '3022203110222033'; ...
-            '3022201110222033'; ...
-            '3022204440222033'; ...
-            '3022220002222033'; ...
-            '3022222222222033'; ...
-            '3000000000000033'; ...
-            '3333333333333333'; ...
-            '3333333333333333'; ...
-            '3333333333333333'];
-    cm = [   0      0      0; ...  % black
-             0   0.60      1; ...  % light blue
-          0.53   0.53   0.53; ...  % light gray
-           NaN    NaN    NaN; ...  % transparent
-             0   0.73      0; ...  % light green
-          0.27   0.27   0.27; ...  % gray
-          0.13   0.13   0.13];     % dark gray
-    cdata = ind2rgb(uint8(icon-'0'),cm);
-
-    % If the button does not already exit
-    hButton = findall(hToolbar,'Tag','ScreenCaptureButton');
-    tooltip = 'Screen capture';
-    if ~isempty(paramsStruct.target)
-        tooltip = [tooltip ' to ' paramsStruct.target];
-    end
-    if isempty(hButton)
-        % Add the button with the icon to the figure's toolbar
-        hButton = uipushtool(hToolbar, 'CData',cdata, 'Tag','ScreenCaptureButton', 'TooltipString',tooltip, 'ClickedCallback',['screencapture(''' paramsStruct.target ''')']);  %#ok unused
-    else
-        % Otherwise, simply update the existing button
-        set(hButton, 'CData',cdata, 'Tag','ScreenCaptureButton', 'TooltipString',tooltip, 'ClickedCallback',['screencapture(''' paramsStruct.target ''')']);
-    end
-function imgData = getScreenCaptureImageData(positionRect)
-    if isempty(positionRect) | all(positionRect==0) | positionRect(3)<=0 | positionRect(4)<=0  %#ok ML6
-        imgData = [];
-    else
-        % Use java.awt.Robot to take a screen-capture of the specified screen area
-        rect = java.awt.Rectangle(positionRect(1), positionRect(2), positionRect(3), positionRect(4));
-        robot = java.awt.Robot;
-        jImage = robot.createScreenCapture(rect);
-
-        % Convert the resulting Java image to a Matlab image
-        % Adapted for a much-improved performance from:
-        % http://www.mathworks.com/support/solutions/data/1-2WPAYR.html
-        h = jImage.getHeight;
-        w = jImage.getWidth;
-        %imgData = zeros([h,w,3],'uint8');
-        %pixelsData = uint8(jImage.getData.getPixels(0,0,w,h,[]));
-        %for i = 1 : h
-        %    base = (i-1)*w*3+1;
-        %    imgData(i,1:w,:) = deal(reshape(pixelsData(base:(base+3*w-1)),3,w)');
-        %end
-
-        % Performance further improved based on feedback from Urs Schwartz:
-        %pixelsData = reshape(typecast(jImage.getData.getDataStorage,'uint32'),w,h).';
-        %imgData(:,:,3) = bitshift(bitand(pixelsData,256^1-1),-8*0);
-        %imgData(:,:,2) = bitshift(bitand(pixelsData,256^2-1),-8*1);
-        %imgData(:,:,1) = bitshift(bitand(pixelsData,256^3-1),-8*2);
-
-        % Performance even further improved based on feedback from Jan Simon:
-        pixelsData = reshape(typecast(jImage.getData.getDataStorage, 'uint8'), 4, w, h);
-        imgData = cat(3, ...
-            transpose(reshape(pixelsData(3, :, :), w, h)), ...
-            transpose(reshape(pixelsData(2, :, :), w, h)), ...
-            transpose(reshape(pixelsData(1, :, :), w, h)));
-    end
-function redockFigureIfRelevant(paramsStruct)
-  if paramsStruct.wasDocked
-      try
-          set(paramsStruct.hFigure,'WindowStyle','docked');
-          %drawnow;
-      catch
-          % never mind - ignore...
-      end
-  end
-function imclipboard(imgData)
-    % Import necessary Java classes
-    import java.awt.Toolkit.*
-    import java.awt.image.BufferedImage
-    import java.awt.datatransfer.DataFlavor
-
-    % Add the necessary Java class (ImageSelection) to the Java classpath
-    if ~exist('ImageSelection', 'class')
-        javaaddpath(fileparts(which(mfilename)), '-end');
-    end
-        
-    % Get System Clipboard object (java.awt.Toolkit)
-    cb = getDefaultToolkit.getSystemClipboard;  % can't use () in ML6!
-    
-    % Get image size
-    ht = size(imgData, 1);
-    wd = size(imgData, 2);
-    
-    % Convert to Blue-Green-Red format
-    imgData = imgData(:, :, [3 2 1]);
-    
-    % Convert to 3xWxH format
-    imgData = permute(imgData, [3, 2, 1]);
-    
-    % Append Alpha data (not used)
-    imgData = cat(1, imgData, 255*ones(1, wd, ht, 'uint8'));
-    
-    % Create image buffer
-    imBuffer = BufferedImage(wd, ht, BufferedImage.TYPE_INT_RGB);
-    imBuffer.setRGB(0, 0, wd, ht, typecast(imgData(:), 'int32'), 0, wd);
-    
-    % Create ImageSelection object
-    %    % custom java class
-    imSelection = ImageSelection(imBuffer);
-    
-    % Set clipboard content to the image
-    cb.setContents(imSelection, []);
-    
-% | layControl (file exchange) & wrapper 
-% ========================================================================= 
-function s = easydefaults(varargin)
-% easydefaults  Set many default arguments quick and easy.
-%
-%   - For input arguments x1,x2,x3, set default values x1def,x2def,x3def
-%     using easydefaults as parameter-value pairs:
-%       easydefaults('x1',x1def,'x2',x2def,'x3',x3def);
-%   
-%   - Defaults can be set for any input argument, whether explicit or as 
-%     part of a parameter-value pair:
-%       function dummy_function(x,varargin)
-%           easydefaults('x',1,'y',2);
-%           ...   
-%       end
-%
-%   - easydefaults and easyparse can in principle be used in either order, 
-%     but it is usually better to parse first and fill in defaults after:
-%       function dummy_function(x,varargin)
-%           easyparse(varargin,'y')
-%           easydefaults('x',1,'y',2);
-%           ...   
-%       end
-%
-%   CAVEAT UTILITOR: this function relies on evals and assignin statements.
-%   Input checking is performed to limit potential damage, but use at your 
-%   own risk.
-%
-%   Author: Jared Schwede 
-%   Last update: Jan 14, 2013
-
-    % Check that all inputs come in parameter-value pairs.
-    if mod(length(varargin),2)
-        error('Default arguments must be specified in pairs!');
-    end
-    
-    for i=1:2:length(varargin)
-        if ~ischar(varargin{i})
-            error('Variables to easydefaults must be written as strings!');
-        end
-        
-        % We'll check that the varargin is a valid variable name. This
-        % should hopefully avoid any nasty code...
-        if ~isvarname(varargin{i})
-            error('Invalid variable name!');
-        end
-        
-        if exist(varargin{i},'builtin') || (exist(varargin{i},'file') == 2) || exist(varargin{i},'class')
-            warning('MATLAB:defined_function',['''' varargin{i} ''' conflicts with the name of a function, m-file, or class along the MATLAB path and will be ignored by easydefaults.' ...
-                                        ' Please rename the variable, or use a temporary variable with easydefaults and explicitly define ''' varargin{i} ...
-                                        ''' within your function.']);
-        else
-            if ~evalin('caller',['exist(''' varargin{i} ''',''var'')'])
-                % We assign the arguments to a struct, s, which allows us to
-                % check that the evalin statement will not either throw an 
-                % error or execute some nasty code.
-                s.(varargin{i}) = varargin{i+1};
-                assignin('caller',varargin{i},varargin{i+1});
-            end
-        end
-    end
-function s = easyparse(caller_varargin,allowed_names)
-% easyparse    Parse parameter-value pairs without using inputParser
-%   easyparse is called by a function which takes parameter value pairs and
-%   creates individual variables in that function. It can also be used to
-%   generate a struct like inputParser.
-%
-%   - To create variables in the function workspace according to the
-%     varargin of parameter-value pairs, use this syntax in your function:
-%       easyparse(varargin)
-%
-%   - To create only variables with allowed_names, create a cell array of
-%     allowed names and use this syntax:
-%       easyparse(varargin, allowed_names);
-%
-%   - To create a struct with fields specified by the names in varargin,
-%     (similar to the output of inputParser) ask for an output argument:
-%       s = easyparse(...);
-%  
-%   CAVEAT UTILITOR: this function relies on assignin statements. Input
-%   checking is performed to limit potential damage, but use at your own 
-%   risk.
-%
-%   Author: Jared Schwede
-%   Last update: January 14, 2013
-
-    % We assume all inputs come in parameter-value pairs. We'll also assume
-    % that there aren't enough of them to justify using a containers.Map. 
-    for i=1:2:length(caller_varargin)
-        if nargin == 2 && ~any(strcmp(caller_varargin{i},allowed_names))
-            error(['Unknown input argument: ' caller_varargin{i}]);
-        end
-        
-        if ~isvarname(caller_varargin{i})
-            error('Invalid variable name!');
-        end
-        
-        
-        % We assign the arguments to the struct, s, which allows us to
-        % check that the assignin statement will not either throw an error 
-        % or execute some nasty code.
-        s.(caller_varargin{i}) = caller_varargin{i+1};
-        % ... but if we ask for the struct, don't write all of the
-        % variables to the function as well.
-        if ~nargout
-            if exist(caller_varargin{i},'builtin') || (exist(caller_varargin{i},'file') == 2) || exist(caller_varargin{i},'class')
-                warning('MATLAB:defined_function',['''' caller_varargin{i} ''' conflicts with the name of a function, m-file, or class along the MATLAB path and will be ignored by easyparse.' ...
-                                            ' Please rename the variable, or use a temporary variable with easyparse and explicitly define ''' caller_varargin{i} ...
-                                            ''' within your function.']);
-            else
-                assignin('caller',caller_varargin{i},caller_varargin{i+1});
-            end
-        end
-    end
-function h = buipanel(parent, uilabels, uistyles, relwidth, varargin)
-% BUIPANEL Create a panel and populate it with uicontrols
-%
-%  USAGE: h = buipanel(parent, uilabels, uistyles, uiwidths, varargin)
-% __________________________________________________________________________
-%  INPUTS 
-%
-
-% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
-%	Created:  2014-10-08
-%	Email:    spunt@caltech.edu
-% __________________________________________________________________________
-global st
-easyparse(varargin, ... 
-            { ...
-            'panelposition', ...
-            'paneltitleposition', ...
-            'paneltitle', ...
-            'panelborder', ... 
-            'panelbackcolor',  ...
-            'panelforecolor', ...
-            'panelfontsize',  ...
-            'panelfontname' ...
-            'panelfontweight', ...
-            'editbackcolor',  ...
-            'editforecolor', ...
-            'editfontsize',  ...
-            'editfontname', ...
-            'labelbackcolor',  ...
-            'labelforecolor', ...
-            'labelfontsize',  ...
-            'labelfontname', ...
-            'labelfontweight', ...
-            'relheight', ...
-            'marginsep', ...
-            'uicontrolsep', ...
-            'tag'}); 
-defaults = easydefaults(...
-            'paneltitleposition', 'centertop', ...
-            'panelborder',      'none', ... 
-            'panelbackcolor',   st.color.bg, ...
-            'editbackcolor',    st.color.fg, ...
-            'labelbackcolor',   st.color.bg, ...
-            'panelforecolor',   st.color.fg, ...
-            'editforecolor',    [0 0 0], ...
-            'labelforecolor',   st.color.fg, ...
-            'panelfontname',    st.fonts.name, ...
-            'editfontname',     'fixed-width', ...
-            'labelfontname',    st.fonts.name, ...
-            'panelfontsize',    st.fonts.sz2, ...
-            'editfontsize',     st.fonts.sz3, ...
-            'labelfontsize',    st.fonts.sz3, ...
-            'panelfontweight',  'bold', ...
-            'labelfontweight',  'bold', ...
-            'relheight',        [6 7], ...
-            'marginsep',        .025, ...
-            'uicontrolsep',     .025);
-if nargin==0, mfile_showhelp; disp(defaults); return; end
-
-% | UNITS
-unit0 = get(parent, 'units'); 
-        
-% | PANEL
-set(parent, 'units', 'pixels')
-pp          = get(parent, 'pos'); 
-pp          = [pp(3:4) pp(3:4)]; 
-P           = uipanel(parent, 'units', 'pix', 'pos', panelposition.*pp, 'title', paneltitle, ...
-            'backg', panelbackcolor, 'foreg', panelforecolor, 'fontsize', panelfontsize, ...
-            'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
-labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight, 'tag', 'uilabel'}; 
-editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname', editfontname, 'foreg', editforecolor, 'backg', editbackcolor}; 
-propadd     = {'tag'};
-
-% | UICONTROLS
-
-pos         = getpositions(relwidth, relheight, marginsep, uicontrolsep);
-editpos     = pos(pos(:,1)==1,3:6); 
-labelpos    = pos(pos(:,1)==2, 3:6); 
-hc          = zeros(length(uilabels), 1); 
-he          = gobjects(length(uilabels), 1); 
-
-for i = 1:length(uilabels)
-    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox', 'popup'}, uistyles{i}));
-    ttag = ~cellfun('isempty', regexpi({'text'}, uistyles{i}));
-    if sum(ctag)==1
-        hc(i) = uibutton(labelprop{:}, 'pos', labelpos(i,:), 'str', uilabels{i}); 
-        he(i) = uicontrol(editprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:));
-    elseif ttag
-        editpos(i,4) = 1 - marginsep*2; 
-        he(i) = uibutton(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i}); 
-    else
-        editpos(i,4) = 1 - marginsep*2; 
-        he(i) = uicontrol(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i});  
-    end
-    for ii = 1:length(propadd)
-           if ~isempty(propadd{ii})
-                tmp = eval(sprintf('%s', propadd{ii})); 
-                set(he(i), propadd{ii}, tmp{i}); 
-           end
-    end
-end
-% | HANDLES
-h.panel = P;
-h.label = hc; 
-h.edit  = he;  
-
-set(parent, 'units', unit0);
-function pos = getpositions(relwidth, relheight, marginsep, uicontrolsep)
-    if nargin<2, relheight = [6 7]; end
-    if nargin<3, marginsep = .025; end
-    if nargin<4, uicontrolsep = .01; end
-    ncol = length(relwidth);
-    nrow = length(relheight); 
-
-    % width
-    rowwidth    = 1-(marginsep*2)-(uicontrolsep*(ncol-1));  
-    uiwidths    = (relwidth/sum(relwidth))*rowwidth;
-    allsep      = [marginsep repmat(uicontrolsep, 1, ncol-1)];
-    uilefts     = ([0 cumsum(uiwidths(1:end-1))]) + cumsum(allsep); 
-
-    % height
-    colheight   = 1-(marginsep*2)-(uicontrolsep*(nrow-1));
-    uiheights   = (relheight/sum(relheight))*colheight;
-    allsep      = [marginsep repmat(uicontrolsep, 1, nrow-1)];
-    uibottoms   = ([0 cumsum(uiheights(1:end-1))]) + cumsum(allsep);
-
-    % combine
-    pos = zeros(ncol, 4, nrow);
-    pos(:,1,:)  = repmat(uilefts', 1, nrow); 
-    pos(:,2,:)  = repmat(uibottoms, ncol, 1);
-    pos(:,3,:)  = repmat(uiwidths', 1, nrow);
-    pos(:,4,:)  = repmat(uiheights, ncol, 1);
-
-    % test
-    pos = zeros(ncol*nrow, 6);
-    pos(:,1) = reshape(repmat(1:nrow, ncol, 1), size(pos,1), 1);
-    pos(:,2) = reshape(repmat(1:ncol, 1, nrow), size(pos,1), 1);
-    pos(:,3) = uilefts(pos(:,2)); 
-    pos(:,4) = uibottoms(pos(:,1)); 
-    pos(:,5) = uiwidths(pos(:,2)); 
-    pos(:,6) = uiheights(pos(:,1)); 
     
