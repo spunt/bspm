@@ -34,6 +34,11 @@ function S = bspmview(ol, ul)
 %	Email:    spunt@caltech.edu
 % _________________________________________________________________________
 
+% | UTILITIES FOLDER
+% | =======================================================================
+utilitydir = fullfile(fileparts(mfilename('fullpath')), 'utilities'); 
+addpath(utilitydir); 
+
 % | CHECK INPUTS
 % | =======================================================================
 if nargin < 1 
@@ -145,7 +150,7 @@ put_axesmenu;
 setthresh(st.ol.C0(3,:), find(strcmpi({'+', '-', '+/-'}, st.direct))); 
 setvoxelinfo;
 setcolormap;  
-setunitstonorm
+setunitstonorm;
 if nargout==1, S.handles = gethandles; end
 catch lasterr
     rethrow(lasterr)
@@ -377,7 +382,8 @@ function put_figmenu
     
     %% Main Menu
     S.menu1         = uimenu('Parent', st.fig, 'Label', 'bspmVIEW');
-    S.appear        = uimenu(S.menu1, 'Label','Appearance'); 
+    S.prefs         = uimenu(S.menu1, 'Label','Settings', 'Callback', @cb_preferences); 
+    S.appear        = uimenu(S.menu1, 'Label','Appearance', 'Separator', 'on'); 
     S.skin          = uimenu(S.appear, 'Label', 'Skin');
     S.changeskin(1) = uimenu(S.skin, 'Label', 'Dark', 'Checked', 'on', 'Callback', @cb_changeskin);
     S.changeskin(2) = uimenu(S.skin, 'Label', 'Light', 'Separator', 'on', 'Callback',@cb_changeskin);
@@ -387,8 +393,8 @@ function put_figmenu
     S.fontsize      = uimenu(S.appear, 'Label','Font Size', 'Separator', 'on'); 
     S.font(1)       = uimenu(S.fontsize, 'Label', 'Increase', 'Accelerator', 'i', 'Callback', @cb_changefontsize);
     S.font(2)       = uimenu(S.fontsize, 'Label', 'Decrease', 'Accelerator', 'd', 'Separator', 'on', 'Callback',@cb_changefontsize);
-    S.opencode      = uimenu(S.menu1, 'Label','Open GUI M-File', 'Callback', @cb_opencode); 
-    S.exit          = uimenu(S.menu1, 'Label', 'Exit', 'Callback', {@cb_closegui, st.fig});
+    S.opencode      = uimenu(S.menu1, 'Label','Open GUI M-File', 'Separator', 'on', 'Callback', @cb_opencode); 
+    S.exit          = uimenu(S.menu1, 'Label', 'Exit', 'Separator', 'on', 'Callback', {@cb_closegui, st.fig});
     
     %% Load Menu
     S.load = uimenu(st.fig,'Label','Load');
@@ -404,8 +410,7 @@ function put_figmenu
     
     %% Options Menu
     S.options       = uimenu(st.fig,'Label','Options');
-    S.prefs         = uimenu(S.options, 'Label','Defaults', 'Callback', @cb_preferences); 
-    S.report        = uimenu(S.options,'Label','Show Report', 'Separator', 'on', 'CallBack', @cb_report);
+    S.report        = uimenu(S.options,'Label','Show Report', 'CallBack', @cb_report);
     S.render        = uimenu(S.options,'Label','Show Rendering', 'Separator', 'on', 'CallBack', @cb_render);
     S.crosshair     = uimenu(S.options,'Label','Show Crosshairs','Separator', 'on','Checked', 'on', 'CallBack', @cb_crosshair);
     S.reversemap    = uimenu(S.options,'Label','Reverse Color Map', 'Tag', 'reversemap', 'Separator', 'on', 'Checked', 'off', 'CallBack', @cb_reversemap);
@@ -774,6 +779,7 @@ function cb_reversemap(varargin)
 function cb_closegui(varargin)
    if length(varargin)==3, h = varargin{3};
    else h = varargin{1}; end
+   rmpath(fullfile(fileparts(mfilename('fullpath')), 'utilities')); 
    delete(h); % Bye-bye figure
 function cb_render(varargin)
     global st
@@ -914,8 +920,8 @@ function cb_savetable(varargin)
     allcell = [headers1; headers2; voxels];
     [p, imname] = fileparts(st.ol.fname);
     outname = ['save_table_' imname '_I' num2str(peaknii.thresh) '_C' num2str(peaknii.cluster) '_S' num2str(peaknii.separation) '.xlsx'];
-    [imname, pname] = uiputfile({'*.xls; *.xlsx', 'Spreadsheet Table'; '*.*', 'All Files (*.*)'}, 'Save Table As', outname);
-    xlwrite(outname, allcell);
+    [imname, pname] = uiputfile({'*.csv', 'Spreadsheet Table'; '*.*', 'All Files (*.*)'}, 'Save Table As', outname);
+    writereport(allcell, outname); 
 
 % | SETTERS
 % =========================================================================
@@ -1992,16 +1998,12 @@ lMNI = T.map.lMNI;
 lv = T.map.lv;
 rMNI =T.map.rMNI;
 rv = T.map.rv;
-if ischar(obj.input);
-    [m he] = openIMG(obj.input);
-else
-    try
-        m = obj.input.m;
-        he = obj.input.he;
-    catch
-        he = obj.input;
-        m = spm_read_vols(he);
-    end
+try
+    m = obj.input.m;
+    he = obj.input.he;
+catch
+    he = obj.input;
+    m = spm_read_vols(he);
 end
 [x y z] = ind2sub(he.dim,(1:numel(m))');
 mat = [x y z ones(numel(z),1)];
@@ -2178,6 +2180,15 @@ ticklabel = ticklabel([1 end]);
 set(gca,'YDir','normal','YAxisLocation','right','XTick',[],'YTick',(tickmark),'YTickLabel',(ticklabel),'fontsize',14,'YColor','w');
 shading interp
 end
+function y = spm_range(x,dim)
+% Computes the difference between the min and max of a vector. If you need
+% to use it on a matrix, then you need to specify which dimension to
+% operate on.
+if nargin < 2
+    y = max(x) - min(x);
+else
+    y = max(x,[],dim) - min(x,[],dim);
+end
 function [cols, cm ,cc] = cmap(X, lims, cm)
     %%% Written by Aaron P. Schultz - aschultz@martinos.org
     %%%
@@ -2213,6 +2224,203 @@ function [cols, cm ,cc] = cmap(X, lims, cm)
     cc(cc<1)=1;
     cols = nan(numel(cc),3);
     cols(~isnan(cc),:) = cm(cc(~isnan(cc)),:);
+function writereport(incell, outname)
+% WRITEREPORT Write cell array to CSV file
+%
+%  USAGE: outname = writereport(incell, outname)	*optional input
+% __________________________________________________________________________
+%  INPUTS
+%	incell:     cell array of character arrays
+%	outname:   base name for output csv file 
+%
+
+% ---------------------- Copyright (C) 2015 Bob Spunt ----------------------
+%	Created:  2015-02-02
+%	Email:    spunt@caltech.edu
+% __________________________________________________________________________
+if nargin < 2, disp('USAGE: outname = writereport(incell, outname)'); return; end
+
+% | Convert all cell contents to character arrays
+% | ========================================================================
+[nrow, ncol] = size(incell);
+for i = 1:numel(incell)
+    if isnumeric(incell{i}), incell{i} = num2str(incell{i}); end
+    if strcmp(incell{i},'NaN'), incell{i} = ''; end
+end
+incell = regexprep(incell, ',', '');
+
+% | Write to file
+% | ========================================================================
+fid = fopen(outname,'w');
+for r = 1:nrow
+    fprintf(fid,['%s' repmat(',%s',1,ncol-1) '\n'],incell{r,:});
+end
+fclose(fid);
+function h = buipanel(parent, uilabels, uistyles, relwidth, varargin)
+% BUIPANEL Create a panel and populate it with uicontrols
+%
+%  USAGE: h = buipanel(parent, uilabels, uistyles, uiwidths, varargin)
+% __________________________________________________________________________
+%  INPUTS 
+%
+
+% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
+%	Created:  2014-10-08
+%	Email:    spunt@caltech.edu
+% __________________________________________________________________________
+global st
+easyparse(varargin, ... 
+            { ...
+            'panelposition', ...
+            'paneltitleposition', ...
+            'paneltitle', ...
+            'panelborder', ... 
+            'panelbackcolor',  ...
+            'panelforecolor', ...
+            'panelfontsize',  ...
+            'panelfontname' ...
+            'panelfontweight', ...
+            'editbackcolor',  ...
+            'editforecolor', ...
+            'editfontsize',  ...
+            'editfontname', ...
+            'labelbackcolor',  ...
+            'labelforecolor', ...
+            'labelfontsize',  ...
+            'labelfontname', ...
+            'labelfontweight', ...
+            'relheight', ...
+            'marginsep', ...
+            'uicontrolsep', ...
+            'tag'}); 
+defaults = easydefaults(...
+            'paneltitleposition', 'centertop', ...
+            'panelborder',      'none', ... 
+            'panelbackcolor',   st.color.bg, ...
+            'editbackcolor',    st.color.fg, ...
+            'labelbackcolor',   st.color.bg, ...
+            'panelforecolor',   st.color.fg, ...
+            'editforecolor',    [0 0 0], ...
+            'labelforecolor',   st.color.fg, ...
+            'panelfontname',    st.fonts.name, ...
+            'editfontname',     'fixed-width', ...
+            'labelfontname',    st.fonts.name, ...
+            'panelfontsize',    st.fonts.sz2, ...
+            'editfontsize',     st.fonts.sz3, ...
+            'labelfontsize',    st.fonts.sz3, ...
+            'panelfontweight',  'bold', ...
+            'labelfontweight',  'bold', ...
+            'relheight',        [6 7], ...
+            'marginsep',        .025, ...
+            'uicontrolsep',     .025);
+if nargin==0, mfile_showhelp; disp(defaults); return; end
+
+% | UNITS
+unit0 = get(parent, 'units'); 
+        
+% | PANEL
+set(parent, 'units', 'pixels')
+pp          = get(parent, 'pos'); 
+pp          = [pp(3:4) pp(3:4)]; 
+P           = uipanel(parent, 'units', 'pix', 'pos', panelposition.*pp, 'title', paneltitle, ...
+            'backg', panelbackcolor, 'foreg', panelforecolor, 'fontsize', panelfontsize, ...
+            'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
+labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight, 'tag', 'uilabel'}; 
+editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname', editfontname, 'foreg', editforecolor, 'backg', editbackcolor}; 
+propadd     = {'tag'};
+
+% | UICONTROLS
+
+pos         = getpositions(relwidth, relheight, marginsep, uicontrolsep);
+editpos     = pos(pos(:,1)==1,3:6); 
+labelpos    = pos(pos(:,1)==2, 3:6); 
+hc          = zeros(length(uilabels), 1); 
+he          = gobjects(length(uilabels), 1); 
+
+for i = 1:length(uilabels)
+    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox', 'popup'}, uistyles{i}));
+    ttag = ~cellfun('isempty', regexpi({'text'}, uistyles{i}));
+    if sum(ctag)==1
+        hc(i) = uibutton(labelprop{:}, 'pos', labelpos(i,:), 'str', uilabels{i}); 
+        he(i) = uicontrol(editprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:));
+    elseif ttag
+        editpos(i,4) = 1 - marginsep*2; 
+        he(i) = uibutton(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i}); 
+    else
+        editpos(i,4) = 1 - marginsep*2; 
+        he(i) = uicontrol(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i});  
+    end
+    for ii = 1:length(propadd)
+           if ~isempty(propadd{ii})
+                tmp = eval(sprintf('%s', propadd{ii})); 
+                set(he(i), propadd{ii}, tmp{i}); 
+           end
+    end
+end
+% | HANDLES
+h.panel = P;
+h.label = hc; 
+h.edit  = he;  
+
+set(parent, 'units', unit0);
+function pos = getpositions(relwidth, relheight, marginsep, uicontrolsep)
+    if nargin<2, relheight = [6 7]; end
+    if nargin<3, marginsep = .025; end
+    if nargin<4, uicontrolsep = .01; end
+    ncol = length(relwidth);
+    nrow = length(relheight); 
+
+    % width
+    rowwidth    = 1-(marginsep*2)-(uicontrolsep*(ncol-1));  
+    uiwidths    = (relwidth/sum(relwidth))*rowwidth;
+    allsep      = [marginsep repmat(uicontrolsep, 1, ncol-1)];
+    uilefts     = ([0 cumsum(uiwidths(1:end-1))]) + cumsum(allsep); 
+
+    % height
+    colheight   = 1-(marginsep*2)-(uicontrolsep*(nrow-1));
+    uiheights   = (relheight/sum(relheight))*colheight;
+    allsep      = [marginsep repmat(uicontrolsep, 1, nrow-1)];
+    uibottoms   = ([0 cumsum(uiheights(1:end-1))]) + cumsum(allsep);
+
+    % combine
+    pos = zeros(ncol, 4, nrow);
+    pos(:,1,:)  = repmat(uilefts', 1, nrow); 
+    pos(:,2,:)  = repmat(uibottoms, ncol, 1);
+    pos(:,3,:)  = repmat(uiwidths', 1, nrow);
+    pos(:,4,:)  = repmat(uiheights, ncol, 1);
+
+    % test
+    pos = zeros(ncol*nrow, 6);
+    pos(:,1) = reshape(repmat(1:nrow, ncol, 1), size(pos,1), 1);
+    pos(:,2) = reshape(repmat(1:ncol, 1, nrow), size(pos,1), 1);
+    pos(:,3) = uilefts(pos(:,2)); 
+    pos(:,4) = uibottoms(pos(:,1)); 
+    pos(:,5) = uiwidths(pos(:,2)); 
+    pos(:,6) = uiheights(pos(:,1)); 
+function directory = whichdir(file)
+% WHICHDIR Return directory of file in Matlab path
+%
+% USAGE: directory = whichdir(file)
+%
+% ARGUMENTS
+%
+%   file = file to find directory for
+%
+% ==================================================================
+if nargin<1
+    disp('USAGE: directory = whichdir(file)');
+    return
+end
+if iscell(file)
+    file = char(file);
+end
+d = which(file);
+if isempty(d)
+    disp(sprintf('%s not found in path!', file));
+    directory = '';
+else
+    [directory n e] = fileparts(d);
+end
 
 % | BSPM_OPTHVIEWS (MODIFIED FROM ORIGINAL SPM8 CODE)
 % =========================================================================
@@ -6128,8 +6336,195 @@ function imclipboard(imgData)
     % Set clipboard content to the image
     cb.setContents(imSelection, []);
     
-% | layControl (file exchange) & wrapper 
-% ========================================================================= 
+% | file exchange stuff
+% =========================================================================
+function [hout,ax_out] = uibutton(varargin)
+%uibutton: Create pushbutton with more flexible labeling than uicontrol.
+% Usage:
+%   uibutton accepts all the same arguments as uicontrol except for the
+%   following property changes:
+%
+%     Property      Values
+%     -----------   ------------------------------------------------------
+%     Style         'pushbutton', 'togglebutton' or 'text', default =
+%                   'pushbutton'.
+%     String        Same as for text() including cell array of strings and
+%                   TeX or LaTeX interpretation.
+%     Interpreter   'tex', 'latex' or 'none', default = default for text()
+%     Rotation      text rotation angle, default = 0
+%
+% Syntax:
+%   handle = uibutton('PropertyName',PropertyValue,...)
+%   handle = uibutton(parent,'PropertyName',PropertyValue,...)
+%   [text_obj,axes_handle] = uibutton('Style','text',...
+%       'PropertyName',PropertyValue,...)
+%
+% uibutton creates a temporary axes and text object containing the text to
+% be displayed, captures the axes as an image, deletes the axes and then
+% displays the image on the uicontrol.  The handle to the uicontrol is
+% returned.  If you pass in a handle to an existing uicontol as the first
+% argument then uibutton will use that uicontrol and not create a new one.
+%
+% If the Style is set to 'text' then the axes object is not deleted and the
+% text object handle is returned (as well as the handle to the axes in a
+% second output argument).
+%
+% See also UICONTROL.
+
+% Version: 1.9, 5 November 2010
+% Author:  Douglas M. Schwarz
+% Email:   dmschwarz=ieee*org, dmschwarz=urgrad*rochester*edu
+% Real_email = regexprep(Email,{'=','*'},{'@','.'})
+
+
+% Detect if first argument is a uicontrol handle.
+keep_handle = false;
+if nargin > 0
+	h = varargin{1};
+	if isscalar(h) && ishandle(h) && strcmp(get(h,'Type'),'uicontrol')
+		keep_handle = true;
+		varargin(1) = [];
+	end
+end
+
+% Parse arguments looking for 'Interpreter' property.  If found, note its
+% value and then remove it from where it was found.
+interp_value = get(0,'DefaultTextInterpreter');
+rotation_value = get(0,'DefaultTextRotation');
+arg = 1;
+remove = [];
+while arg <= length(varargin)
+	v = varargin{arg};
+	if isstruct(v)
+		fn = fieldnames(v);
+		for i = 1:length(fn)
+			if strncmpi(fn{i},'interpreter',length(fn{i}))
+				interp_value = v.(fn{i});
+				v = rmfield(v,fn{i});
+			elseif strncmpi(fn{i},'rotation',length(fn{i}))
+				rotation_value = v.(fn{i});
+				v = rmfield(v,fn{i});
+			end
+		end
+		varargin{arg} = v;
+		arg = arg + 1;
+	elseif ischar(v)
+		if strncmpi(v,'interpreter',length(v))
+			interp_value = varargin{arg+1};
+			remove = [remove,arg,arg+1]; %#ok<AGROW>
+		elseif strncmpi(v,'rotation',length(v))
+			rotation_value = varargin{arg+1};
+			remove = [remove,arg,arg+1]; %#ok<AGROW>
+		end
+		arg = arg + 2;
+	elseif arg == 1 && isscalar(v) && ishandle(v) && ...
+			any(strcmp(get(h,'Type'),{'figure','uipanel'}))
+		arg = arg + 1;
+	else
+		error('Invalid property or uicontrol parent.')
+	end
+end
+varargin(remove) = [];
+
+% Create uicontrol, get its properties then hide it.
+if keep_handle
+	set(h,varargin{:})
+else
+	h = uicontrol(varargin{:});
+end
+s = get(h);
+if ~any(strcmp(s.Style,{'pushbutton','togglebutton','text'}))
+	delete(h)
+	error('''Style'' must be pushbutton, togglebutton or text.')
+end
+set(h,'Visible','off')
+
+% Create axes.
+parent = get(h,'Parent');
+ax = axes('Parent',parent,...
+	'Units',s.Units,...
+	'Position',s.Position,...
+	'XTick',[],'YTick',[],...
+	'XColor',s.BackgroundColor,...
+	'YColor',s.BackgroundColor,...
+	'Box','on',...
+	'Color',s.BackgroundColor);
+% Adjust size of axes for best appearance.
+set(ax,'Units','pixels')
+pos = round(get(ax,'Position'));
+if strcmp(s.Style,'text')
+	set(ax,'Position',pos + [0 1 -1 -1])
+else
+	set(ax,'Position',pos + [4 4 -8 -8])
+end
+switch s.HorizontalAlignment
+	case 'left'
+		x = 0.0;
+	case 'center'
+		x = 0.5;
+	case 'right'
+		x = 1;
+end
+% Create text object.
+text_obj = text('Parent',ax,...
+	'Position',[x,0.5],...
+	'String',s.String,...
+	'Interpreter',interp_value,...
+	'Rotation',rotation_value,...
+	'HorizontalAlignment',s.HorizontalAlignment,...
+	'VerticalAlignment','middle',...
+	'FontName',s.FontName,...
+	'FontSize',s.FontSize,...
+	'FontAngle',s.FontAngle,...
+	'FontWeight',s.FontWeight,...
+	'Color',s.ForegroundColor);
+
+% If we are creating something that looks like a text uicontrol then we're
+% all done and we return the text object and axes handles rather than a
+% uicontrol handle.
+if strcmp(s.Style,'text')
+	delete(h)
+	if nargout
+		hout = text_obj;
+		ax_out = ax;
+	end
+	return
+end
+
+% Determine parent figure and move it to main screen, if necessary.
+% (Necessary because of bug in getframe.)
+fig = parent;
+while ~strcmp(get(fig,'Type'),'figure')
+	fig = get(fig,'Parent');
+end
+fig_pos = get(fig,'Position');
+movegui(fig)
+
+% Capture image of axes and then delete the axes.
+frame = getframe(ax);
+delete(ax)
+
+% Move figure back to original position.
+set(fig,'Position',fig_pos)
+
+% Build RGB image, set background pixels to NaN and put it in 'CData' for
+% the uicontrol.
+if isempty(frame.colormap)
+	rgb = frame.cdata;
+else
+	rgb = reshape(frame.colormap(frame.cdata,:),[pos([4,3]),3]);
+end
+size_rgb = size(rgb);
+rgb = double(rgb)/255;
+back = repmat(permute(s.BackgroundColor,[1 3 2]),size_rgb(1:2));
+isback = all(rgb == back,3);
+rgb(repmat(isback,[1 1 3])) = NaN;
+set(h,'CData',rgb,'String','','Visible',s.Visible)
+
+% Assign output argument if necessary.
+if nargout
+	hout = h;
+end
 function s = easydefaults(varargin)
 % easydefaults  Set many default arguments quick and easy.
 %
@@ -6242,145 +6637,425 @@ function s = easyparse(caller_varargin,allowed_names)
             end
         end
     end
-function h = buipanel(parent, uilabels, uistyles, relwidth, varargin)
-% BUIPANEL Create a panel and populate it with uicontrols
+function out = scaledata(in, minmax)
+% SCALEDATA
 %
-%  USAGE: h = buipanel(parent, uilabels, uistyles, uiwidths, varargin)
-% __________________________________________________________________________
-%  INPUTS 
+% USAGE: out = scaledata(in, minmax)
 %
-
-% ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
-%	Created:  2014-10-08
-%	Email:    spunt@caltech.edu
-% __________________________________________________________________________
-global st
-easyparse(varargin, ... 
-            { ...
-            'panelposition', ...
-            'paneltitleposition', ...
-            'paneltitle', ...
-            'panelborder', ... 
-            'panelbackcolor',  ...
-            'panelforecolor', ...
-            'panelfontsize',  ...
-            'panelfontname' ...
-            'panelfontweight', ...
-            'editbackcolor',  ...
-            'editforecolor', ...
-            'editfontsize',  ...
-            'editfontname', ...
-            'labelbackcolor',  ...
-            'labelforecolor', ...
-            'labelfontsize',  ...
-            'labelfontname', ...
-            'labelfontweight', ...
-            'relheight', ...
-            'marginsep', ...
-            'uicontrolsep', ...
-            'tag'}); 
-defaults = easydefaults(...
-            'paneltitleposition', 'centertop', ...
-            'panelborder',      'none', ... 
-            'panelbackcolor',   st.color.bg, ...
-            'editbackcolor',    st.color.fg, ...
-            'labelbackcolor',   st.color.bg, ...
-            'panelforecolor',   st.color.fg, ...
-            'editforecolor',    [0 0 0], ...
-            'labelforecolor',   st.color.fg, ...
-            'panelfontname',    st.fonts.name, ...
-            'editfontname',     'fixed-width', ...
-            'labelfontname',    st.fonts.name, ...
-            'panelfontsize',    st.fonts.sz2, ...
-            'editfontsize',     st.fonts.sz3, ...
-            'labelfontsize',    st.fonts.sz3, ...
-            'panelfontweight',  'bold', ...
-            'labelfontweight',  'bold', ...
-            'relheight',        [6 7], ...
-            'marginsep',        .025, ...
-            'uicontrolsep',     .025);
-if nargin==0, mfile_showhelp; disp(defaults); return; end
-
-% | UNITS
-unit0 = get(parent, 'units'); 
-        
-% | PANEL
-set(parent, 'units', 'pixels')
-pp          = get(parent, 'pos'); 
-pp          = [pp(3:4) pp(3:4)]; 
-P           = uipanel(parent, 'units', 'pix', 'pos', panelposition.*pp, 'title', paneltitle, ...
-            'backg', panelbackcolor, 'foreg', panelforecolor, 'fontsize', panelfontsize, ...
-            'fontname', panelfontname, 'bordertype', panelborder, 'fontweight', panelfontweight, 'titleposition', paneltitleposition);
-labelprop   = {'parent', P, 'style', 'text', 'units', 'norm', 'fontsize', labelfontsize, 'fontname', labelfontname, 'foreg', labelforecolor, 'backg', labelbackcolor, 'fontweight', labelfontweight, 'tag', 'uilabel'}; 
-editprop    = {'parent', P, 'units', 'norm', 'fontsize', editfontsize, 'fontname', editfontname, 'foreg', editforecolor, 'backg', editbackcolor}; 
-propadd     = {'tag'};
-
-% | UICONTROLS
-
-pos         = getpositions(relwidth, relheight, marginsep, uicontrolsep);
-editpos     = pos(pos(:,1)==1,3:6); 
-labelpos    = pos(pos(:,1)==2, 3:6); 
-hc          = zeros(length(uilabels), 1); 
-he          = gobjects(length(uilabels), 1); 
-
-for i = 1:length(uilabels)
-    ctag = ~cellfun('isempty', regexpi({'editbox', 'slider', 'listbox', 'popup'}, uistyles{i}));
-    ttag = ~cellfun('isempty', regexpi({'text'}, uistyles{i}));
-    if sum(ctag)==1
-        hc(i) = uibutton(labelprop{:}, 'pos', labelpos(i,:), 'str', uilabels{i}); 
-        he(i) = uicontrol(editprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:));
-    elseif ttag
-        editpos(i,4) = 1 - marginsep*2; 
-        he(i) = uibutton(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i}); 
-    else
-        editpos(i,4) = 1 - marginsep*2; 
-        he(i) = uicontrol(labelprop{:}, 'style', uistyles{i}, 'pos', editpos(i,:), 'str', uilabels{i});  
-    end
-    for ii = 1:length(propadd)
-           if ~isempty(propadd{ii})
-                tmp = eval(sprintf('%s', propadd{ii})); 
-                set(he(i), propadd{ii}, tmp{i}); 
-           end
-    end
+% Example:
+% a = [1 2 3 4 5];
+% a_out = scaledata(a,0,1);
+% 
+% Output obtained: 
+%            0    0.1111    0.2222    0.3333    0.4444
+%       0.5556    0.6667    0.7778    0.8889    1.0000
+%
+% Program written by:
+% Aniruddha Kembhavi, July 11, 2007
+if nargin<2, minmax = [0 1]; end
+if nargin<1, error('USAGE: out = scaledata(in, minmax)'); end
+out = in - repmat(min(in), size(in, 1), 1); 
+out = ((out./repmat(range(out), size(out,1), 1))*(minmax(2)-minmax(1))) + minmax(1); 
+function mfile_showhelp(varargin)
+% MFILE_SHOWHELP
+%
+% ------------------------------------------------------------------------
+ST = dbstack('-completenames');
+if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; end
+eval(sprintf('help %s', ST(2).file));  
+function X = demean(x)
+%%% Written by Aaron Schultz (aschultz@martinos.org)
+%%% Copyright (C) 2014,  Aaron P. Schultz
+%%%
+%%% Supported in part by the NIH funded Harvard Aging Brain Study (P01AG036694) and NIH R01-AG027435 
+%%%
+%%% This program is free software: you can redistribute it and/or modify
+%%% it under the terms of the GNU General Public License as published by
+%%% the Free Software Foundation, either version 3 of the License, or
+%%% any later version.
+%%% 
+%%% This program is distributed in the hope that it will be useful,
+%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%%% GNU General Public License for more details.
+X = x-repmat(mean(x),size(x,1),1);
+function [map,num,typ] = brewermap(N,scheme)
+% The complete selection of ColorBrewer colorschemes (RGB colormaps).
+%
+% (c) 2014 Stephen Cobeldick
+%
+% ### Function ###
+%
+% Returns an RGB colormap of one of the ColorBrewer colorschemes, especially
+% intended for mapping and plots with attractive, distinguishable colors.
+%
+% Syntax:
+%  map = brewermap(N,scheme);  % Select colormap length, select any colorscheme.
+%  brewermap('demo')           % View a figure showing all ColorBrewer colorschemes.
+%  old = brewermap(scheme);    % Set the default colorscheme, return the last default scheme.
+%  map = brewermap(N);         % Use the default scheme, select colormap length.
+%  map = brewermap;            % Use the default scheme, same length as current figure's colormap.
+%  [...,num] = brewermap(...); % Return the selected/default scheme's number of nodes.
+%
+% See the ColorBrewer website for further information about each colorscheme,
+% colorblind suitability, licensing, and citations: http://colorbrewer.org/
+%
+% Note: Due to license restrictions, this file is not distributed with the actual
+% ColorBrewer data. Please read the file <brewermap_read.m> for more information.
+%
+% See also CUBEHELIX RGBPLOT3 RGBPLOT COLORMAP COLORBAR PLOT PLOT3 SURF CONTOURF IMAGE CONTOURCMAP AXES SET JET LBMAP
+%
+% ### Color Schemes ###
+%
+% Each color scheme is defined by a set of hand-picked RGB values (nodes).
+% If <N> is greater than the requested colorscheme's number of nodes then:
+%  - Sequential and Diverging schemes are interpolated to give larger colormaps.
+%  - Qualitative schemes throw an error.
+% Else:
+%  - Exact values from the ColorBrewer sequences are returned for all schemes.
+%
+% # Diverging #
+%
+% Scheme|'BrBG'|'PRGn'|'PiYG'|'PuOr'|'RdBu'|'RdGy'|'RdYlBu'|'RdYlGn'|'Spectral'|
+% ------|------|------|------|------|------|------|--------|--------|----------|
+% Nodes |  15  |  15  |  15  |  15  |  15  |  15  |   15   |   15   |     15   |
+%
+% # Qualitative #
+%
+% Scheme|'Accent'|'Dark2'|'Paired'|'Pastel1'|'Pastel2'|'Set1'|'Set2'|'Set3'|
+% ------|--------|-------|--------|---------|---------|------|------|------|
+% Nodes |    8   |   8   |   12   |    9    |    8    |   9  |   8  |  12  |
+%
+% # Sequential #
+%
+% Scheme|'Blues'|'BuGn'|'BuPu'|'GnBu'|'Greens'|'Greys'|'OrRd'|'Oranges'|'PuBu'|
+% ------|-------|------|------|------|--------|-------|------|---------|------|
+% Nodes |   13  |  13  |  13  |  13  |   13   |   13  |  13  |    13   |  13  |
+%
+% Scheme|'PuBuGn'|'PuRd'|'Purples'|'RdPu'|'Reds'|'YlGn'|'YlGnBu'|'YlOrBr'|'YlOrRd'|
+% ------|--------|------|---------|------|------|------|--------|--------|--------|
+% Nodes |   13   |  13  |    13   |  13  |  13  |  13  |   13   |   13   |   13   |
+%
+% ### Examples ###
+%
+% % Plot a scheme's RGB values:
+% rgbplot(brewermap(13,'Blues'))  % normal
+% rgbplot(brewermap(13,'*Blues')) % reversed
+%
+% % Multiline plot using matrices:
+% N = 6;
+% axes('ColorOrder',brewermap(N,'Pastel2'),'NextPlot','replacechildren')
+% X = linspace(0,pi*3,1000);
+% Y = bsxfun(@(x,n)n*sin(x+2*n*pi/N), X.', 1:N);
+% plot(X,Y, 'linewidth',4)
+%
+% % Multiline plot in a loop:
+% N = 6;
+% set(0,'DefaultAxesColorOrder',brewermap(8,'Accent'))
+% X = linspace(0,pi*3,1000);
+% Y = bsxfun(@(x,n)n*sin(x+2*n*pi/N), X.', 1:N);
+% for n = 1:N
+%     plot(X(:),Y(:,n), 'linewidth',4);
+%     hold all
+% end
+%
+% % New colors for the "colormap" example:
+% load spine
+% image(X)
+% colormap(brewermap([],'*YlGnBu'))
+%
+% % New colors for the "surf" example:
+% [X,Y,Z] = peaks(30);
+% surfc(X,Y,Z)
+% colormap(brewermap([],'RdYlGn'))
+% axis([-3,3,-3,3,-10,5])
+%
+% % New colors for the "contourcmap" example:
+% brewermap('*PuOr'); % Set the default scheme.
+% load topo
+% load coast
+% figure
+% worldmap(topo, topolegend)
+% contourfm(topo, topolegend);
+% contourcmap('brewermap', 'Colorbar','on', 'Location','horizontal',...
+%     'TitleString','Contour Intervals in Meters');
+% plotm(lat, long, 'k')
+%
+% ### Input & Output Arguments ###
+%
+% Inputs (*=default):
+%  N   = NumericScalar, N>=0, an integer to define the colormap length.
+%      = *[], use the length of the current figure's colormap (see "colormap").
+%      = StringToken, to set this ColorBrewer scheme as the default.
+%      = 'demo', create a figure showing all of the ColorBrewer schemes.
+%  scheme = StringToken, a ColorBrewer scheme to select the colorscheme.
+%           To reverse the colormap sequence prefix the string token with '*'.
+%         = *none, uses the default colorscheme.
+%
+% Outputs:
+%  map = NumericMatrix, size N-by-3, a colormap of RGB values between 0 and 1.
+%  num = NumericScalar, the number of nodes defining the ColorBrewer scheme.
+%
+% [map,num] = brewermap(*N,*scheme)
+persistent dcs
+switch nargin
+    case 0
+        % Use the current figure's colormap length, and the default colorscheme.
+        [map,num] = cbSample([],dcs);
+    case 1
+        if strcmpi(N,'demo')
+            % Plot all colorschemes in a figure.
+            cbDemoFig
+        elseif strcmpi(N,'list')
+            % Return a list of all available colorschemes.
+            map = cbListTok;
+            [num,typ] = cellfun(@cbSelect,map,'UniformOutput',false);
+            num = cat(1,num{:});
+        elseif ischar(N)
+            % Set the default colorscheme.
+            map = dcs;
+            num = cbSelect(N(1+strncmp('*',N,1):end));
+            dcs = N;
+        else
+            % Use the provided colormap length, and the default colorscheme.
+            [map,num] = cbSample(N,dcs);
+        end
+    case 2
+        % Use the provided colormap length and the provided colorscheme.
+        [map,num] = cbSample(N,scheme);
 end
-% | HANDLES
-h.panel = P;
-h.label = hc; 
-h.edit  = he;  
+function [map,num] = cbSample(N,tok)
+% Pick a colorscheme, downsample/interpolate to the requested colormap length.
+%
+if isempty(N)
+    N = size(get(gcf,'colormap'),1);
+else
+    assert(isnumeric(N)&&isscalar(N),'First argument must be a numeric scalar.')
+end
+if strncmp('*',tok,1);
+    vec = N:-1:1;
+    tok = tok(2:end);
+else
+    vec = 1:+1:N;
+end
+[num,typ,rgb] = cbSelect(tok);
+if strncmpi(typ,'Q',1)
+    % Exact (Qualitative).
+    assert(N<=num,'Color scheme "%s" maximum colormap length: %d. Requested: %d.',tok,num,N)
+    map = rgb(vec,:);
+    %
+elseif N<num
+    % Downsample (Diverging / Sequential).
+    map = rgb(cbIndex(N,num,typ,vec),:);
+    %
+elseif N>num
+    % Interpolate (Diverging / Sequential).
+    xi = (vec-1).' / (N-1);
+    map = interp1q((1:num).', rgb, num*xi + xi(end:-1:1));
+    %map = interp1((1:num).', rgb, num*xi + xi(end:-1:1), 'pchip');
+    %
+else
+    % Exact (Diverging / Sequential).
+    map = rgb(vec,:);
+    %
+end
+function seq = cbListTok
+seq = {'BrBG';'PRGn';'PiYG';'PuOr';'RdBu';'RdGy';'RdYlBu';'RdYlGn';'Spectral';... % Diverging
+    'Accent';'Dark2';'Paired';'Pastel1';'Pastel2';'Set1';'Set2';'Set3';...        % Qualitative
+    'Blues';'BuGn';'BuPu';'GnBu';'Greens';'Greys';'OrRd';'Oranges';'PuBu';...     % Sequential
+    'PuBuGn';'PuRd';'Purples';'RdPu';'Reds';'YlGn';'YlGnBu';'YlOrBr';'YlOrRd'};   % Sequential
+function cbDemoFig
+% Creates a figure showing all of the ColorBrewer colorschemes.
+%
+persistent cbh axh
+seq = cbListTok;
+xmx = max(cellfun(@cbSelect,seq));
+ymx = numel(seq);
+if ishghandle(cbh)
+    figure(cbh);
+    delete(axh);
+else
+    cbh = figure('HandleVisibility','callback', 'NumberTitle','off', 'Name',[mfilename,' Demo'],'Color','white');
+end
+axh = axes('Parent',cbh, 'XTick',0:xmx, 'YTick',0.5:ymx, 'YTickLabel',seq, 'YDir','reverse','Color','none');
+title(axh,['ColorBrewer Color Schemes (',mfilename,'.m)'])
+xlabel(axh,'Scheme Nodes')
+ylabel(axh,'Scheme Name')
+for y = 1:ymx
+    [num,typ,rgb] = cbSelect(seq{y});
+    for x = 1:num
+        patch([x-1,x-1,x,x],[y-1,y,y,y-1],1, 'FaceColor',rgb(x,:), 'Parent',axh)
+    end
+    text(xmx+0.1,y-0.5,typ, 'Parent',axh)
+end
+function idx = cbIndex(N,num,typ,vec)
+% Ensure exactly the same colors as in the online ColorBrewer schemes.
+%
+if strncmp('D',typ,1) && 3<=N && N<=11
+    switch N
+        case 3
+            idx = [5,8,11];
+        case 4
+            idx = [3,6,10,13];
+        case 5
+            idx = [3,6,8,10,13];
+        case 6
+            idx = [2,5,7,9,11,14];
+        case 7
+            idx = [2,5,7,8,9,11,14];
+        case 8
+            idx = [2,4,6,7,9,10,12,14];
+        case 9
+            idx = [2,4,6,7,8,9,10,12,14];
+        case 10
+            idx = [1,2,4,6,7,9,10,12,14,15];
+        case 11
+            idx = [1,2,4,6,7,8,9,10,12,14,15];
+    end
+    idx = idx(vec);
+elseif strncmp('S',typ,1) && 3<=N && N<=9
+    switch N
+        case 3
+            idx = [3,6,9];
+        case 4
+            idx = [2,5,7,10];
+        case 5
+            idx = [2,5,7,9,11];
+        case 6
+            idx = [2,4,6,7,9,11];
+        case 7
+            idx = [2,4,6,7,8,10,12];
+        case 8
+            idx = [1,3,4,6,7,8,10,12];
+        case 9
+            idx = [1,3,4,6,7,8,10,11,13];
+    end
+    idx = idx(vec);
+else
+    % Evenly spaced downsampling:
+    idx = (1+num) * vec / (1+N);
+    % Round to odd:
+    adj = rem(idx,2);
+    adj(idx~=1.5) = 0;
+    idx = round(idx-adj/3);
+end
+function [num,typ,rgb] = cbSelect(tok)
+% Return the raw colorscheme values.
+%
+assert(ischar(tok)&&isrow(tok),'Token must be a ColorBrewer scheme name. Forgotten to save one?')
+%
+switch tok % ColorName
+    case 'Accent'
+        rgb = [127,201,127;190,174,212;253,192,134;255,255,153;56,108,176;240,2,127;191,91,23;102,102,102];
+        typ = 'Qualitative';
+    case 'Blues'
+        rgb = [247,251,255;239,243,255;222,235,247;198,219,239;189,215,231;158,202,225;107,174,214;66,146,198;49,130,189;33,113,181;8,81,156;8,69,148;8,48,107];
+        typ = 'Sequential';
+    case 'BrBG'
+        rgb = [84,48,5;140,81,10;166,97,26;191,129,45;216,179,101;223,194,125;246,232,195;245,245,245;199,234,229;128,205,193;90,180,172;53,151,143;1,133,113;1,102,94;0,60,48];
+        typ = 'Diverging';
+    case 'BuGn'
+        rgb = [247,252,253;237,248,251;229,245,249;204,236,230;178,226,226;153,216,201;102,194,164;65,174,118;44,162,95;35,139,69;0,109,44;0,88,36;0,68,27];
+        typ = 'Sequential';
+    case 'BuPu'
+        rgb = [247,252,253;237,248,251;224,236,244;191,211,230;179,205,227;158,188,218;140,150,198;140,107,177;136,86,167;136,65,157;129,15,124;110,1,107;77,0,75];
+        typ = 'Sequential';
+    case 'Dark2'
+        rgb = [27,158,119;217,95,2;117,112,179;231,41,138;102,166,30;230,171,2;166,118,29;102,102,102];
+        typ = 'Qualitative';
+    case 'GnBu'
+        rgb = [247,252,240;240,249,232;224,243,219;204,235,197;186,228,188;168,221,181;123,204,196;78,179,211;67,162,202;43,140,190;8,104,172;8,88,158;8,64,129];
+        typ = 'Sequential';
+    case 'Greens'
+        rgb = [247,252,245;237,248,233;229,245,224;199,233,192;186,228,179;161,217,155;116,196,118;65,171,93;49,163,84;35,139,69;0,109,44;0,90,50;0,68,27];
+        typ = 'Sequential';
+    case 'Greys'
+        rgb = [255,255,255;247,247,247;240,240,240;217,217,217;204,204,204;189,189,189;150,150,150;115,115,115;99,99,99;82,82,82;37,37,37;37,37,37;0,0,0];
+        typ = 'Sequential';
+    case 'Oranges'
+        rgb = [255,245,235;254,237,222;254,230,206;253,208,162;253,190,133;253,174,107;253,141,60;241,105,19;230,85,13;217,71,1;166,54,3;140,45,4;127,39,4];
+        typ = 'Sequential';
+    case 'OrRd'
+        rgb = [255,247,236;254,240,217;254,232,200;253,212,158;253,204,138;253,187,132;252,141,89;239,101,72;227,74,51;215,48,31;179,0,0;153,0,0;127,0,0];
+        typ = 'Sequential';
+    case 'Paired'
+        rgb = [166,206,227;31,120,180;178,223,138;51,160,44;251,154,153;227,26,28;253,191,111;255,127,0;202,178,214;106,61,154;255,255,153;177,89,40];
+        typ = 'Qualitative';
+    case 'Pastel1'
+        rgb = [251,180,174;179,205,227;204,235,197;222,203,228;254,217,166;255,255,204;229,216,189;253,218,236;242,242,242];
+        typ = 'Qualitative';
+    case 'Pastel2'
+        rgb = [179,226,205;253,205,172;203,213,232;244,202,228;230,245,201;255,242,174;241,226,204;204,204,204];
+        typ = 'Qualitative';
+    case 'PiYG'
+        rgb = [142,1,82;197,27,125;208,28,139;222,119,174;233,163,201;241,182,218;253,224,239;247,247,247;230,245,208;184,225,134;161,215,106;127,188,65;77,172,38;77,146,33;39,100,25];
+        typ = 'Diverging';
+    case 'PRGn'
+        rgb = [64,0,75;118,42,131;123,50,148;153,112,171;175,141,195;194,165,207;231,212,232;247,247,247;217,240,211;166,219,160;127,191,123;90,174,97;0,136,55;27,120,55;0,68,27];
+        typ = 'Diverging';
+    case 'PuBu'
+        rgb = [255,247,251;241,238,246;236,231,242;208,209,230;189,201,225;166,189,219;116,169,207;54,144,192;43,140,190;5,112,176;4,90,141;3,78,123;2,56,88];
+        typ = 'Sequential';
+    case 'PuBuGn'
+        rgb = [255,247,251;246,239,247;236,226,240;208,209,230;189,201,225;166,189,219;103,169,207;54,144,192;28,144,153;2,129,138;1,108,89;1,100,80;1,70,54];
+        typ = 'Sequential';
+    case 'PuOr'
+        rgb = [127,59,8;179,88,6;230,97,1;224,130,20;241,163,64;253,184,99;254,224,182;247,247,247;216,218,235;178,171,210;153,142,195;128,115,172;94,60,153;84,39,136;45,0,75];
+        typ = 'Diverging';
+    case 'PuRd'
+        rgb = [247,244,249;241,238,246;231,225,239;212,185,218;215,181,216;201,148,199;223,101,176;231,41,138;221,28,119;206,18,86;152,0,67;145,0,63;103,0,31];
+        typ = 'Sequential';
+    case 'Purples'
+        rgb = [252,251,253;242,240,247;239,237,245;218,218,235;203,201,226;188,189,220;158,154,200;128,125,186;117,107,177;106,81,163;84,39,143;74,20,134;63,0,125];
+        typ = 'Sequential';
+    case 'RdBu'
+        rgb = [103,0,31;178,24,43;202,0,32;214,96,77;239,138,98;244,165,130;253,219,199;247,247,247;209,229,240;146,197,222;103,169,207;67,147,195;5,113,176;33,102,172;5,48,97];
+        typ = 'Diverging';
+    case 'RdGy'
+        rgb = [103,0,31;178,24,43;202,0,32;214,96,77;239,138,98;244,165,130;253,219,199;255,255,255;224,224,224;186,186,186;153,153,153;135,135,135;64,64,64;77,77,77;26,26,26];
+        typ = 'Diverging';
+    case 'RdPu'
+        rgb = [255,247,243;254,235,226;253,224,221;252,197,192;251,180,185;250,159,181;247,104,161;221,52,151;197,27,138;174,1,126;122,1,119;122,1,119;73,0,106];
+        typ = 'Sequential';
+    case 'Reds'
+        rgb = [255,245,240;254,229,217;254,224,210;252,187,161;252,174,145;252,146,114;251,106,74;239,59,44;222,45,38;203,24,29;165,15,21;153,0,13;103,0,13];
+        typ = 'Sequential';
+    case 'RdYlBu'
+        rgb = [165,0,38;215,48,39;215,25,28;244,109,67;252,141,89;253,174,97;254,224,144;255,255,191;224,243,248;171,217,233;145,191,219;116,173,209;44,123,182;69,117,180;49,54,149];
+        typ = 'Diverging';
+    case 'RdYlGn'
+        rgb = [165,0,38;215,48,39;215,25,28;244,109,67;252,141,89;253,174,97;254,224,139;255,255,191;217,239,139;166,217,106;145,207,96;102,189,99;26,150,65;26,152,80;0,104,55];
+        typ = 'Diverging';
+    case 'Set1'
+        rgb = [228,26,28;55,126,184;77,175,74;152,78,163;255,127,0;255,255,51;166,86,40;247,129,191;153,153,153];
+        typ = 'Qualitative';
+    case 'Set2'
+        rgb = [102,194,165;252,141,98;141,160,203;231,138,195;166,216,84;255,217,47;229,196,148;179,179,179];
+        typ = 'Qualitative';
+    case 'Set3'
+        rgb = [141,211,199;255,255,179;190,186,218;251,128,114;128,177,211;253,180,98;179,222,105;252,205,229;217,217,217;188,128,189;204,235,197;255,237,111];
+        typ = 'Qualitative';
+    case 'Spectral'
+        rgb = [158,1,66;213,62,79;215,25,28;244,109,67;252,141,89;253,174,97;254,224,139;255,255,191;230,245,152;171,221,164;153,213,148;102,194,165;43,131,186;50,136,189;94,79,162];
+        typ = 'Diverging';
+    case 'YlGn'
+        rgb = [255,255,229;255,255,204;247,252,185;217,240,163;194,230,153;173,221,142;120,198,121;65,171,93;49,163,84;35,132,67;0,104,55;0,90,50;0,69,41];
+        typ = 'Sequential';
+    case 'YlGnBu'
+        rgb = [255,255,217;255,255,204;237,248,177;199,233,180;161,218,180;127,205,187;65,182,196;29,145,192;44,127,184;34,94,168;37,52,148;12,44,132;8,29,88];
+        typ = 'Sequential';
+    case 'YlOrBr'
+        rgb = [255,255,229;255,255,212;255,247,188;254,227,145;254,217,142;254,196,79;254,153,41;236,112,20;217,95,14;204,76,2;153,52,4;140,45,4;102,37,6];
+        typ = 'Sequential';
+    case 'YlOrRd'
+        rgb = [255,255,204;255,255,178;255,237,160;254,217,118;254,204,92;254,178,76;253,141,60;252,78,42;240,59,32;227,26,28;189,0,38;177,0,38;128,0,38];
+        typ = 'Sequential';
+    otherwise
+        error('Color scheme "%s" is not supported. Check the token tables.', tok)
+end
+num = size(rgb,1);
+rgb = rgb./255;
 
-set(parent, 'units', unit0);
-function pos = getpositions(relwidth, relheight, marginsep, uicontrolsep)
-    if nargin<2, relheight = [6 7]; end
-    if nargin<3, marginsep = .025; end
-    if nargin<4, uicontrolsep = .01; end
-    ncol = length(relwidth);
-    nrow = length(relheight); 
 
-    % width
-    rowwidth    = 1-(marginsep*2)-(uicontrolsep*(ncol-1));  
-    uiwidths    = (relwidth/sum(relwidth))*rowwidth;
-    allsep      = [marginsep repmat(uicontrolsep, 1, ncol-1)];
-    uilefts     = ([0 cumsum(uiwidths(1:end-1))]) + cumsum(allsep); 
 
-    % height
-    colheight   = 1-(marginsep*2)-(uicontrolsep*(nrow-1));
-    uiheights   = (relheight/sum(relheight))*colheight;
-    allsep      = [marginsep repmat(uicontrolsep, 1, nrow-1)];
-    uibottoms   = ([0 cumsum(uiheights(1:end-1))]) + cumsum(allsep);
-
-    % combine
-    pos = zeros(ncol, 4, nrow);
-    pos(:,1,:)  = repmat(uilefts', 1, nrow); 
-    pos(:,2,:)  = repmat(uibottoms, ncol, 1);
-    pos(:,3,:)  = repmat(uiwidths', 1, nrow);
-    pos(:,4,:)  = repmat(uiheights, ncol, 1);
-
-    % test
-    pos = zeros(ncol*nrow, 6);
-    pos(:,1) = reshape(repmat(1:nrow, ncol, 1), size(pos,1), 1);
-    pos(:,2) = reshape(repmat(1:ncol, 1, nrow), size(pos,1), 1);
-    pos(:,3) = uilefts(pos(:,2)); 
-    pos(:,4) = uibottoms(pos(:,1)); 
-    pos(:,5) = uiwidths(pos(:,2)); 
-    pos(:,6) = uiheights(pos(:,1)); 
     

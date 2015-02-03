@@ -1,6 +1,8 @@
 function [] = bspm_level1(images, general_info, runs, contrasts)
 % BSPM_LEVEL1
 %
+%   USAGE: bspm_level1(images, general_info, runs, contrasts)
+%
 %   ARGUMENTS:
 %
 %   images:            NRUNS x 1 cell array with functional image files
