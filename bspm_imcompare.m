@@ -56,13 +56,13 @@ else
     out(:,1) = nanmean(tmpout.^2)';
     out(:,1) = max(out(:,1)) - out(:,1); 
     for i = 1:length(in)
-        out(i,2) = corr(M,im(:,i),'rows','pairwise');
+        out(i,2) = 1 - corr(M,im(:,i),'rows','pairwise');
     end
     zout = abs(oneoutzscore(out));
     flag = zout>sdcut;
     result = [out(:,1) flag(:,1) out(:,2) flag(:,2)];
     fprintf('\nCOMPARING %d IMAGES\n', length(in));
-    disptable(result,{'MSS' 'FLAG' 'MCORR' 'FLAG'},labels,'%2.2f');
+    disptable(result,{'MSS' 'FLAG' 'MDISS' 'FLAG'},labels,'%2.2f');
     bad = find(flag(:,1) | flag(:,2));
     disp(bad);
     disp(char(in(bad)));

@@ -1,5 +1,7 @@
-function [] = bspm_level2_ostt_spm(cons, name, mask, implicitTAG, outdir)
+function bspm_level2_ostt_spm(cons, name, mask, implicitTAG, outdir)
 % BSPM_LEVEL2_OSTT
+%
+%   USAGE: bspm_level2_ostt_spm(cons, name, mask, implicitTAG, outdir)
 %
 %   ARGUMENTS:
 %       cons: contrast images from level 1
