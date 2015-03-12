@@ -26,9 +26,14 @@ function matlabbatch = bspm_level1(images, general_info, runs, contrasts)
 %               name:           string naming the condition
 %               onsets:         onsets
 %               durations:      durations
-%               parameters:     for building parametric modulators (leave empty for none)
+%               parameters:     for within-condition parametric modulators (leave empty for none)
 %                   name:       string naming the paramter
 %                   values:     parameter values
+%           floatingpm          for between-condition parametric modulators
+%               name:       string naming the parameter
+%               onsets:     onsets of modulated events
+%               durations:  durations of modulated events
+%               values:     parameter values
 %           regressors:         for regressors not convolved with the HRF (e.g., motion)
 %               name:           string naming the regressors
 %               values:         regressors values (1 x nscans)
@@ -101,11 +106,13 @@ nruns = length(runs);
 if nruns==0, runs.conditions = []; nruns = 1; end
 for r = 1:nruns
     regressors = [];
+    floatingpm = []; 
     if nruns==1
         cimages = images;
         conditions = runs.conditions;
         nuisance = general_info.nuisance_file;
         if isfield(runs, 'regressors'), regressors = runs.regressors; end
+        if isfield(runs, 'floatingpm'), floatingpm = runs.floatingpm; end
     else
         cimages = images{r};
         conditions = runs(r).conditions;
@@ -133,17 +140,34 @@ for r = 1:nruns
             spec.sess.cond.orth = general_info.orth;
         end  
     end
+    rc = 0; 
+    if ~isempty(floatingpm)
+        for p = 1:length(floatingpm)
+            x = bspm_make_regressor(length(cimages), general_info.TR, floatingpm(p).onsets, ... 
+                floatingpm(p).durations, 'PMods', floatingpm(p).values, 'TRbin', general_info.mt_res, ...
+                'TRons', general_info.mt_onset, 'TempDeriv', general_info.hrf_derivs(1));
+            rc = rc + 1; 
+            spec.sess(r).regress(rc).name   = floatingpm(p).name;
+            spec.sess(r).regress(rc).val    = x(:,2); 
+            if general_info.hrf_derivs(1)
+                rc = rc + 1; 
+                spec.sess(r).regress(rc).name   = strcat([floatingpm(p).name, '_xTD']); 
+                spec.sess(r).regress(rc).val    = x(:,3); 
+            end
+        end
+    end
     if ~isempty(regressors)
         for p = 1:length(regressors)
-            spec.sess(r).regress(p).name = regressors(p).name;
-            spec.sess(r).regress(p).val = regressors(p).values;
+            rc = rc + 1; 
+            spec.sess(r).regress(rc).name = regressors(p).name;
+            spec.sess(r).regress(rc).val = regressors(p).values;
         end
     end  
     spec.sess(r).multi{1} = '';
     spec.sess(r).multi_reg{1} = nuisance;
     spec.sess(r).hpf = general_info.hpf;
 end
-   
+    
 % | Estimation Job
 % | =======================================================================
 est.spmmat{1} = [general_info.analysis filesep 'SPM.mat'];

@@ -9,7 +9,7 @@ function matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)
 %       epi     = first epi of each run
 %       ets     = array of short and long echo times (e.g., [2.55 5.01])
 %       epi_rot = echo spacing * # of lines of data acquired
-%       blip    = blip direction (-1 or 1) [DEFAULT = 1]
+%       blip    = blip direction (-1 or 1) [DEFAULT = -1]
 %       jacbob  = use jacobian modulation? (0 = NO, 1 = YES) [DEFAULT = 0]
 %       method  = unwrapping method ('Mark2D', 'Mark3D')
 %
@@ -22,7 +22,7 @@ function matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)
 %	$Revision Date: Aug_20_2014
 if nargin<5, disp('USAGE: matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)'); return; end
 def = { 'blip',         -1, ...
-        'jacobTAG',     0, ...
+        'jacob',     0, ...
         'method',       'Mark3D'};
 bspm_setdefaults(def, varargin); 
 if ischar(phase), phase = cellstr(phase); end

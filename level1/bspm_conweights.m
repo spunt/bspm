@@ -1,5 +1,5 @@
-function weights = bspm_contrast_weights(ncond)
-% BSPM_CONTRAST_WEIGHTS
+function weights = bspm_conweights(ncond)
+% BSPM_CONWEIGHTS
 %
 % Generate a matrix of non-redundant pairwise comparisons
 % across conditions. Each row has a unique comparison.
@@ -17,7 +17,7 @@ function weights = bspm_contrast_weights(ncond)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, disp('USAGE: weights = bspm_contrast_weights(ncond)'); return; end
+if nargin<1, disp('USAGE: weights = bspm_conweights(ncond)'); return; end
 
 [p,q] = meshgrid(1:ncond);
 pairs = [p(:) q(:)];
