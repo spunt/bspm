@@ -54,18 +54,18 @@ if isfield(hdr{1}, 'InstitutionName'), dicominfo.scannerinfo.facility = hdr{1}.I
 if isfield(hdr{1}, 'InstitutionAddress'), dicominfo.scannerinfo.location = hdr{1}.InstitutionAddress; end
     
 % general information
-dicominfo.parameterinfo.TR = hdr{1}.RepetitionTime;
-dicominfo.parameterinfo.voxelsize = [hdr{1}.PixelSpacing' hdr{1}.SliceThickness];
-dicominfo.parameterinfo.matrixsize = hdr{1}.AcquisitionMatrix;
-dicominfo.parameterinfo.echotime = hdr{1}.EchoTime;
-dicominfo.parameterinfo.flipangle = hdr{1}.FlipAngle;
-dicominfo.parameterinfo.bandwidth = hdr{1}.PixelBandwidth;
+dicominfo.parameterinfo.TR          = hdr{1}.RepetitionTime;
+dicominfo.parameterinfo.voxelsize   = [hdr{1}.PixelSpacing' hdr{1}.SliceThickness];
+dicominfo.parameterinfo.matrixsize  = hdr{1}.AcquisitionMatrix;
+dicominfo.parameterinfo.echotime    = hdr{1}.EchoTime;
+dicominfo.parameterinfo.flipangle   = hdr{1}.FlipAngle;
+dicominfo.parameterinfo.bandwidth   = hdr{1}.PixelBandwidth;
 
 % dicominfo.sequenceinfo
-dicominfo.sequenceinfo.name = regexprep(strtrim(hdr{1}.ProtocolName),' ','_');
-dicominfo.sequenceinfo.type = regexprep(strtrim(hdr{1}.ScanningSequence),' ','_');
-dicominfo.sequenceinfo.pulsename = regexprep(strtrim(hdr{1}.SequenceName),' ','_');
-dicominfo.sequenceinfo.timestamp = hdr{1}.PerformedProcedureStepID;
+dicominfo.sequenceinfo.name = cleanupname(hdr{1}.ProtocolName); 
+dicominfo.sequenceinfo.type = cleanupname(hdr{1}.ScanningSequence); 
+dicominfo.sequenceinfo.pulsename = cleanupname(hdr{1}.SequenceName);
+dicominfo.sequenceinfo.timestamp = cleanupname(hdr{1}.PerformedProcedureStepID); 
 dicominfo.sequenceinfo.order = hdr{1}.SeriesNumber;
 idx = cellstrfind(allfield,'TotalScanTimeSec');
 tmp = allfield{idx};
@@ -117,6 +117,15 @@ end
 if disptag
     tmp = which('strucdisp.m'); 
     if ~isempty(tmp), strucdisp(dicominfo); end
+end
+
+end
+
+function cname = cleanupname(name); 
+
+    cname = regexprep(strtrim(name), ' ', '_');
+    cname = regexprep(cname, '\', '');
+
 end
 
 

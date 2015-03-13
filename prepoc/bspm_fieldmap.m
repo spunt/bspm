@@ -1,14 +1,17 @@
-function matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)
+function matlabbatch = bspm_fieldmap(mag, phase, epi, epi_rot, varargin)
 % BSPM_FIELDMAP
 %
-%   USAGE: matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)
+%   USAGE: matlabbatch = bspm_fieldmap(mag, phase, epi, epi_rot, varargin)
 %
 %   ARGUMENTS:
 %       mag     = the magnitude image (if 2 entered, mean is taken)
 %       phase   = the presubtracted phase image
 %       epi     = first epi of each run
-%       ets     = array of short and long echo times (e.g., [2.55 5.01])
 %       epi_rot = echo spacing * # of lines of data acquired
+%
+%   VARARGIN: 
+%       ets     = array of short and long echo times (e.g., [2.55 5.01])
+%       (will attempt to determine this automatically from descrip field of hdr of mag images)
 %       blip    = blip direction (-1 or 1) [DEFAULT = -1]
 %       jacbob  = use jacobian modulation? (0 = NO, 1 = YES) [DEFAULT = 0]
 %       method  = unwrapping method ('Mark2D', 'Mark3D')
@@ -20,18 +23,26 @@ function matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<5, disp('USAGE: matlabbatch = bspm_fieldmap(mag, phase, epi, ets, epi_rot, varargin)'); return; end
-def = { 'blip',         -1, ...
-        'jacob',     0, ...
+if nargin<4, disp('USAGE: matlabbatch = bspm_fieldmap(mag, phase, epi, epi_rot, varargin)'); return; end
+def = { 'ets',          [], ...
+        'blip',         -1, ...
+        'jacob',        0, ...
         'method',       'Mark3D'};
 bspm_setdefaults(def, varargin); 
 if ischar(phase), phase = cellstr(phase); end
 if ischar(mag), mag = cellstr(mag); end
 if ischar(epi), epi = cellstr(epi); end
 spm_dir = fileparts(which('spm'));
-fm_dir  = fullfile(spm_dir, 'toolbox', 'FieldMap'); 
+fm_dir  = fullfile(spm_dir, 'toolbox', 'FieldMap');
 if length(mag)==2
     hdr     = spm_vol(char(mag));
+    if isempty(ets)
+        for i = 1:2
+            tmp = hdr(i).descrip;
+            [i1,i2] = regexp(tmp, 'TE=.+ms'); 
+            ets(i) = str2double(tmp(i1+3:i2-2)); 
+        end
+    end
     imdata  = spm_read_vols(hdr);
     mag     = fullfile(fileparts(hdr(1).fname), 'mean_mag.nii'); 
     hdr(1).fname = mag;

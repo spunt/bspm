@@ -1,11 +1,9 @@
-function matlabbatch = bspm_convert_dcm(subs, format, force)
+function matlabbatch = bspm_convert_dcm(subdirs)
 % BSPM_CONVERT_DCM
 %
-% USAGE: bspm_convert_dcm(subs, format, force)
+% USAGE: matlabbatch = bspm_convert_dcm(subdirs)
 %
-%   subs =  paths to subject folders containing dicom directory
-%   format  =  'img' or 'nii' (default = 'nii')
-%   force = option to force conversion (ignores default directory check)
+%   subdirs = paths to subject folders containing dicom directory
 %
 
 % ------------------------- Copyright (C) 2014 -------------------------
@@ -14,82 +12,47 @@ function matlabbatch = bspm_convert_dcm(subs, format, force)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-
-% check arguments
-if nargin<3, force = 0; end
-if nargin<1, disp('USAGE: bspm_convert_dcm(subs, format, force)'); return
-elseif nargin<2, disp('Format not specified. Using the default; 3D nifti'); format = 'nii'; end
-if ~iscell(subs), subs = cellstr(subs); end
-
-% loop over subject folders
-nsubs = length(subs);
+if nargin<1, disp('USAGE: bspm_convert_dcm(subdirs)'); return; end
+if ischar(subdirs), subdirs = cellstr(subdirs); end
+nsubs = length(subdirs);
 count = 0; 
 for sub = 1:nsubs
 
-    subDIR = subs{sub};
-    [p, subnam, e] = fileparts(subDIR);
+    subDIR          = subdirs{sub};
+    [p, subnam, e]  = fileparts(subDIR);
     tmp = files([subDIR filesep '*'], 'dironly', 1);
-
-    if ~force
-        if length(tmp)~=1
-            fprintf('\n%s looks strange... skipping\n', subnam);
-            continue
-        end
-        [p n e] = fileparts(char(tmp));
-        if ~strcmp(n,'dicom')
-            movefile(tmp{1},[subDIR filesep 'dicom']);
-        end
-    else
-        idx = cellstrfind(tmp,'dicom');
-        if isempty(idx), fprintf('\nCouldn''t find dicom directory for %s... skipping\n', subnam); continue; end
-    end
-    % make directories
-    % -----------------
+    [p, n, e] = fileparts(char(tmp));
+    if ~strcmp(n,'dicom'), movefile(tmp{1},[subDIR filesep 'dicom']); end
     dirnames = {'raw' 'analysis' 'notes' 'behav'};
-    for i = 1:length(dirnames);
-        mkdir([subDIR filesep dirnames{i}]);
-    end
-
-    dicomDIR = [subDIR filesep 'dicom'];
-    dothese = files([dicomDIR filesep '*']);
-
+    for i = 1:length(dirnames), mkdir([subDIR filesep dirnames{i}]); end
+    dicomDIR    = fullfile(subDIR, 'dicom');
+    dothese     = files(fullfile(dicomDIR, '*'));
     for s = 1:length(dothese)
 
         currentDIR = dothese{s};
         dicomfiles = files([currentDIR filesep '*.dcm']);
-        if isempty(dicomfiles)
-            dicomfiles = files([currentDIR filesep '*']);
-        end
-        current_hdr = spm_dicom_headers(dicomfiles{1});
-
-        % get some info from header file
-        studyStartTime=current_hdr{1}.PerformedProcedureStepID(end-5:end-2);
-        sequenceTime=round((current_hdr{1}.AcquisitionTime-current_hdr{1}.StudyTime)/60);
-        sequenceTime=num2str(sequenceTime);
-        sequenceName=regexprep(current_hdr{1}.ProtocolName,' ','_');
-        sequenceType=regexprep(current_hdr{1}.ScanningSequence,'\','_');
-        sequenceType=regexprep(sequenceType,' ','_');
-
-        % now...
-        [p n e] = fileparts(currentDIR);
-        outputDIR = [subDIR filesep 'raw' filesep sequenceType '_' n];
+        if isempty(dicomfiles), dicomfiles = files([currentDIR filesep '*']); end
+        dcmref  = dicomfiles{floor(length(dicomfiles)/2)}; 
+        dcminfo = bspm_get_dicom_info(dcmref, 0); 
+        outputDIR = fullfile(subDIR, 'raw', sprintf('%s_%s_%02d', dcminfo.sequenceinfo.type(1:2), dcminfo.sequenceinfo.name, dcminfo.sequenceinfo.order));
         mkdir(outputDIR);
-        hdr = current_hdr;
-        save([outputDIR filesep 'dicom_header.mat'], 'hdr');
+        copyfile(dcmref, fullfile(outputDIR, 'dicom_reference.dcm'));
+        if strcmpi(dcminfo.sequenceinfo.type(1:2), 'EP')
+            save(fullfile(outputDIR, 'dicom_info.mat'), 'dcminfo');
+        end
         
+        % | Job
         count = count + 1; 
-
-        % this is what the dicom convert job looks like:
-        matlabbatch{count}.spm.util.dicom.data = cellstr(dicomfiles);
-        matlabbatch{count}.spm.util.dicom.root = 'flat';
-        matlabbatch{count}.spm.util.dicom.outdir{1} = outputDIR;
-        matlabbatch{count}.spm.util.dicom.convopts.format = format;
-        matlabbatch{count}.spm.util.dicom.convopts.icedims = 0;
-
+        matlabbatch{count}.spm.util.import.dicom.data = cellstr(dicomfiles);
+        matlabbatch{count}.spm.util.import.dicom.root = 'flat';
+        matlabbatch{count}.spm.util.import.dicom.outdir{1} = outputDIR;
+        matlabbatch{count}.spm.util.import.dicom.protfilter = '.*';
+        matlabbatch{count}.spm.util.import.dicom.convopts.format = 'nii';
+        matlabbatch{count}.spm.util.import.dicom.convopts.icedims = 0;
 
     end;
 
 end;
 % run
 if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
+end
