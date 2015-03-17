@@ -32,9 +32,6 @@ nsubs = length(images);
 matlabbatch{1}.spm.tools.dartel.mni_norm.template = cellstr(template);
 for s = 1:nsubs
     cim = images{s};
-    for i = 1:length(cim)
-        cim(i) = cellstr([cim{i} ',1']);
-    end
     matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).flowfield = flowfields(s);
     matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).images = cim;
 end

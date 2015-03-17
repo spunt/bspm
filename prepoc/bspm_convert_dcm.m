@@ -1,7 +1,7 @@
-function matlabbatch = bspm_convert_dcm(subdirs)
+function matlabbatch = bspm_convert_dcm(subdirs, dcmdirpat)
 % BSPM_CONVERT_DCM
 %
-% USAGE: matlabbatch = bspm_convert_dcm(subdirs)
+% USAGE: matlabbatch = bspm_convert_dcm(subdirs, dcmdirpat)
 %
 %   subdirs = paths to subject folders containing dicom directory
 %
@@ -12,7 +12,8 @@ function matlabbatch = bspm_convert_dcm(subdirs)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: bspm_convert_dcm(subdirs)'); return; end
+if nargin<1, disp('USAGE: bspm_convert_dcm(subdirs, dcmdirpat)'); return; end
+if nargin<2, dcmdirpat = '*'; end
 if ischar(subdirs), subdirs = cellstr(subdirs); end
 nsubs = length(subdirs);
 count = 0; 
@@ -20,7 +21,7 @@ for sub = 1:nsubs
 
     subDIR          = subdirs{sub};
     [p, subnam, e]  = fileparts(subDIR);
-    tmp = files([subDIR filesep '*'], 'dironly', 1);
+    tmp = files([subDIR filesep dcmdirpat], 'dironly', 1);
     [p, n, e] = fileparts(char(tmp));
     if ~strcmp(n,'dicom'), movefile(tmp{1},[subDIR filesep 'dicom']); end
     dirnames = {'raw' 'analysis' 'notes' 'behav'};

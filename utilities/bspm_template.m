@@ -9,7 +9,7 @@ function template = bspm_template
 %	$Revision Date: Aug_20_2014
 
 spmdir = whichdir('spm');
-template = [spmdir filesep 'templates' filesep 'sbrain_avg152T1.img'];
+template = [spmdir filesep 'templates' filesep 'sbrain_avg152T1.nii'];
  
  
  

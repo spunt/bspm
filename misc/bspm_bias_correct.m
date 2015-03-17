@@ -6,7 +6,8 @@ function bspm_bias_correct(in)
 % -------------------------------------------------------------------------
 if nargin<1, error('bspm_bias_correct(in)'); end
 if ischar(in), in = cellstr(in); end
-startdir= pwd; 
+startdir= pwd;
+progressbar(0); 
 for i = 1:length(in)
     cd(fileparts(in{i}));
     V = spm_vol(in{i});
@@ -14,8 +15,10 @@ for i = 1:length(in)
     BC = bspm_bias_apply(V, T);
     [p,n,e] = fileparts(V.fname);
     V.fname = fullfile(p, ['m' n e]); 
-    spm_write_vol(V, BC); 
+    spm_write_vol(V, BC);
+    progressbar(i/length(in)); 
 end
+progressbar(1);
 cd(startdir);
 end
 function T = bspm_bias_estimate(V,flags)
