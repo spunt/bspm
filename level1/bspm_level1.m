@@ -87,19 +87,19 @@ if ~exist(general_info.analysis, 'dir'), mkdir(general_info.analysis); end
 % | =======================================================================
 
 % | Session Non-Specific Parameters
-spec.dir{1} = general_info.analysis;
-spec.timing.units = 'secs';
-spec.timing.RT = general_info.TR;
-spec.timing.fmri_t = general_info.mt_res;
-spec.timing.fmri_t0 = general_info.mt_onset; 
-spec.bases.hrf.derivs(1) = general_info.hrf_derivs(1); % time derivative (0=no, 1=yes)
-spec.bases.hrf.derivs(2) = general_info.hrf_derivs(2); % dispersion derivative (0=no, 1=yes)
-spec.volt = 1;
-spec.global = 'None';
-spec.mask{1} = general_info.brainmask;
-spec.mthresh = general_info.maskthresh; 
-opt = {'none' 'AR(1)' 'wls' 'FAST'};
-spec.cvi = opt{general_info.autocorrelation+1}; 
+spec.dir{1}                 = general_info.analysis;
+spec.timing.units           = 'secs';
+spec.timing.RT              = general_info.TR;
+spec.timing.fmri_t          = general_info.mt_res;
+spec.timing.fmri_t0         = general_info.mt_onset; 
+spec.bases.hrf.derivs(1)    = general_info.hrf_derivs(1); % time derivative (0=no, 1=yes)
+spec.bases.hrf.derivs(2)    = general_info.hrf_derivs(2); % dispersion derivative (0=no, 1=yes)
+spec.volt                   = 1;
+spec.global                 = 'None';
+spec.mask{1}                = general_info.brainmask;
+spec.mthresh                = general_info.maskthresh; 
+autocorropt                 = {'none' 'AR(1)' 'wls' 'FAST'};
+spec.cvi                    = autocorropt{general_info.autocorrelation+1}; 
 
 % | Session Specific Parameters
 nruns = length(runs);
