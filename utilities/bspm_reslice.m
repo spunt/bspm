@@ -1,12 +1,12 @@
 function [out, outmat] = bspm_reslice(in, ref, int, nowrite)
 % BSPM_RESLICE 
 %
-% USAGE: [out M] = bspm_reslice(in, ref, int, nowrite)
+% USAGE: [out, outmat] = bspm_reslice(in, ref, int, nowrite)
 %
 % ARGUMENTS
 %   in:         path to image to reslice
 %   ref:        path to reference image (image to reslice to)
-%   int:        interpolation method, 0=Nearest Neighbor, 1=Trilinear(default)
+%   int:        interpolation, 0=Nearest Neighbor, 1=Trilinear(default)
 %   nowrite:    option to not write new volume (default = 0)
 %
 % OUTPUT

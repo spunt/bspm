@@ -31,7 +31,6 @@ vals = setargs(def, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
 
-
 if ischar(cons), cons = cellstr(cons); end
 if iscell(mask), mask = char(mask); end
 if ~isempty(mask)
