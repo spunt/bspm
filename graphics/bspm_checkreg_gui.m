@@ -1,12 +1,12 @@
-function bspm_checkreg_gui(in, titles)
+function bspm_checkreg_gui(in, subnames)
 % BSPM_CHECKREG_GUI
 %
-% USAGE: bspm_checkreg_batch(in, titles)
+% USAGE: bspm_checkreg_gui(in, subnames)
 %
 % ARGUMENTS
 %   in: an array of cells, with each cell containing paths for images
 %   to loop over
-%   titles: for each cell
+%   subnames: for each cell
 %
 
 % ------------------------ Copyright (C) 2014 ------------------------
@@ -17,26 +17,24 @@ function bspm_checkreg_gui(in, titles)
 %	$Revision Date: Aug_20_2014
 
 % CHECK ARGS
-if nargin<1, error('USAGE: bspm_checkreg_batch(in, titles)'); end
+if nargin<1, error('USAGE: bspm_checkreg_batch(in, subnames)'); end
 if ~iscell(in), in = cellstr(in); end
 % GUI
 S.fig = spm_figure('Create','Graphics', 'Check Reg GUI', 'off');
 set(S.fig, 'CloseRequestFcn', @cb_close, 'MenuBar', 'none'); 
-if nargin<2 
-    titles = strcat({'Group'}, cellstr(num2str((1:length(in))'))); 
-end
-checkreg(S.fig, in{1}, [0 0 0]', titles{1});
+if nargin<2, subnames = strcat({'Group'}, cellstr(num2str((1:length(in))'))); end
+checkreg(S.fig, in{1}, [0 0 0]', subnames{1});
 data = guihandles(S.fig);
-data.titles = titles; 
+data.titles = subnames; 
 data.in = in;
 data.ngroup = length(in); 
 data.count = 1;
 data.xyz = [0 0 0]';
 S.count = uimenu('Parent', S.fig, 'Tag', 'Count', 'Label', sprintf('Group %d of %d', data.count, length(data.in)));
 pos.next        = [.900 .965 .09 .03];
-pos.prev        = [.010 .965 .09 .03];
-pos.save        = [.405 .965 .09 .03];
-pos.which       = [.505 .965 .09 .03];
+pos.prev        = [.800 .965 .09 .03];
+pos.save        = [.900 .930 .09 .03];
+pos.which       = [.800 .930 .09 .03];
 S.prev = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ...
         'Style', 'Push', ...
         'Position', pos.prev, ...
@@ -63,7 +61,7 @@ S.which = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', .
         'Position', pos.which, ...
         'FontUnits', 'norm', ...
         'FontName', 'Arial', ...
-        'FontSize', .55, ...
+        'FontSize', .50, ...
         'FontWeight', 'norm', ...  
         'String', 'Which', ...
         'Enable', 'on', ...
@@ -73,7 +71,7 @@ S.save = uicontrol('Parent', S.fig, 'Units', 'Normal', 'FontUnits', 'Normal', ..
         'Position', pos.save, ...
         'FontUnits', 'norm', ...
         'FontName', 'Arial', ...
-        'FontSize', .55, ...
+        'FontSize', .50, ...
         'FontWeight', 'norm', ...  
         'String', 'Save', ...
         'Enable', 'on', ...
@@ -225,8 +223,9 @@ function checkreg(F, images, xyz, title)
 % John Ashburner
 % $Id: spm_check_registration.m 4330 2011-05-23 18:04:16Z ged $
     if ischar(images), images = cellstr(images); end
-    captions = cellfun(@fileparts, images, 'Unif', false); 
-    [~,captions] = cellfun(@fileparts, captions, 'Unif', false);
+    [pathnames,imnames] = cellfun(@fileparts, images, 'Unif', false); 
+    [tmp,captions] = cellfun(@fileparts, pathnames, 'Unif', false);
+    captions = regexprep(captions, '_+', ' '); 
     if iscell(images{1}), images = spm_vol(vertcat(images{:})); end 
     chkeep  = [findobj(F, 'type', 'uicontrol'); findobj(F, 'type', 'uimenu')]; 
     chall   = get(F, 'children'); 
@@ -263,9 +262,7 @@ function checkreg(F, images, xyz, title)
     end
     spm_orthviews('Reposition', xyz); 
     set(findobj(gcf, 'type', 'line'), 'color',[0.7020    0.8039    0.8902], 'linewidth', 1);  
-end
-
- 
+end 
  
  
  

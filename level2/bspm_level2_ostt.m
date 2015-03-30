@@ -1,113 +1,119 @@
-function [] = bspm_level2_ostt(cons, minN, mask, rmoutliers, omit)
-% BSPM_LEVEL2_OSTT (uses GLM Flex by Aaron Schultz by default)
+function matlabbatch = bspm_level2_ostt(cons, varargin)
+% BSPM_LEVEL2_OSTT
 %
-% USAGE: bspm_level2_ostt(cons, minN, mask, rmoutliers, omit)
+%   USAGE: matlabbatch = bspm_level2_ostt(cons, varargin)
 %
-%   ARGUMENTS:
-%       cons: contrast images from level 1
-%       name: prefix for directory in _groupstats_/<analysis_name> 
-%       (optional) mask: mask file to use (default = none)
-%       (optional) rmoutliers: 0 = no (default), 1 = yes
-%       (optional) name: name for output directory (default is to figure this out automatically)
-%       (optional) omit: string to omit subjects
+%         cons: contrast images from level 1
+%   OPTIONAL
+%       outdir: allows custom output directory
+%     implicit: yes (1) or no (0) for implicit masking
+%         mask: specify explicit mask file if desired
+%     pctgroup: specify some percent of all subjects. voxels present in at
+%     least that percentage of subjects will be included. default is to not do this. 
+%       viewit: will change to output directory and open BSPMVIEW at finish
+%     nan2zero: will convert nans to zeros in the con images (important for
+%     explicit masking)
 %
 
-% ------------------------------------- Copyright (C) 2014 -------------------------------------
+% ---------------------------------- Copyright (C) 2014 ----------------------------------
 %	Author: Bob Spunt
 %	Affilitation: Caltech
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
+def = { 'outdir',       [],     ... 
+        'implicit',     1,      ...
+        'mask',         '',     ...
+        'pctgroup',     [],     ...
+        'viewit',       0,      ...
+        'nan2zero',     0 };
+vals = setargs(def, varargin);
+if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
+fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
 
-if nargin<1, error('USAGE: bspm_level2_ostt(cons, minN, mask, rmoutliers, name)'); end
-if nargin<2 || isempty(minN), minN = length(cons); end
-if nargin<3, mask = []; end
-if nargin<4, rmoutliers = 0; end
-if nargin<5,
-    name = sprintf('OSTT_FLEX_N=%d_minN=%d_rmout=%d', length(cons),minN, rmoutliers);
+
+if ischar(cons), cons = cellstr(cons); end
+if iscell(mask), mask = char(mask); end
+if ~isempty(mask)
+    [~,mtag] = fileparts(mask); 
 else
-    if ischar(omit), omit = cellstr(omit); end
-    omitidx = cellismember(cons, omit);
-    if omitidx
-        cons(omitidx) = [];
-        omitlab = sprintf(repmat('%s_', 1, length(omitidx)), omit{:}); 
-        name = sprintf('OSTT_FLEX_N=%d_minN=%d_rmout=%d_omit=%s', length(cons),minN, rmoutliers, omitlab(1:end-1));
+    mtag = 'noexplicitmask'; 
+end
+
+% | OUTPUT DIRECTORY
+if isempty(outdir)
+    
+    % | Contrast Name
+    hdr = spm_vol(cons{1});
+    idx = strfind(hdr.descrip,':');
+    cname = hdr.descrip(idx+1:end);
+    cname = strtrim(regexprep(cname,'- All Sessions',''));
+    
+    % | Analysis Name
+    [p, level1name]  = fileparts(fileparts(cons{1})); 
+    gadir       = fullfile(parentpath(cons), '_groupstats_', level1name); 
+    gasubdir    = fullfile(gadir, sprintf('OSTT_N=%d_%s_%s', length(cons), mtag, bspm_timestamp(1)));
+    outdir      = fullfile(gasubdir, cname);
+
+    % | Make Directories
+    if ~isdir(gadir), mkdir(gadir); end
+    if ~isdir(gasubdir), mkdir(gasubdir); end
+    
+end
+if ~isdir(outdir), mkdir(outdir); end
+
+% | NAN2ZERO (IF APPLICABLE)
+if nan2zero, bspm_batch_imcalc(cons, '', 'nan2zero'); end
+
+% | PCTGROUP (IF APPLICABLE)
+if ~isempty(pctgroup)
+    if ~isempty(mask)
+        [d,h] = bspm_read_vol(cons, 'mask', mask);
     else
-        name = sprintf('OSTT_FLEX_N=%d_minN=%d_rmout=%d', length(cons),minN, rmoutliers);
+        [d,h] = bspm_read_vol(cons); 
+    end
+    d(isnan(d)) = 0; 
+    m = double(sum(d~=0, 4))/length(cons);
+    if pctgroup > 1, pctgroup = pctgroup/100; end
+    m(m<pctgroup) = 0;
+    mask = fullfile(outdir, sprintf('Mask_PctGroup%d_%s.nii', round(pctgroup*100), mtag));
+    hdr = h(1); 
+    hdr.fname = mask; 
+    hdr.descrip = sprintf('Valid Voxels Mask - PercentGroup=%d  - %s', round(pctgroup*100), mtag); 
+    spm_write_vol(hdr, m); 
+end
+
+% | FIX END OF IMAGE FILENAMES
+cons = strcat(cons, ',1'); 
+if ~isempty(mask), mask = strcat(mask, ',1'); end
+
+% | FACTORIAL DESIGN SPECIFICATION
+matlabbatch{1}.spm.stats.factorial_design.dir{1}            = outdir;
+matlabbatch{1}.spm.stats.factorial_design.des.t1.scans      = cellstr(cons);
+matlabbatch{1}.spm.stats.factorial_design.masking.im        = implicit;
+matlabbatch{1}.spm.stats.factorial_design.masking.em{1}     = mask; 
+
+% | FACTORIAL DESIGN SPECIFICATION
+matlabbatch{2}.spm.stats.fmri_est.spmmat{1} = fullfile(outdir,'SPM.mat');
+matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
+
+% | CONTRASTS
+matlabbatch{3}.spm.stats.con.spmmat{1} = fullfile(outdir,'SPM.mat');
+matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = 'Positive';
+matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = 1;
+matlabbatch{3}.spm.stats.con.consess{1}.tcon.sessrep = 'none';
+matlabbatch{3}.spm.stats.con.consess{2}.tcon.name = 'Negative';
+matlabbatch{3}.spm.stats.con.consess{2}.tcon.weights = -1;
+matlabbatch{3}.spm.stats.con.consess{2}.tcon.sessrep = 'none';
+matlabbatch{3}.spm.stats.con.delete = 1;
+
+% | RUN IF NO OUTPUT ARGS SPECIFIED
+if nargout==0
+    bspm_runbatch(matlabbatch);
+    if viewit
+        cd(outdir); 
+        bspmview; 
     end
 end
 
-if nargin<6, 
-    namelab = {'' 'SPM_GLMFLEX'};
 end
-
-if ischar(cons), cons = cellstr(cons); end
-
-% define output directory
-if iscell(name), name = char(name); end
-[p n e] = fileparts(cons{1});
-idx = strfind(p,'/');
-sname = p(1:idx(end-2)-1);
-aname = p(idx(end)+1:length(p));
-hdr = spm_vol(cons{1});
-hdr = hdr.descrip;
-idx = strfind(hdr,':');
-cname = hdr(idx+1:end);
-cname = regexprep(cname,'- All Sessions','');
-cname = strtrim(cname);
-gadir = fullfile(sname,'_groupstats_',aname);
-gasubdir = fullfile(gadir,name);
-outdir = fullfile(gasubdir,cname);
-if ~isdir(gadir), mkdir(gadir); end
-if ~isdir(gasubdir), mkdir(gasubdir); end
-mkdir(outdir);
-
-% setup structure
-IN.N_subs = length(cons);        % Number of input images
-IN.Between = 1;       % Number of levels per factor.
-IN.EqualVar = 1;       % Do variance corrections
-IN.Independent = 1; % Do independence correction
-F = CreateDesign2(IN); 
-
-% setup I
-I.OutputDir = outdir;
-I.F = F;
-I.Mask = mask;
-I.minN = minN;
-I.DoOnlyAll = 0;
-I.RemoveOutliers= rmoutliers;
-I.Scans = cons;
-I.Cons(1).name = cname;
-I.Cons(1).Groups = 1;
-I.Cons(1).Levs = 1;
-I.Cons(1).ET = 1;
-
-% run glmflex
-GLM_Flex2(I);
-
-
-%%% I.OutputDir = pwd;
-%%% I.F = [];
-%%% I.Scans = [];
-%%% I.Mask = [];
-%%% I.RemoveOutliers = 0;
-%%% I.DoOnlyAll = 0;
-%%% I.minN = 2;
-%%% I.minRat = 0;
-%%% I.Thresh = [];
-%%% I.writeIni = 0;
-%%% I.writeFin = 0;
-%%% I.writeoo = 1;
-%%% I.writeI = 1;
-%%% I.KeepResiduals = 0;
-%%% I.estSmooth = 1;
-%%% I.Transform.FisherZ = 0;
-%%% I.Transform.AdjustR2 = 0;
-%%% I.Transform.ZScore = 0;
-
-end
-
- 
- 
- 
- 

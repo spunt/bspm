@@ -120,6 +120,11 @@ for r = 1:nruns
         if isfield(runs(r), 'regressors'), regressors = runs(r).regressors; end
     end
     if general_info.is4D
+        [pcim, ncim, ecim] = fileparts(char(cimages));
+        if strcmp(ecim, '.gz')
+            gunzip(char(cimages)); 
+            cimages = fullfile(pcim, ncim); 
+        end
         hdr     = spm_vol(char(cimages));
         append  = cellfun(@num2str, num2cell(1:length(hdr))', 'Unif', false);
         cimages = strcat(cimages, {','}, append);

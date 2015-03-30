@@ -34,7 +34,6 @@ bspm_setdefaults(def, varargin);
 if nargin<4, error('USAGE: [X, X0] = bspm_make_regressor(nscan, TR, onsets, durations, varargin)'); end
 if size(onsets,1)==1 & size(onsets,2)~=1, onsets = onsets'; end
 if size(durations,1)==1 & size(durations,2)~=1, durations = durations'; end
-% if mod(TRbin, TR), TRbin = ceil(TRbin/TR)*TR; end
 osrate  = TR/(TR/TRbin);
 xlength = nscan*osrate;
 onso    = fix((onsets/TR)*osrate)+TRons;

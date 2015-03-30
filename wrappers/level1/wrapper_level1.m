@@ -1,9 +1,9 @@
-function matlabbatch = level1_wrapper(covidx,varargin)
-% matlabbatch = level1_wrapper(covidx,varargin)
+function matlabbatch = wrapper_level1(covidx, varargin)
+% matlabbatch = wrapper_level1(covidx, varargin)
 %
 % To show default settings, run without any arguments.
 %
-% COVIDX 
+%     COVIDX 
 %       01 - Duration          
 %       02 - Errors (Total)
 %       03 - Errors (Foils)
@@ -14,7 +14,7 @@ function matlabbatch = level1_wrapper(covidx,varargin)
 defaults = {
             'HPF',              128,            ...
             'armethod',         1,              ... 
-            'nuisancepat',      '',             ...
+            'nuisancepat',      'bad*txt',      ...
             'epipat',           'lswbua*nii',   ...
             'subid',            'RA*',          ...
             'runid',            'EP*LOIS*',     ...
@@ -22,10 +22,10 @@ defaults = {
             'basename',         'LOIS',         ...
             'brainmask',        '',             ...
             'model',            '2x3',          ...
-            'fcontrast',        0,              ...
+            'fcontrast',        1,              ...
             'nskip',            2,              ...
             'runtest',          0,              ...
-            'is4D',             0               ...
+            'is4D',             1               ...
              };
 vals = setargs(defaults, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
@@ -45,7 +45,12 @@ pmnames         = regexprep(covnames(covidx), '_', '');
 pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
 analysisname    = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
-printmsg(analysisname, 'Analysis Name'); 
+printmsg(analysisname, 'Analysis Name');
+
+% | IMAGING PARAMETERS
+% | ========================================================================
+TR              = 2.5; 
+adjons          = TR*nskip;
                                     
 % | RUNTIME OPTIONS
 % | ===========================================================================           
@@ -69,17 +74,8 @@ for s = 1:length(subdir)
     % | Behavioral and Nuisance Regressor Files
     % | ========================================================================
     nuisance    = files([subdir{s} filesep 'raw' filesep runid filesep nuisancepat]);
-    behav           = files([subdir{s} filesep 'behav' filesep behavid]);
+    behav       = files([subdir{s} filesep 'behav' filesep behavid]);
     
-    % | Run-Level Parameters
-    % | ========================================================================
-    epihdr          = files([rundir{1} filesep 'dicom*mat']);
-    epidicominfo    = bspm_get_dicom_info(char(epihdr), 0);
-    TR              = epidicominfo.parameterinfo.TR/1000;
-    adjons          = TR*nskip;
-    mt_res          = epidicominfo.sliceinfo.number;
-    mt_onset        = round(mt_res/2);
-
     % | Run Loop
     % | ========================================================================
     images          = cell(size(rundir)); 
@@ -88,6 +84,9 @@ for s = 1:length(subdir)
         % | Data for Current Run
         % | =====================================================================
         images{r}   = files([rundir{r} filesep epipat]);
+        if isempty(images{r})
+            error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); 
+        end
         b = get_behavior(behav{r}, model);
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
         
@@ -137,9 +136,9 @@ for s = 1:length(subdir)
     general_info.autocorrelation    = armethod;
     general_info.nuisance_file      = nuisance;
     general_info.brainmask          = brainmask;
-    general_info.mt_res             = mt_res;
-    general_info.mt_onset           = mt_onset;
-    general_info.hrf_derivs         = [0 0]; 
+    general_info.hrf_derivs         = [0 0];
+    general_info.mt_res             = 16; 
+    general_info.mt_onset           = 1;
 
     % | Contrasts
     % | ========================================================================
@@ -215,7 +214,6 @@ end
 ntrials         = length(data(data(:,1)==1,1));
 data(:,10)      = data(:,4)~=data(:,8); % errors
 data(data(:,8)==0, 7:8) = NaN; % NR to NaN
-data(:,9)       = data(:,6) + data(:,7); 
 blockwise(:,3)  = data(data(:,2)==1, 6);
 blockwise(:,4)  = data(data(:,2)==ntrials, 9) - data(data(:,2)==1, 6); 
 
