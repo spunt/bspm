@@ -183,6 +183,7 @@ function varargout = nii_tool(cmd, varargin)
 % 150208 Add 4th input for 'save', allowing to save SPM 3D files
 % 150210 Add 'cat3D' to load SPM 3D files
 % 150226 Assign all 8 char for 'magic' (version 2 needs it)
+% 150321 Correct nByte for ecode=40 with big endian.
 
 persistent C dataFmt; % C columns: name, length, format, value, offset
 if isempty(C), [C, dataFmt] = niiHeader(1); end
@@ -474,7 +475,7 @@ if niiVer == 1
     'datatype'          1   'int16'     0               70
     'bitpix'            1   'int16'     0               72
     'slice_start'       1   'int16'     0               74
-    'pixdim'            8   'single'    [0 ones(1,7)]   76
+    'pixdim'            8   'single'    zeros(1,8)      76
     'vox_offset'        1   'single'    0               108
     'scl_slope'         1   'single'    1               112
     'scl_inter'         1   'single'    0               116
@@ -515,7 +516,7 @@ elseif niiVer == 2
     'intent_p1'         1   'double'    0               80
     'intent_p2'         1   'double'    0               88
     'intent_p3'         1   'double'    0               96
-    'pixdim'            8   'double'    [0 ones(1,7)]   104
+    'pixdim'            8   'double'    zeros(1,8)      104
     'vox_offset'        1   'int64'     0               168
     'scl_slope'         1   'double'    1               176
     'scl_inter'         1   'double'    0               184
@@ -758,6 +759,7 @@ while ftell(fid) < nEnd
     % Decode edata if we know ecode
     if ext(i).ecode == 40 % Matlab: any kind of matlab variable
         nByte = typecast(ext(i).edata(1:4), 'int32'); % num of bytes of MAT data
+        if strcmp(hdr.machine, 'ieee-be'), nByte = swapbytes(nByte); end
         tmp = [tempname '.mat']; % temp MAT file to save edata
         fid1 = fopen(tmp, 'w');
         fwrite(fid1, ext(i).edata(5:nByte+4)); % exclude padded zeros
@@ -887,7 +889,7 @@ if strcmp(magic, ['n+' vStr])
 elseif strcmp(magic, ['ni' vStr])
     isNii = false;
 else % likely wrong magic. Warn user and use file ext for nii detection
-    fprintf(2, 'Inconsistent sizeof_hdr and magic string for file %s\n', fname);
+    fprintf(2, 'Inconsistent sizeof_hdr and magic string for file %s\n', fnameIn);
     fprintf(2, 'sizeof_hdr: %g; magic: %s\n', typecast(n, 'int32'), magic);
     isNii = strcmpi(fname(end+(-3:0)), '.nii');
 end

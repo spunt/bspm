@@ -104,7 +104,7 @@ switch operation
         outim(posidx) = pos;
         outim(negidx) = neg;
     case {'imfill'}
-        outim = imfill(im,6);
+        outim = imfill(im,6,'holes');
     otherwise
         outim = eval(['im' operation]);
 end

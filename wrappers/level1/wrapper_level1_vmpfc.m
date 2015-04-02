@@ -178,8 +178,8 @@ function b = get_behavior(in, opt)
 %   USAGE: b = get_behavior(in, opt)
 %       
 %       in      behavioral data filename (.mat)
-%       opt     '2x3to2x2'  - social vs. nonsocial
-%               '2x3'       - face vs. hand vs. nonsocial
+%       opt     '2x2'  - full design
+%               '1x2'  - why vs. how
 %
 %       Columns for b.blockwise
 %          1 - Block
@@ -192,7 +192,7 @@ function b = get_behavior(in, opt)
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
 % =========================================================================
 if nargin < 1, error('USAGE: b = get_behavior(in, opt)'); end
-if nargin < 2, opt = '2x3'; end
+if nargin < 2, opt = '2x2'; end
 if iscell(in), in = char(in); end
  
 % | read data

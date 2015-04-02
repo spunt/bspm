@@ -13,8 +13,6 @@ function varargout = sort_dicm(srcDir)
 % each subject, and move corresponding files into each subject folder. If a
 % subject has more than one studies, each study will have a subfolder.
 % 
-% This will simplify the dicom to nifti conversion by dicm2nii.
-% 
 % See also DICM2NII, DICM_HDR, RENAME_DICM 
 
 % History (yymmdd):

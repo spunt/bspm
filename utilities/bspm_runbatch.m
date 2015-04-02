@@ -23,7 +23,7 @@ if numerrs==0
 else
     outfile = sprintf('ErrorData_bspm_runbatch_%s.mat', bspm_timestamp); 
     save(outfile, 'errdata'); 
-    printmsg(sprintf('Error Data Saved To: %s', outfile), sprintf('%d Failed Jobs', numerrs), '='); 
+    printmsg(sprintf('Error Data Saved To: %s', outfile), 'msgtitle', sprintf('%d Failed Jobs', numerrs), 'msgtop', '='); 
 end
 end
 

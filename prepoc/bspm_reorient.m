@@ -30,9 +30,7 @@ else
 end
 
 % apply to input images
-for i = 1:length(images)
-    spm_get_space(images{i},refmat);
-end
+for i = 1:length(images), spm_get_space(images{i},refmat); end
  
  
  

@@ -1,7 +1,7 @@
-function matlabbatch = bspm_deformations(in, field)
+function matlabbatch = bspm_deformations(in, field, varargin)
 % BSPM_DEFORMATIONS
 %
-%   USAGE: bspm_deformations(in, field)
+%   USAGE: matlabbatch = bspm_deformations(in, field, varargin)
 %
 %   ARGUMENTS:
 %       in = cell array of images to apply deformation field to
@@ -14,25 +14,30 @@ function matlabbatch = bspm_deformations(in, field)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<2, disp('USAGE: bspm_deformations(in, field)'); return; end
-
-% make sure image names are cell arrays of strings
+def = { 'weightimage',      [], ...
+        'fwhm',             [0 0 0], ...
+        'voxsize',          [1 1 1] ...
+        };
+vals = setargs(def, varargin);
+if nargin < 2, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 if ischar(in), in = cellstr(in); end
 if iscell(field), field = char(field); end
+if isempty(weightimage), weightimage = {''}; end
+if ischar(weightimage), weightimage = cellstr(weightimage); end
+if length(fwhm)==1, fwhm = repmat(fwhm,1,3); end
+if length(voxsize)==1, voxsize = repmat(voxsize,1,3); end
 
-% fix end of image filename cell array
-for i = 1:length(in), in(i) = cellstr([in{i} ',1']); end
+% | JOB
+matlabbatch{1}.spm.util.defs.comp{1}.def                    = cellstr(field); 
+matlabbatch{1}.spm.util.defs.out{1}.push.fnames             = in; 
+matlabbatch{1}.spm.util.defs.out{1}.push.weight             = weightimage;
+matlabbatch{1}.spm.util.defs.out{1}.push.savedir.savepwd    = 1;
+matlabbatch{1}.spm.util.defs.out{1}.push.fov.bbvox.bb       = [-78 -112 -50; 78 76 85];
+matlabbatch{1}.spm.util.defs.out{1}.push.fov.bbvox.vox      = voxsize;
+matlabbatch{1}.spm.util.defs.out{1}.push.preserve           = 0;
+matlabbatch{1}.spm.util.defs.out{1}.push.fwhm               = fwhm;
 
-% build job
-% -------------------------------------------------
-matlabbatch{1}.spm.util.defs.comp{1}.def = cellstr(field);
-matlabbatch{1}.spm.util.defs.ofname = '';
-matlabbatch{1}.spm.util.defs.fnames = in;
-matlabbatch{1}.spm.util.defs.savedir.savesrc = 1;
-matlabbatch{1}.spm.util.defs.interp = 4;
-
-% run job
+% | RUN
 if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
 
 end

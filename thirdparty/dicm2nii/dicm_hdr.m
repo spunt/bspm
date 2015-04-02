@@ -78,6 +78,8 @@ function [s, info] = dicm_hdr(fname, dict, iFrames)
 % 150222 philips_par: fix slice dir in R using 'image offcentre';
 %        Avoid repeatedly reading .REC .BRIK file for hdr. 
 % 150227 Avoid error due to empty file (thx Kushal).
+% 150316 Avoid error due to empty item dat for search method (thx VG).
+% 150324 philips_par/afni_head: make up SeriesInstanceUID for dicm2nii.
 
 persistent dict_full;
 s = []; info = '';
@@ -176,6 +178,7 @@ if toSearch % search each tag if only a few fields
             break; % re-do in regular way
         end
         [dat, name, info] = read_item(i);
+        if isnumeric(name) || isempty(dat), continue; end
         s.(name) = dat;
         [s, info, updated] = checkManufacturer(s, info, name);
         if updated, return; end
@@ -498,6 +501,8 @@ foo = foo(isstrprop(foo, 'digit'));
 s.AcquisitionDateTime = foo;
 % s.SeriesType = strkey(str, 'Series Type', '%c');
 s.SeriesNumber = par_key('Acquisition nr');
+s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
+    datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
 s.InstanceNumber = 1; % make dicm2nii.m happy
 % s.SamplesPerPixel = 1;
 % s.ReconstructionNumberMR = strkey(str, 'Reconstruction nr', '%g');
@@ -754,6 +759,8 @@ if isempty(i), s = []; err = 'Not brik header file'; return; end
 s.IsAFNIHEAD = true;
 s.ProtocolName = foo;
 s.SeriesNumber = SN; SN = SN+1; % make it unique for multilple files
+s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
+    datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
 s.InstanceNumber = 1;
 s.ImageType = afni_key('TYPESTRING');
 

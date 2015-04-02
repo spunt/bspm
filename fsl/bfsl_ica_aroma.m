@@ -25,8 +25,8 @@ if nargin < 3, outdir = fileparts(in); end
 rpfile = char(files(fullfile(fileparts(in), 'rp*txt'))); 
 icaaroma = '/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/_functions_/git/others/ICA-AROMA/ICA_AROMA.py';
 if isempty(TR)
-    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s', icaaroma, in, outdir, rpfile);
+    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s &', icaaroma, in, outdir, rpfile);
 else
-    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s -tr %d', icaaroma, in, outdir, rpfile, TR);
+    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s -tr %d &', icaaroma, in, outdir, rpfile, TR);
 end
 system(cmd);
