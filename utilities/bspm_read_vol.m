@@ -24,13 +24,13 @@ function [data, hdr, info] = bspm_read_vol(in, varargin)
 
 if nargin < 1, error('USAGE: [data hdr info] = bspm_read_vols(in,option)'); end
 if nargin > 1, optional = 1; else optional = 0; end
-if iscell(in), in = char(in); end
 if any(cellfun(@iscell, varargin))
     varargin{cellfun(@iscell, varargin)} = char(varargin{cellfun(@iscell, varargin)}); 
 end
-hdr = spm_vol(in);
-nvol = length(hdr);
-if optional==0, data = spm_read_vols(hdr); datadim = size(data); end
+if ischar(in), in = cellstr(in); end
+data    = bnii_read(in);
+hdr     = spm_vol(char(in)); 
+nvol    = length(hdr);
 if optional
     varargin = lower(varargin);
     if ismember('reslice', varargin) 
@@ -65,9 +65,9 @@ if optional
         maskfile = varargin{find(ismember(varargin, 'mask'))+1};
         if iscell(maskfile), maskfile = char(maskfile); end
         if ismember('reslice', varargin) 
-            mask = bob_reslice(maskfile, ref, 1, 1);
+            mask = bspm_reslice(maskfile, ref, 1, 1);
         else
-            mask = bob_reslice(maskfile, hdr(1).fname, 1, 1);
+            mask = bspm_reslice(maskfile, hdr(1).fname, 1, 1);
         end
         if length(datadim)==3 datadim(4) = 1; end
         tmp = data;
@@ -99,7 +99,7 @@ if optional
     end
 end
 if nargout==3
-    info.dim = datadim;
+    info.dim = size(data);
     info.nvalid = sum(~isnan(data(:)));
     info.mean = nanmean(data(:));
     info.median = nanmedian(data(:));

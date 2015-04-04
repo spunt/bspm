@@ -15,7 +15,7 @@ if nargin<2, phase_map = ''; end
 if ischar(epi_images{1})
     nsess = 1; charflag = 1;
 else
-    nsess = length(epi_images); charflag = 0;
+    nsess   = length(epi_images); charflag = 0;
 end
 phaseflag = 1;
 if isempty(phase_map), phaseflag = 0; end

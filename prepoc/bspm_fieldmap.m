@@ -48,6 +48,8 @@ if length(mag)==2
     hdr(1).fname = mag;
     spm_write_vol(hdr(1), nanmean(imdata,4));
 end
+flag    = bspm_check_orientations({mag; phase{1}});
+if flag, bspm_reorient(phase, mag); end
 % build job variable
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.phase = cellstr(phase);
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.magnitude = cellstr(mag);

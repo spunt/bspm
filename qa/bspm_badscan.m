@@ -4,11 +4,12 @@ function tsinfo = bspm_badscan(epi, varargin)
 %   USAGE: tsinfo = bspm_badscan(epi, varargin)
 %
 %  ARGUMENTS
-%  def = { 'dvars_thresh',     2.5,  ...
-%         'framewise_thresh', 0.5,  ...
-%         'include_rp',       1,    ...
-%         'maskfile',         []}
-%   epi = cell array of EPI filenames
+%    epi = cell array of EPI filenames
+%   'dvars_thresh',     2.5,  
+%   'framewise_thresh', 0.5,  
+%   'include_rp',       1,    
+%   'maskfile',         []
+%   
 % 
 % Bob Spunt, Caltech
 % Based on a script by Donald McLaren, Ph.D.
@@ -16,12 +17,12 @@ function tsinfo = bspm_badscan(epi, varargin)
 % 2012_06_04 -- Added to FUNC + Presented in SCAN Lab Workshop
 % 2013_03_08 -- Added option to MASK data prior to computing bad scans
 % ========================================================================%
-if nargin < 1, disp('USAGE: matlabbatch = [pctbad, maxmotion, gs] = bspm_badscan(epi, varargin)'); return; end
 def = { 'dvars_thresh',     2.5,  ...
         'framewise_thresh', 0.5,  ...
         'include_rp',       1,    ...
         'maskfile',         []};
-bspm_setdefaults(def, varargin); 
+vals = setargs(def, varargin);
+if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end 
 
 % | create output filename
 if ischar(epi), epi = cellstr(epi); end

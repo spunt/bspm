@@ -3,17 +3,18 @@ function matlabbatch = bspm_segment(in, varargin)
 %
 %   USAGE: matlabbatch = bspm_segment(in, varargin)
 %
-%   ARGUMENTS:
 %      in = cell array containing paths to all images to segment
+%
 %   VARARGINS:
 %      1 - dartel_imported      [1 1 0 0 0 0]
 %      2 - native_space         [1 1 1 0 0 0]
 %      3 - ngaus                [1 1 2 3 4 2]
 %      4 - forward_deform       0
-%      5 - inverse_deform       0
-%      6 - biasfield            0
-%      7 - biascorrected        0
-%      8 - biasreg              0.001
+%      5 - backward_deform      0
+%      6 - sampling_dist        3
+%      7 - biasfield            0
+%      8 - biascorrected        0
+%      9 - biasreg              0.001
 %
 %   Tissue Classes (use varargin "native_space" to save)
 %      1 - grey matter
@@ -34,7 +35,8 @@ def = { 'dartel_imported',  [1 1 0 0 0 0], ...
         'native_space',     [1 1 1 0 0 0], ...
         'ngaus',            [1 1 2 3 4 2], ...
         'forward_deform',   0, ...
-        'inverse_deform',   0, ...
+        'backward_deform',  0, ...
+        'sampling_dist',    3, ...
         'biasreg',          0.001, ...
         'biasfield',        0, ...
         'biascorrected',    0 };
@@ -60,8 +62,8 @@ matlabbatch{1}.spm.spatial.preproc.warp.mrf     = 1; % MRF parameter (cleanup) (
 matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 1;
 matlabbatch{1}.spm.spatial.preproc.warp.reg     = [0 0.001 0.5 0.05 0.2];
 matlabbatch{1}.spm.spatial.preproc.warp.affreg  = 'mni';
-matlabbatch{1}.spm.spatial.preproc.warp.samp    = 3; % sampling distance
-matlabbatch{1}.spm.spatial.preproc.warp.write   = [inverse_deform forward_deform]; 
+matlabbatch{1}.spm.spatial.preproc.warp.samp    = sampling_dist;
+matlabbatch{1}.spm.spatial.preproc.warp.write   = [backward_deform forward_deform]; 
 
 % | RUN
 if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end

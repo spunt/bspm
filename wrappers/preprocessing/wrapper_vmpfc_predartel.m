@@ -3,8 +3,8 @@ home; clear all
 % | options
 runit.omitvols      = 1; 
 runit.slicetime     = 1;
-opt.slice_times     = 0; % 1 do slice-timing using actual times, 0 will do using order
-opt.coreg_epi2t1    = 0; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
+opt.slice_times     = 1; % 1 do slice-timing using actual times, 0 will do using order
+opt.coreg_epi2t1    = 0; % 1 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
 runit.segment       = 0;
 
 % | paths for relevant folders
@@ -13,10 +13,10 @@ path.qa     = fullfile(path.study, '_notes_', 'qa');
 if ~exist(path.qa, 'dir'), mkdir(path.qa); end
 
 % | patterns for finding relevant files/folders (relative to subject dir)
-pattern = struct(                   ...
-    'subdir',   'sub0747*',             ...
-    'epidir',   'EP*LOI_2*',              ...
-    't1dir',    'GR*T1*',           ...
+pattern = struct(                       ...
+    'subdir',   'sub*',             ...
+    'epidir',   'EP*LOI*',              ...
+    't1dir',    'GR*T1*',               ...
     'fmdir',    'GR*Field*LOI*',        ...
     'anatimg',  's*nii',                ...
     'epiimg',   'f*nii',                ...
@@ -62,6 +62,16 @@ for s = 1:length(subdirs)
     qa_runnames = epi_all;
     phase_map   = epi_all;
     uaepi       = []; 
+    fieldmapimg = files([subdir filesep 'raw' filesep pattern.fmdir filesep pattern.anatimg]);
+    mag         = fieldmapimg(1:2);
+    phase       = fieldmapimg(3);
+    [pmapp, pmapn, pmape] = fileparts(phase{1});
+    if length(epidirs) > 1
+        for i = 1:length(epidirs), allepi{i}    = files([epidirs{i} filesep pattern.epiimg]); end
+        allepi1 = cellfun(@(x) x{1}, allepi, 'unif', false); 
+        flag = bspm_check_orientations(allepi1, 0);
+        if flag, bspm_reorient(vertcat(allepi{2:end}), allepi{1}{1}); end 
+    end
 
     for e = 1:length(epidirs)
                 
@@ -81,9 +91,13 @@ for s = 1:length(subdirs)
 
         % | Save Volumes for Unwarp
         epi_all{e} = epi_st; 
-%         [pmapp, pmapn, pmape] = fileparts(phase_map{1}); 
-%         phase_map{e} = strcat(pmapp, filesep, 'vdm5_sc', pmapn, pmape); 
-        qa_epis{e} = epi_uw{1}; 
+        if length(epidirs)==1
+            phase_map{e}   = strcat(pmapp, filesep, 'vdm5_sc', pmapn, pmape);
+        else
+            phase_map{e}   = strcat(pmapp, filesep, 'vdm5_sc', pmapn, sprintf('_run%d', e), pmape);
+        end
+        epi_first{e}    = epi_st{1}; 
+        qa_epis{e}      = epi_uw{1}; 
         if e==1
             [ep, en, ee] = fileparts(epi_uw{1});  
             mean_epi = strcat(ep, filesep, 'mean', en, ee); 
@@ -95,39 +109,31 @@ for s = 1:length(subdirs)
         uaepi = [uaepi; epi_uw]; 
 
     end
-    
-    
-    
-    % | Field Map 
-%     epi_st      = [epi_all{1}(1); epi_all{2}(1)]
-    epi_st      = epi_all{1}(1); 
-    fieldmapimg = files([subdir filesep 'raw' filesep pattern.fmdir filesep pattern.anatimg]);
-    mag         = fieldmapimg(1:2);
-    phase       = fieldmapimg(3);
-    count       = count + 1;
-    matlabbatch(count)   = bspm_fieldmap(mag, phase, epi_st, rot, 'ets', ets, 'blip', blip, 'jacob', jacob, 'method', method);
 
-    return
+    % | Field Map 
+    count  = count + 1;
+    matlabbatch(count) = bspm_fieldmap(mag, phase, epi_first, rot, 'ets', ets, 'blip', blip, 'jacob', jacob, 'method', method);
+    
     % | Realign and Unwarp
     count = count + 1; 
     matlabbatch(count) = bspm_realign_and_unwarp(epi_all, phase_map); 
     
-    % | Co-register
-    t1 = files([subdir filesep 'raw' filesep pattern.t1dir filesep pattern.anatimg]);
-    count = count + 1;
-    if opt.coreg_epi2t1 
-        % | EPIs to T1
-        matlabbatch(count) = bspm_coregister(t1, mean_epi, uaepi);
-    else
-        % | T1 to Mean EPI
-        matlabbatch(count) = bspm_coregister(mean_epi, t1);
-    end
-
-    % | Segment T1
-    if runit.segment
-        count = count + 1; 
-        matlabbatch(count) = bspm_segment(t1);
-    end
+%     % | Co-register
+%     t1 = files([subdir filesep 'raw' filesep pattern.t1dir filesep pattern.anatimg]);
+%     count = count + 1;
+%     if opt.coreg_epi2t1 
+%         % | EPIs to T1
+%         matlabbatch(count) = bspm_coregister(t1, mean_epi, uaepi);
+%     else
+%         % | T1 to Mean EPI
+%         matlabbatch(count) = bspm_coregister(mean_epi, t1);
+%     end
+% 
+%     % | Segment T1
+%     if runit.segment
+%         count = count + 1; 
+%         matlabbatch(count) = bspm_segment(t1);
+%     end
     
 end
 

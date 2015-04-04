@@ -18,7 +18,18 @@ function matlabbatch = bspm_3dto4d(in, outname)
 %	$Revision Date: Aug_20_2014
 if nargin < 1, error('USAGE: matlabbatch = bspm_3dto4d(in, outname)'); end
 if ischar(in), in = cellstr(in);end
-if nargin < 2, outname = '4D.nii'; end
+if nargin < 2
+    [p,n,e] = cellfun(@fileparts, in, 'unif', false);
+    n       = regexp(n, '\W', 'split');
+    nelem   = length(n{1});  
+    n       = [n{:}]; 
+    n       = reshape(n, nelem, length(p))';
+    for i = 1:nelem, nu(i) = length(unique(n(:,i))); end
+    n       = n(1, nu==1);
+    n       = strcat(n, '-');
+    n       = strcat(n{:}, '4D.nii');
+    outname = fullfile(p{1}, n); 
+end
 matlabbatch{1}.spm.util.cat.vols    = in; 
 matlabbatch{1}.spm.util.cat.name    = outname;
 matlabbatch{1}.spm.util.cat.dtype   = 0;

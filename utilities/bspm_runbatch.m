@@ -19,7 +19,7 @@ for i = 1:length(job)
     end
 end
 if numerrs==0
-    printmsg('No Errors. Great Job!', sprintf('Completed %s', bspm_timestamp), '='); 
+    printmsg('No Errors. Great Job!', 'msgtitle', sprintf('Completed %s', bspm_timestamp), 'msgtop', '='); 
 else
     outfile = sprintf('ErrorData_bspm_runbatch_%s.mat', bspm_timestamp); 
     save(outfile, 'errdata'); 
