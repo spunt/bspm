@@ -12,11 +12,12 @@ function bnii_3dto4d(fname3d, varargin)
 def = { ... 
     'compress',         1,  ...
     'delete3d',         0,  ...
+    'delimiter',        '_' ...
 	};
 vals = setargs(def, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
 if ischar(fname3d), fname3d = cellstr(fname3d); end
-fname4d = bnii_3dto4d_filename(fname3d, 'addgz', compress);
+fname4d = bnii_3dto4d_filename(fname3d, 'addgz', compress, 'delimiter', '_');
 fprintf('| Combing %d 3D images to: %s', length(fname3d), fname4d); 
 nii4d   = nii_tool('cat3D', fname3d);
 nii_tool('save', nii4d, fname4d);

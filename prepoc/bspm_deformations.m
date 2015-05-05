@@ -31,13 +31,13 @@ if length(voxsize)==1, voxsize = repmat(voxsize,1,3); end
 matlabbatch{1}.spm.util.defs.comp{1}.def                    = cellstr(field); 
 matlabbatch{1}.spm.util.defs.out{1}.push.fnames             = in; 
 matlabbatch{1}.spm.util.defs.out{1}.push.weight             = weightimage;
-matlabbatch{1}.spm.util.defs.out{1}.push.savedir.savepwd    = 1;
+matlabbatch{1}.spm.util.defs.out{1}.push.savedir.savesrc    = 1;
 matlabbatch{1}.spm.util.defs.out{1}.push.fov.bbvox.bb       = [-78 -112 -50; 78 76 85];
 matlabbatch{1}.spm.util.defs.out{1}.push.fov.bbvox.vox      = voxsize;
 matlabbatch{1}.spm.util.defs.out{1}.push.preserve           = 0;
 matlabbatch{1}.spm.util.defs.out{1}.push.fwhm               = fwhm;
 
 % | RUN
-if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
+if nargout==0, bspm_runbatch(matlabbatch); end
 
 end

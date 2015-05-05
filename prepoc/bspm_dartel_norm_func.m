@@ -39,6 +39,8 @@ matlabbatch{1}.spm.tools.dartel.mni_norm.vox = voxsize;
 matlabbatch{1}.spm.tools.dartel.mni_norm.bb = [-78 -112 -50; 78 76 85];
 matlabbatch{1}.spm.tools.dartel.mni_norm.preserve = 0;
 matlabbatch{1}.spm.tools.dartel.mni_norm.fwhm = fwhm;
-if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
+if nargout==0
+    bspm_runbatch(matlabbatch); 
+end
 
 end

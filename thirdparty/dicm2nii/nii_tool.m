@@ -1,7 +1,9 @@
 function varargout = nii_tool(cmd, varargin)
-% rst = NII_TOOL('cmd', para, ...);
+% Basic function to create, load and save NIfTI file.
 % 
-% Basic function to create, load and save NIfTI file. To list all command, type
+% rst = nii_tool(cmd, para);
+% 
+% To list all command, type
 %  nii_tool ?
 % 
 % To get help information for each command, include '?' in cmd, for example:
@@ -10,6 +12,7 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % Here is a list of all command:
 % 
+% nii_tool('default', 'version', 1, 'rgb_dim', 1);
 % nii = nii_tool('init', img);
 % nii_tool('save', nii, filename, force_3D);
 % hdr = nii_tool('hdr', filename);
@@ -20,6 +23,29 @@ function varargout = nii_tool(cmd, varargin)
 % nii_tool('RGBStyle', 'afni');
 % 
 % Detail for each command is described below.
+% 
+% oldVal = nii_tool('default', 'version', 1, 'rgb_dim', 1);
+% oldVal = nii_tool('default', struct('version', 1, 'rgb_dim', 1));
+% 
+% - Set/query default NIfTI version and/or rgb_dim. To check the setting, run
+% nii_tool('default') without other input. The input for 'default' command can
+% be either a struct with fields of 'version' and/or 'rgb_dim', or
+% parameter/value pairs. See nii_tool('RGBstyle') for meaning of rgb_dim.
+% 
+% Note that the setting will be saved for future use. If one wants to change the
+% settting temporarily, it is better to return the oldVal, and to restore it
+% after done:
+% 
+%  oldVal = nii_tool('default', 'version', 2); % set version 2 as default
+%  % 'init' and 'save' NIfTI using above version
+%  nii_tool('default', oldVal); % restore default setting
+% 
+% The default version setting affects 'init' command only. If you 'load' a NIfTI
+% file, modify it, and then 'save' it, the version will be the same as the
+% original file, unless it is changed explicitly (see help for 'save' command).
+% All 'load' command ('load', 'hdr', 'ext', 'img') will read any version
+% correctly, regardless of version setting.
+% 
 % 
 % nii = nii_tool('init', img, RGB_dim);
 % 
@@ -32,6 +58,10 @@ function varargout = nii_tool(cmd, varargin)
 % supported, including 8/16/32/64 bit signed and unsigned integers, single and
 % double floating numbers. Single/double complex and logical array are also
 % supported.
+% 
+% nii_tool returns img with the same data type as it is stored, while numeric
+% values in hdr are in double. This also applies to the struct returned by any
+% nii_tool loading sub-functions.
 % 
 % The optional third input is needed only if img contains RGB/RGBA data. It
 % specifies which dimension in img is for RGB or RGBA. In other words, if a
@@ -106,9 +136,9 @@ function varargout = nii_tool(cmd, varargin)
 % by 'load' a 4D file, then 'save' it as 3D files. The 3D file names will have
 % 5-digit like '_00001' appended to indicate volume index.
 % 
-% The NIfTI version can be specified in nii.hdr.version. The default version is
-% 1 if not specified. To convert between versions, load a NIfTI file, specify
-% new version, and save it. For example:
+% The NIfTI version can be set by nii_tool('default'). One can override the
+% default version by specifying it in nii.hdr.version. To convert between
+% versions, load a NIfTI file, specify new version, and save it. For example:
 % 
 %  nii = nii_tool('load', 'file_nifti1.nii'); % load version 1 file
 %  nii.hdr.version = 2; % force to NIfTI-2
@@ -139,9 +169,12 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % oldStyle = nii_tool('RGBStyle', 'afni');
 % 
-% - Set/query the method to save/load RGB or RGBA NIfTI file. By default, it is
-% 'afni' style (or 1), which is defined by NIfTI standard, but is not well
-% supported by fsl and mricron.
+% - Set/query the method to save/load RGB or RGBA NIfTI file. The default method
+% can be set by nii_tool('default', [version rgb_dim]), where rgb_dim can be 1,
+% 3 or 4, as explained below.
+% 
+% The default style is 'afni' style (or 1), which is defined by NIfTI standard,
+% but is not well supported by fsl or mricron.
 % 
 % If the second input is set to 'mricron' (or 3), nii_tool will save/load file
 % using the old RGB fashion (dim 3 for RGB). This works for mricron at least
@@ -162,7 +195,7 @@ function varargout = nii_tool(cmd, varargin)
 %  nii_tool('RGBStyle', 'fsl'); % switch to fsl style
 %  nii_tool('save', nii, 'fslRGB.nii'); % fsl can read it as RGB
 % 
-% Note that, if one likes to convert fsl style (non-RGB file by NIfTI standard)
+% Note that, if one wants to convert fsl style (non-RGB file by NIfTI standard)
 % to other styles, an extra step is needed to change the RGB dim from 4th to 8th
 % dim before 'save':
 % 
@@ -170,6 +203,10 @@ function varargout = nii_tool(cmd, varargin)
 %  nii.img = permute(nii.img, [1:3 5:8 4]); % force it to be RGB data
 %  nii_tool('RGBStyle', 'mricron'); % switch to RGB mricron style
 %  nii_tool('save', nii, 'mricronRGB.nii'); % now mricron can read it as RGB
+% 
+% Also note that the setting by nii_tool('RGBStyle') is effective only for
+% current Matlab session. If one clears all, or starts a new Matlab session, the
+% default style by nii_tool('default') will take effect.
  
 % More information for NIfTI format:
 % Official NIfTI website: http://nifti.nimh.nih.gov/
@@ -183,39 +220,19 @@ function varargout = nii_tool(cmd, varargin)
 % 150208 Add 4th input for 'save', allowing to save SPM 3D files
 % 150210 Add 'cat3D' to load SPM 3D files
 % 150226 Assign all 8 char for 'magic' (version 2 needs it)
-% 150321 Correct nByte for ecode=40 with big endian.
+% 150321 swapbytes(nByte) for ecode=40 with big endian.
+% 150401 Add 'default' to set/query version and rgb_dim default setting.
 
-persistent C dataFmt; % C columns: name, length, format, value, offset
-if isempty(C), [C, dataFmt] = niiHeader(1); end
+persistent C para; % C columns: name, length, format, value, offset
+if isempty(C), [C, para] = niiHeader; end
 
 if ~ischar(cmd)
     error('Provide a string command as the first input for nii_tool');
 end
 if any(cmd=='?'), subFuncHelp(mfilename, cmd); return; end
 
-if strcmpi(cmd, 'RGBStyle') % here before check 2nd input
-    styles = {'afni' '' 'mricron' 'fsl'};
-    curStyle = styles{dataFmt.rgb_dim};
-    if nargin<2, varargout{1} = curStyle; return; end % query only
-    irgb = varargin{1};
-    if isempty(irgb), irgb = 1; end % default as 'afni'
-    if ischar(irgb)
-        if strncmpi(irgb, 'fsl', 3), irgb = 4;
-        elseif strncmpi(irgb, 'mricron', 4), irgb = 3;
-        else irgb = 1;
-        end
-    end
-    if ~any(irgb == [1 3 4])
-        error('nii_tool(''RGBStyle'') can have 1, 3, or 4 as second input'); 
-    end
-    if nargout, varargout{1} = curStyle; end % return old one
-    dataFmt.rgb_dim = irgb;
-    return;
-end
-
-if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
-
 if strcmpi(cmd, 'init')
+    if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     for i = 1:size(C,1), nii.hdr.(C{i,1}) = C{i,4}; end
     nii.img = varargin{1};
     if numel(size(nii.img))>8
@@ -223,12 +240,13 @@ if strcmpi(cmd, 'init')
     end
     if nargin>2
         i = varargin{2};
-        if i<0 || i>8 || mod(i,1)>0, error('Invalid RGB dim number'); end
+        if i<0 || i>8 || mod(i,1)>0, error('Invalid RGB_dim number'); end
         nii.img = permute(nii.img, [1:i-1 i+1:8 i]); % RGB to dim8
     end
-    varargout{1} = img2datatype(nii, dataFmt); % set datatype etc 
+    varargout{1} = img2datatype(nii, para); % set datatype etc 
     
 elseif strcmpi(cmd, 'save')
+    if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     nii = varargin{1};
     if ~isstruct(nii) || ~isfield(nii, 'hdr') || ~isfield(nii, 'img') 
         error(['nii_tool(''save'') needs a struct from nii_tool(''init'')' ...
@@ -252,27 +270,31 @@ elseif strcmpi(cmd, 'save')
     [pth, fname, fext] = fileparts(fname);
     do_gzip = strcmpi(fext, '.gz');
     if do_gzip
-        [~, fname, fext] = fileparts(fname); % get .nii .img .hdr
+        [tmptmp, fname, fext] = fileparts(fname); % get .nii .img .hdr
     end
     if isempty(fext), fext = '.nii'; end % default single .nii file
     fname = fullfile(pth, fname); % without file ext
     isNii = strcmpi(fext, '.nii'); % will use .img/.hdr if not .nii
     
     % Deal with NIfTI version and sizeof_hdr
-    niiVer = 1;
+    niiVer = para.version;
     if isfield(nii.hdr, 'version'), niiVer = nii.hdr.version; end
     if niiVer == 1
         nii.hdr.sizeof_hdr = 348; % in case it was loaded from other version
-        C0 = C;
     elseif niiVer == 2
         nii.hdr.sizeof_hdr = 540; % version 2
-        C0 = niiHeader(2);
     else 
         error('Unsupported NIfTI version: %g', niiVer);
     end
     
+    if niiVer ~= para.version
+        C0 = niiHeader(niiVer);
+    else
+        C0 = C;
+    end
+    
     % Update datatype/bitpix/dim in case nii.img is changed
-    [nii, fmt] = img2datatype(nii, dataFmt);
+    [nii, fmt] = img2datatype(nii, para);
 
     % This 'if' block: lazy implementation SPM: split to 3D files
     if nargin>3 && ~isempty(varargin{3}) && varargin{3} && nii.hdr.dim(5)>1
@@ -292,19 +314,19 @@ elseif strcmpi(cmd, 'save')
     % re-arrange img for special datatype: RGB/RGBA/Complex.
     % mis-use unused data_type to store rgb_dim in nifti FILE
     if any(nii.hdr.datatype == [128 511 2304]) % RGB or RGBA
-        nii.hdr.data_type = sprintf('rgb_dim=%g', dataFmt.rgb_dim);
-        if dataFmt.rgb_dim == 1 % AFNI style
+        nii.hdr.data_type = sprintf('rgb_dim=%g', para.rgb_dim);
+        if para.rgb_dim == 1 % AFNI style
             nii.img = permute(nii.img, [8 1:7]);
-        elseif dataFmt.rgb_dim == 3 % mricron
+        elseif para.rgb_dim == 3 % mricron
             nii.img = permute(nii.img, [1 2 8 3:7]);
-        elseif dataFmt.rgb_dim == 4 % for fslview
+        elseif para.rgb_dim == 4 % for fslview
             nii.img = permute(nii.img, [1:3 8 4:7]); % violate nii rule
             dim = size(nii.img);
             if numel(dim)>6 % dim7 is not 1
                 i = find(dim(5:7)==1, 1, 'last') + 4;
                 nii.img = permute(nii.img, [1:i-1 i+1:8 i]);
             end
-            nii = img2datatype(nii, dataFmt); % changed to non-RGB datatype
+            nii = img2datatype(nii, para); % changed to non-RGB datatype
         end
     elseif any(nii.hdr.datatype == [32 1792]) % complex single/double
         nii.img = [real(nii.img(:))'; imag(nii.img(:))'];
@@ -386,6 +408,7 @@ elseif strcmpi(cmd, 'save')
     end
     
 elseif strcmpi(cmd, 'hdr')
+    if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     if ~ischar(varargin{1})
         error('nii_tool(''hdr'') needs nii file name as second input'); 
     end
@@ -395,6 +418,7 @@ elseif strcmpi(cmd, 'hdr')
     varargout{1} = read_hdr(fid, niiVer, C, fname);
    
 elseif any(strcmpi(cmd, {'ext' 'img' 'load'})) 
+    if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     if ischar(varargin{1})
         fname = nii_name(varargin{1}, '.hdr');
     elseif isstruct(varargin{1}) && isfield(varargin{1}, 'file_name')
@@ -425,14 +449,32 @@ elseif any(strcmpi(cmd, {'ext' 'img' 'load'}))
             fname = nii_name(fname, '.img');
             [fid, clnObj] = fopen_nii(fname, nii.hdr.machine); %#ok<NASGU>
         end
-        nii.img = read_img(fid, nii.hdr, dataFmt);
+        nii.img = read_img(fid, nii.hdr, para);
         if strcmpi(cmd, 'img')
             varargout{1} = nii.img;
         else % load
             varargout{1} = nii;
         end
     end
+elseif strcmpi(cmd, 'RGBStyle')
+    styles = {'afni' '' 'mricron' 'fsl'};
+    curStyle = styles{para.rgb_dim};
+    if nargin<2, varargout{1} = curStyle; return; end % query only
+    irgb = varargin{1};
+    if isempty(irgb), irgb = 1; end % default as 'afni'
+    if ischar(irgb)
+        if strncmpi(irgb, 'fsl', 3), irgb = 4;
+        elseif strncmpi(irgb, 'mricron', 4), irgb = 3;
+        else irgb = 1;
+        end
+    end
+    if ~any(irgb == [1 3 4])
+        error('nii_tool(''RGBStyle'') can have 1, 3, or 4 as second input'); 
+    end
+    if nargout, varargout{1} = curStyle; end % return old one
+    para.rgb_dim = irgb;
 elseif strcmpi(cmd, 'cat3D')
+    if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     fnames = varargin{1};
     if ischar(fnames) % guess it is like run1*.nii
         f = dir(fnames);
@@ -449,14 +491,62 @@ elseif strcmpi(cmd, 'cat3D')
     nii.img(:,:,:,2:n) = 0; % pre-allocate
     % For now, omit all consistence check between files
     for i = 2:n, nii.img(:,:,:,i) = nii_tool('img', fnames{i}); end
-    varargout{1} = img2datatype(nii, dataFmt); % update dim
+    varargout{1} = img2datatype(nii, para); % update dim
+elseif strcmpi(cmd, 'default')
+    flds = {'version' 'rgb_dim'}; % may add more in the future
+    for i = 1:length(flds), val.(flds{i}) = para.(flds{i}); end
+    if nargin<2, varargout{1} = val; return; end % query only
+    if nargout, varargout{1} = val; end % return old val
+    in2 = varargin;
+    if ~isstruct(in2), in2 = struct(in2{:}); end
+    nam = fieldnames(in2);
+    for i = 1:length(nam)
+        if strcmpi(nam{i}, 'rgb_dim')
+            nii_tool('RGBstyle', in2.(nam{i}));
+            continue;
+        end
+        ind = strcmpi(nam{i}, flds);
+        if isempty(ind), continue; end
+        para.(flds{ind}) = in2.(nam{i});
+    end
+    if val.version ~= para.version, C = niiHeader(para.version); end
+    
+    fname = [fileparts(which(mfilename)) '/nii_tool_para.mat'];
+    fid = fopen(fname, 'w'); % check writing permission
+    if fid<1
+        fname = [getenv('HOME') '/nii_tool_para.mat'];
+    else
+        fclose(fid);
+    end
+    try
+        save(fname, '-struct', 'para', flds{:}); % overwrite
+    catch me
+        fprintf(2, 'Failed to save default parameters for future use.\n');
+        fprintf(2, '%s\n', me.message);
+    end
 else
     error('Invalid command for nii_tool: %s', cmd);
 end
 % End of main function
 
-%% Subfunction: all nii header in the order in NIfTI-1 file
-function [C, dataFmt] = niiHeader(niiVer)
+%% Subfunction: all nii header in the order in NIfTI-1/2 file
+function [C, para] = niiHeader(niiVer)
+rgb_dim = 1;
+if nargin<1 || isempty(niiVer)
+    fname = [getenv('HOME') '/nii_tool_para.mat'];
+    if ~exist(fname, 'file')
+        fname = [fileparts(which(mfilename)) '/nii_tool_para.mat'];
+    end
+
+    try
+        val = load(fname);
+        niiVer = val.version;
+        rgb_dim = val.rgb_dim;
+    catch
+        niiVer = 1;
+    end
+end
+
 if niiVer == 1
     C = {
     % name              len  format     value           offset
@@ -536,9 +626,9 @@ elseif niiVer == 2
     'qoffset_x'         1   'double'    0               376
     'qoffset_y'         1   'double'    0               384
     'qoffset_z'         1   'double'    0               392
-    'srow_x'            4   'double'    [0 0 0 0]       400
-    'srow_y'            4   'double'    [0 0 0 0]       432
-    'srow_z'            4   'double'    [0 0 0 0]       464
+    'srow_x'            4   'double'    [1 0 0 0]       400
+    'srow_y'            4   'double'    [0 1 0 0]       432
+    'srow_z'            4   'double'    [0 0 1 0]       464
     'slice_code'        1   'int32'     0               496
     'xyzt_units'        1   'int32'     0               500
     'intent_code'       1   'int32'     0               504
@@ -554,34 +644,35 @@ if nargout<2, return; end
 
 %   class      datatype bitpix  valpix
 D = {
-	'ubit1'     1       1       1 % neither mricron nor fsl support this
+    'ubit1'     1       1       1 % neither mricron nor fsl support this
     'uint8'     2       8       1
     'int16'     4       16      1
     'int32'     8       32      1
     'single'    16      32      1
-	'single'    32      64      2 % complex
+    'single'    32      64      2 % complex
     'double'    64      64      1
-	'uint8'     128     24      3 % RGB
+    'uint8'     128     24      3 % RGB
     'int8'      256     8       1
-	'single'    511     96      3 % RGB, not in NIfTI standard?
+    'single'    511     96      3 % RGB, not in NIfTI standard?
     'uint16'    512     16      1
     'uint32'    768     32      1
     'int64'     1024    64      1
     'uint64'    1280    64      1
-% 	'float128'  1536    128     1 % long double, for 22nd century?
-	'double'    1792    128     2 % complex
-% 	'float128'  2048    256     2 % long double complex
-	'uint8'     2304    32      4 % RGBA
+%     'float128'  1536    128     1 % long double, for 22nd century?
+    'double'    1792    128     2 % complex
+%     'float128'  2048    256     2 % long double complex
+    'uint8'     2304    32      4 % RGBA
     };
 
-dataFmt.format   =  D(:,1)';
-dataFmt.datatype = [D{:,2}];
-dataFmt.bitpix   = [D{:,3}];
-dataFmt.valpix   = [D{:,4}];
-dataFmt.rgb_dim  = 1; % dim of RGB/RGBA in NIfTI FILE
+para.format   =  D(:,1)';
+para.datatype = [D{:,2}];
+para.bitpix   = [D{:,3}];
+para.valpix   = [D{:,4}];
+para.rgb_dim  = rgb_dim; % dim of RGB/RGBA in NIfTI FILE
+para.version  = niiVer;
 
 %% Subfunction: update hdr based on image class for 'init' and 'save'
-function [nii, fmt] = img2datatype(nii, dataFmt)
+function [nii, fmt] = img2datatype(nii, para)
 dim = size(nii.img);
 ndim = numel(dim);
 dim(ndim+1:7) = 1;
@@ -602,18 +693,18 @@ if ndim == 8 % RGB/RGBA data, we change img type to uint8 or single if needed
 
     dim(8) = []; % remove color-dim so numel(dim)=7 for nii.hdr
     ndim = find(dim>1, 1, 'last'); % update it
-elseif ~isreal(nii.img)
-    typ = 'complex';
-    valpix = 2; 
-else
+elseif isreal(nii.img)
     typ = 'real';
     valpix = 1; 
+else
+    typ = 'complex';
+    valpix = 2; 
 end
 
 if islogical(nii.img), imgFmt = 'ubit1'; 
 else imgFmt = class(nii.img);
 end
-ind = find(strcmp(dataFmt.format, imgFmt) & dataFmt.valpix==valpix);
+ind = find(strcmp(para.format, imgFmt) & para.valpix==valpix);
 
 if isempty(ind) % only RGB and complex can have this problem
     error('nii_tool does not support %s image of ''%s'' type', typ, imgFmt);
@@ -621,13 +712,15 @@ elseif numel(ind)>1 % unlikely
     error('Non-unique datatype found for %s image of ''%s'' type', typ, imgFmt);
 end
 
-fmt = dataFmt.format{ind};
-nii.hdr.datatype = dataFmt.datatype(ind);
-nii.hdr.bitpix = dataFmt.bitpix(ind);
+fmt = para.format{ind};
+nii.hdr.datatype = para.datatype(ind);
+nii.hdr.bitpix = para.bitpix(ind);
 nii.hdr.dim = [ndim dim];
 
-nii.hdr.glmax = round(double(max(nii.img(:)))); % we may remove these
-nii.hdr.glmin = round(double(min(nii.img(:))));
+if nii.hdr.sizeof_hdr == 348
+    nii.hdr.glmax = round(double(max(nii.img(:)))); % we may remove these
+    nii.hdr.glmin = round(double(min(nii.img(:))));
+end
 
 %% Subfunction: use pigz or system gzip if available (faster)
 function gzipOS(fname)
@@ -658,7 +751,7 @@ if err, errorLog(['Error during compression: ' str]); end
 function cmd = check_gzip
 % first, try system pigz
 [err, ~] = system('pigz -V 2>&1');
-if ~err, cmd = 'pigz'; return; end
+if ~err, cmd = 'pigz -n'; return; end
 
 % next, try pigz included with nii_tool
 m_dir = fileparts(which(mfilename));
@@ -678,13 +771,13 @@ elseif ispc % rename back pigz for Windows. Renamed to trick Matlab Central
     end
 end
 
-cmd = fullfile(m_dir, 'pigz');
+cmd = fullfile(m_dir, 'pigz -n');
 [err, ~] = system([cmd ' -V 2>&1']);
 if ~err, return; end
 
 % Third, try system gzip
 [err, ~] = system('gzip -V 2>&1'); % gzip on system path?
-if ~err, cmd = 'gzip'; return; end
+if ~err, cmd = 'gzip -n'; return; end
 
 % Lastly, try to use Matlab gzip/gunzip. Check only one, since they are paired
 if isempty(which('gunzip')) || ~usejava('jvm')
@@ -786,8 +879,8 @@ while ftell(fid) < nEnd
 end
 
 %% subfunction: read img
-function img = read_img(fid, hdr, dataFmt)
-ind = dataFmt.datatype == hdr.datatype;
+function img = read_img(fid, hdr, para)
+ind = para.datatype == hdr.datatype;
 if ~any(ind)
     error('Datatype %g is not supported by nii_tool.', hdr.datatype);
 end
@@ -795,12 +888,12 @@ end
 dim = hdr.dim(2:8);
 dim(hdr.dim(1)+1:7) = 1; % avoid some error in file
 dim(dim<1) = 1;
-n = prod(dim) * dataFmt.valpix(ind); % num of values
+n = prod(dim) * para.valpix(ind); % num of values
 fseek(fid, hdr.vox_offset, 'bof');
-img = fread(fid, n, ['*' dataFmt.format{ind}]); % * to keep original class
+img = fread(fid, n, ['*' para.format{ind}]); % * to keep original class
 
 if any(hdr.datatype == [128 511 2304]) % RGB or RGBA
-    j = dataFmt.rgb_dim;
+    j = para.rgb_dim;
     if isfield(hdr, 'data_type')
         a = hdr.data_type;
         if numel(a)>8 && strncmp(a, 'rgb_dim=', 8) % override user's RGB_dim
@@ -808,7 +901,7 @@ if any(hdr.datatype == [128 511 2304]) % RGB or RGBA
             if any(a == [1 3 4]), j = a; end % 4 is not possible
         end
     end
-    dim = [dim(1:j-1) dataFmt.valpix(ind) dim(j:7)]; % length=8 now
+    dim = [dim(1:j-1) para.valpix(ind) dim(j:7)]; % length=8 now
     img = reshape(img, dim);
     img = permute(img, [1:j-1 j+1:8 j]); % put RGB(A) to dim8
 elseif any(hdr.datatype == [32 1792]) % complex single/double
@@ -848,7 +941,7 @@ if nargin<2, endian = 'ieee-le'; end % only provided for .img fopen
 if fid<1, error([err ': ' fname]); end
 
 n = fread(fid, 4, '*uint8')'; % sizeof_hdr or signature
-isGz = isequal(n(1:3), [31 139 8]); % gz, tgz, tar file
+isGz = isequal(n(1:2), [31 139]); % gz, tgz, tar file
 fnameIn = fname; % for error msg
 if isGz
     fclose(fid); % close .gz file

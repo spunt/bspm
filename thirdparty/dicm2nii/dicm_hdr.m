@@ -1,7 +1,7 @@
 function [s, info] = dicm_hdr(fname, dict, iFrames)
-% [s, err] = dicm_hdr(dicomFileName, dict, iFrames);
+% Return header of a dicom file in a struct.
 % 
-% DICM_HDR returns header of a dicom file in struct s.
+% [s, err] = dicm_hdr(dicomFileName, dict, iFrames);
 % 
 % The mandatory 1st input is the dicom file name. The optional 2nd input can be
 % a dicom dict, which may have only part of the full dict. The partial dict can
@@ -80,6 +80,7 @@ function [s, info] = dicm_hdr(fname, dict, iFrames)
 % 150227 Avoid error due to empty file (thx Kushal).
 % 150316 Avoid error due to empty item dat for search method (thx VG).
 % 150324 philips_par/afni_head: make up SeriesInstanceUID for dicm2nii.
+% 150405 Implement bv_file to read BV fmr/vmr/dmr.
 
 persistent dict_full;
 s = []; info = '';
@@ -112,6 +113,8 @@ if ~isDicm && ~isTruncated % may be PAR or HEAD file
         func = @philips_par;
     elseif strcmpi(ext, '.HEAD') % || strcmpi(ext, '.BRIK')
         func = @afni_head;
+    elseif any(strcmpi(ext, {'.vmr' '.fmr' '.dmr'})) % BrainVoyager
+        func = @bv_file;
     else
         info = ['Unknown file type: ' fname];
         return;
@@ -437,7 +440,7 @@ end
 % subfunction: decode GE ProtocolDataBlock
 function ch = read_ProtocolDataBlock(ch)
 n = typecast(ch(1:4), 'int32') + 4; % nBytes, zeros may be padded to make 4x
-if ~all(ch(5:7) == [31 139 8]') || n>numel(ch), return; end % gz signature
+if ~all(ch(5:6) == [31 139]') || n>numel(ch), return; end % gz signature
 
 b = gunzip_mem(ch(5:n));
 if isempty(b), return; end % guzip faild, we give up
@@ -490,7 +493,7 @@ if strncmpi(s.SoftwareVersion, 'V3', 2)
     s = []; return;
 end
 
-s.IsPhilipsPAR = true;
+% s.IsPhilipsPAR = true;
 s.PatientName = par_key('Patient name', '%c');
 s.StudyDescription = par_key('Examination name', '%c');
 [pth, nam] = fileparts(fname);
@@ -503,8 +506,7 @@ s.AcquisitionDateTime = foo;
 s.SeriesNumber = par_key('Acquisition nr');
 s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
     datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
-s.InstanceNumber = 1; % make dicm2nii.m happy
-% s.SamplesPerPixel = 1;
+% s.SamplesPerPixel = 1; % make dicm2nii.m happy
 % s.ReconstructionNumberMR = strkey(str, 'Reconstruction nr', '%g');
 % s.MRSeriesScanDuration = strkey(str, 'Scan Duration', '%g');
 s.NumberOfEchoes = par_key('Max. number of echoes');
@@ -646,6 +648,7 @@ if isDTI
     fld = 'DiffusionGradientDirection';
     getTableVal('diffusion', fld, iVol);
     if isfield(s, fld), s.(fld) = s.(fld)(:, [3 1 2]); end
+    s.BvecAvailable = true;
 end
 getTableVal('TURBO factor', 'TurboFactor');
 
@@ -756,12 +759,11 @@ if isempty(i), s = []; err = 'Not brik header file'; return; end
 
 % these make dicm_nii.m happy
 [~, foo] = fileparts(fname);
-s.IsAFNIHEAD = true;
+% s.IsAFNIHEAD = true;
 s.ProtocolName = foo;
 s.SeriesNumber = SN; SN = SN+1; % make it unique for multilple files
 s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
     datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
-s.InstanceNumber = 1;
 s.ImageType = afni_key('TYPESTRING');
 
 foo = afni_key('BYTEORDER_STRING');
@@ -814,7 +816,7 @@ if ~isempty(i), s.EchoTime = sscanf(hist(i:end), '%g', 1) * 1000; end
 % INT_CMAP
 foo = afni_key('SCENE_DATA');
 s.TemplateSpace = foo(1)+1; %[0] 0=+orig, 1=+acpc, 2=+tlrc
-if foo(2)==9, s.ImageType =[s.ImageType '\DIFFUSION\']; end
+if foo(2)==9, s.ImageType = [s.ImageType '\DIFFUSION\']; end
 % ori = afni_key('ORIENT_SPECIFIC')+1;
 % orients = [1 -1 -2 2 3 -3]; % RL LR PA AP IS SI
 % ori = orients(ori) % in dicom/afni LPS, 
@@ -890,8 +892,8 @@ try
     import com.mathworks.mlwidgets.io.*
     streamCopier = InterruptibleStreamCopier.getInterruptibleStreamCopier;
     baos = java.io.ByteArrayOutputStream;
-    gz_bytes = typecast(gz_bytes, 'int8');
-    bais = java.io.ByteArrayInputStream(gz_bytes);
+    b = typecast(gz_bytes, 'int8');
+    bais = java.io.ByteArrayInputStream(b);
     gzis = java.util.zip.GZIPInputStream(bais);
     streamCopier.copyStream(gzis, baos);
     bytes = typecast(baos.toByteArray, 'uint8'); % int8 to uint8
@@ -910,5 +912,185 @@ catch
         bytes = fread(fid, '*uint8');
         fclose(fid);
     end
+end
+end
+
+%% Subfunction: read BrainVoyager vmr/fmr/dmr. Call BVQXfile
+function [s, err] = bv_file(fname)
+s = []; err = '';
+try 
+    bv = BVQXfile(fname);
+catch me
+    err = me.message;
+    if strfind(me.identifier, 'UndefinedFunction')
+        fprintf(2, 'Please download BVQXtools at \n%s\n', ...
+        'http://support.brainvoyager.com/available-tools/52-matlab-tools-bvxqtools.html');
+    end
+    return;
+end
+
+persistent SN subj folder % folder is used to update subj
+if isempty(SN), SN = 1; subj = ''; folder = ''; end
+s.Filename = bv.FilenameOnDisk;
+fType = bv.filetype;
+s.ImageType = fType;
+
+% Find a fmr/dmr, and get subj based on dicom file name in BV format.
+% Suppose BV files in the folder are for the same subj
+[pth, nam] = fileparts(s.Filename);
+s.SeriesDescription = nam;
+if isempty(folder) || ~strcmp(folder, pth)
+    folder = pth;
+    subj = '';
+    if strcmp(fType, 'fmr') || strcmp(fType, 'dmr')
+        [~, nam] = fileparts(bv.FirstDataSourceFile);
+        nam = strtok(nam, '-');
+        if ~isempty(nam), subj = nam; end
+    else
+        fnames = dir([pth '/*.fmr']);
+        if isempty(fnames), fnames = dir([pth '/*.dmr']); end
+        if ~isempty(fnames)
+            bv1 = BVQXfile(fullfile(pth, fnames(1).name));
+            [~, nam] = fileparts(bv1.FirstDataSourceFile);
+            bv1.ClearObject;
+            nam = strtok(nam, '-');
+            if ~isempty(nam), subj = nam; end
+        end
+    end
+end
+if ~isempty(subj), s.PatientName = subj; end
+
+s.Columns = bv.NCols;
+s.Rows = bv.NRows;
+s.SliceThickness = bv.SliceThickness;
+R = [bv.RowDirX bv.RowDirY bv.RowDirZ; bv.ColDirX bv.ColDirY bv.ColDirZ]';
+s.ImageOrientationPatient = R(:);
+R(:,3) = cross(R(:,1), R(:,2));
+[~, ixyz] = max(abs(R)); iSL =ixyz(3);
+
+try 
+    s.TemplateSpace = bv.ReferenceSpace; % 0/2/3: Scanner/ACPC/TAL
+    if s.TemplateSpace==0, s.TemplateSpace = 1; end
+catch
+    s.TemplateSpace = 1;
+end
+pos = [bv.Slice1CenterX bv.Slice1CenterY bv.Slice1CenterZ
+       bv.SliceNCenterX bv.SliceNCenterY bv.SliceNCenterZ]'; % for real slices
+
+if strcmpi(fType, 'vmr')
+    s.SpacingBetweenSlices = s.SliceThickness + bv.GapThickness;
+    s.PixelSpacing = [bv.VoxResX bv.VoxResY]';
+    if ~isempty(bv.VMRData16)
+        nSL = bv.DimZ;
+        s.PixelData = bv.VMRData16; % no padded zeros
+    else
+        v16 = [s.Filename(1:end-3) 'v16'];
+        if exist(v16, 'file')
+            bv16 = BVQXfile(v16);
+            nSL = bv16.DimZ;
+            s.PixelData = bv16.VMRData; % no padded zeros
+            bv16.ClearObject;
+        else % fall back the 8-bit data, and deal with padded zeros
+            ix = floor((bv.DimX - s.Columns)/2);
+            iy = floor((bv.DimY - s.Rows)/2);
+            R3 = abs(R(iSL,3)) * s.SpacingBetweenSlices;
+            nSL = round(abs(diff(pos(iSL,:))) / R3) + 1;
+            iz = floor((bv.DimZ - nSL)/2);
+            s.PixelData = bv.PixelData(ix+(1:s.Columns), iy+(1:s.Rows), iz+(1:nSL), :);
+        end
+    end
+    s.LocationsInAcquisition = nSL;
+    s.MRAcquisitionType = '3D'; % for dicm2nii to re-orient
+elseif strcmpi(fType, 'fmr') || strcmpi(fType, 'dmr')
+    s.SpacingBetweenSlices = s.SliceThickness + bv.SliceGap;
+    s.PixelSpacing = [bv.InplaneResolutionX bv.InplaneResolutionY]';
+    nSL = bv.NrOfSlices;
+    s.LocationsInAcquisition = nSL;
+    s.NumberOfTemporalPositions = bv.NrOfVolumes;
+    s.RepetitionTime = bv.TR;
+    s.EchoTime = bv.TE;
+    if bv.TimeResolutionVerified
+        switch bv.SliceAcquisitionOrder % the same as NIfTI?
+            case 1, ind = 1:nSL;
+            case 2, ind = nSL:-1:1;
+            case 3, ind = [1:2:nSL 2:2:nSL];
+            case 4, ind = [nSL:-2:1 nSL-1:-2:1];
+            case 5, ind = [2:2:nSL 1:2:nSL];
+            case 6, ind = [nSL-1:-2:1 nSL:-2:1];
+            otherwise, ind = []; err = 'Unknown SliceAcquisitionOrder';
+        end
+        if ~isempty(ind)
+            t = (0:s.LocationsInAcquisition-1)' * bv.InterSliceTime; % ms
+            t(ind) = t;
+            s.SliceTiming = t;
+        end
+    end
+    if strcmpi(fType, 'fmr')
+        bv.LoadSTC;
+        s.PixelData = permute(bv.Slice.STCData , [1 2 4 3]);
+    else % dmr
+        s.ImageType = [s.ImageType '\DIFFUSION\'];
+        bv.LoadDWI;
+        s.PixelData = bv.DWIData;
+        if strncmpi(bv.GradientInformationAvailable, 'Y', 1)
+            a = bv.GradientInformation; % nDir by 4
+            s.B_value = a(:,4);
+            a = a(:,1:3); % bvec
+            % Following should be right in theory, but I would trust the grd
+            % table which should be in dicom coodinate system, rather than the
+            % confusing Gradient?DirInterpretation 
+%             % 1:6 for LR RL AP PA IS SI. Default [2 3 5] by dicom LPS
+%             i1_6 = [bv.GradientXDirInterpretation ...
+%                     bv.GradientYDirInterpretation ...
+%                     bv.GradientZDirInterpretation];
+%             [xyz, ind] = sort(i1_6);
+%             if isequal(ceil(xyz/2), 1:3) % perm of 1/2/3
+%                 a = a(:,ind);
+%                 flip = xyz == [1 4 6]; % negative by dicom 
+%                 a(:,flip) = -a(:,flip);
+%             else
+%                 str = sprintf(['Wrong Interpretation of gradient found: %s\n' ... 
+%                        'Please check bvec and its sign.\n'], fname);
+%                 fprintf(2, str);
+%                 err = [err str];
+%             end
+            s.DiffusionGradientDirection = a;
+            s.BvecAvailable = true; % for dicm2nii
+        end
+    end
+    
+    % fmr/dmr are normally converted from uint16 to single
+    if isfloat(s.PixelData) && isequal(floor(s.PixelData), s.PixelData) ...
+            && max(s.PixelData(:))<32768 && min(s.PixelData(:))>=-32768
+        s.PixelData = int16(s.PixelData);
+    end
+else
+    err = ['Unknown BV file type: ' fType];
+    s = [];
+    return;
+end
+
+pos = pos - R(:,1:2) * diag(s.PixelSpacing) * [s.Columns s.Rows]'/2 * [1 1];
+s.ImagePositionPatient = pos(:,1);
+s.LastFile.ImagePositionPatient = pos(:,2);
+
+% Following make dicm2nii happy
+try %#ok
+    [~, nam] = fileparts(bv.FirstDataSourceFile);
+    [~, nam] = strtok(nam, '-');
+    serN = str2double(strtok(nam, '-'));
+    if ~isempty(serN), SN = serN; end
+end
+s.SeriesNumber = SN; SN = SN+1; % make it unique for multilple files
+s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
+    datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
+c = class(s.PixelData);
+if strcmp(c, 'double') %#ok
+    s.BitsAllocated = 64;
+elseif strcmp(c, 'single') %#ok
+    s.BitsAllocated = 32;
+else
+    ind = find(isstrprop(c, 'digit'), 1);
+    s.BitsAllocated = sscanf(c(ind:end), '%g');
 end
 end

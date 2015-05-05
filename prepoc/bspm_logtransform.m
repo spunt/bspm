@@ -1,7 +1,7 @@
-function matlabbatch = bspm_logtransform(epi)
+function matlabbatch = bspm_logtransform(epi, is4D)
 % BSPM_LOGTRANSFORM
 %
-%   USAGE: matlabbatch = bspm_logtransform(epi)
+%   USAGE: matlabbatch = bspm_logtransform(epi, is4D)
 %
 
 % -------------------------------- Copyright (C) 2014 --------------------------------
@@ -10,16 +10,19 @@ function matlabbatch = bspm_logtransform(epi)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: matlabbatch = bspm_logtransform(epi)'); end
+if nargin<1, disp('USAGE: matlabbatch = bspm_logtransform(epi, is4D)'); return; end
+if nargin<2, is4D = 0; end; 
 if ischar(epi), epi = cellstr(epi); end
+if is4D, epi = bspm_expand4D(char(epi)); 
+else epi = strcat(epi, ',1'); end
 
 % | build job variable
-matlabbatch{1}.spm.tools.logtransform.data{1}           = strcat(epi, ',1');
+matlabbatch{1}.spm.tools.logtransform.data{1}           = epi; 
 matlabbatch{1}.spm.tools.logtransform.scaling.ascale    = 1;
 matlabbatch{1}.spm.tools.logtransform.clipneg           = false;
 matlabbatch{1}.spm.tools.logtransform.dtype             = 0; 
 
 % | run job
-if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
+if nargout==0, bspm_runbatch(matlabbatch); end
 
 end

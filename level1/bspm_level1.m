@@ -120,14 +120,7 @@ for r = 1:nruns
         if isfield(runs(r), 'regressors'), regressors = runs(r).regressors; end
     end
     if general_info.is4D
-        [pcim, ncim, ecim] = fileparts(char(cimages));
-        if strcmp(ecim, '.gz')
-            gunzip(char(cimages)); 
-            cimages = fullfile(pcim, ncim); 
-        end
-        hdr     = spm_vol(char(cimages));
-        append  = cellfun(@num2str, num2cell(1:length(hdr))', 'Unif', false);
-        cimages = strcat(cimages, {','}, append);
+        cimages = bspm_expand4D(cimages);
     end
     spec.sess(r).scans = cimages;
     for c = 1:length(conditions)
@@ -142,7 +135,7 @@ for r = 1:nruns
                 spec.sess(r).cond(c).pmod(p).param = parameters(p).values;
                 spec.sess(r).cond(c).pmod(p).poly = 1;
             end
-            spec.sess.cond.orth = general_info.orth;
+            spec.sess(r).cond(c).orth = general_info.orth;
         end  
     end
     rc = 0; 
@@ -150,7 +143,7 @@ for r = 1:nruns
         for p = 1:length(floatingpm)
             x = bspm_make_regressor(length(cimages), general_info.TR, floatingpm(p).onsets, ... 
                 floatingpm(p).durations, 'PMods', floatingpm(p).values, 'TRbin', general_info.mt_res, ...
-                'TRons', general_info.mt_onset, 'TempDeriv', general_info.hrf_derivs(1));
+                'TRons', general_info.mt_onset, 'Derivatives', sum(general_info.hrf_derivs));
             rc = rc + 1; 
             spec.sess(r).regress(rc).name   = floatingpm(p).name;
             spec.sess(r).regress(rc).val    = x(:,2); 
@@ -200,11 +193,13 @@ if docon
         if repl_tag, repl_choice = 'repl'; else repl_choice = 'none'; end
         if strcmpi(contrasts(c).type, 'T')
             matlabbatch{3}.spm.stats.con.consess{c}.tcon.name = contrasts(c).name;
-            matlabbatch{3}.spm.stats.con.consess{c}.tcon.weights = contrasts(c).weights;
+            matlabbatch{3}.spm.stats.con.consess{c}.tcon.weights = contrasts(c).weights; % SPM12
+            matlabbatch{3}.spm.stats.con.consess{c}.tcon.convec = contrasts(c).weights; % SPM8
             matlabbatch{3}.spm.stats.con.consess{c}.tcon.sessrep = repl_choice;
         else
             matlabbatch{3}.spm.stats.con.consess{c}.fcon.name = contrasts(c).name;
-            matlabbatch{3}.spm.stats.con.consess{c}.fcon.weights = contrasts(c).weights;
+            matlabbatch{3}.spm.stats.con.consess{c}.fcon.weights = contrasts(c).weights; % SPM12
+            matlabbatch{3}.spm.stats.con.consess{c}.fcon.convec = contrasts(c).weights; % SPM8
             matlabbatch{3}.spm.stats.con.consess{c}.fcon.sessrep = repl_choice;
         end
     end

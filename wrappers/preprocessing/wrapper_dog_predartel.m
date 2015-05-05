@@ -11,6 +11,7 @@ append2jobname      = 'RA0904_SURF1';
 
 % | paths for relevant folders
 path.study  = '/Users/bobspunt/Documents/fmri/dog';
+if regexp(pwd,'/home/spunt'), path.study = regexprep(path.study, '/Users/bobspunt/Documents/fmri', '/home/spunt/data'); end
 path.qa     = fullfile(path.study, '_notes_', 'qa');
 if ~exist(path.qa, 'dir'), mkdir(path.qa); end
 

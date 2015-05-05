@@ -1,10 +1,7 @@
-function bspm_img2nii(in, rmtag)
+function bspm_img2nii(in, varargin)
 % BSPM_IMG2NII
 %
-%   USAGE: bspm_img2nii(in, rmtag)
-%       
-%       in  =  array of images OR wildcard pattern for finding them
-%       rmtag = flag to delete old image, 0=No (default), 1=Yes 
+%   USAGE: bspm_img2nii(in, varargin)
 %
 
 % ----------------------- Copyright (C) 2014 -----------------------
@@ -13,23 +10,32 @@ function bspm_img2nii(in, rmtag)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<1, disp('USAGE: bspm_img2nii(in)'); return; end
-if nargin<2, rmtag = 0; end
-if ~iscell(in) & strfind(in,'*'); in = files(in); end
+def = { ... 
+	'keeporiginal',     0,  ...
+	'compress',         0,  ...
+	};
+vals = setargs(def, varargin);
+if nargin < 1, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
+if ~iscell(in) && strfind(in,'*'); in = files(in); end
 if ischar(in), in = cellstr(in); end
-
-%% just a test
-
+fprintf('\nIMG -> NII for %d files\n', length(in)); 
 for i = 1:length(in)
     
-    hdr = spm_vol(in{i});
-    img = spm_read_vols(hdr);
-    oldname = hdr.fname;
-    [p n e] = fileparts(oldname);
-    hdr.fname = [p filesep n '.nii'];
-    if rmtag, delete([n '*']); end
-    spm_write_vol(hdr, img);
+    [pat,nam,ext] = fileparts(in{i});
+    if ~exist(fullfile(pat, [nam '.hdr']))
+        fprintf('%s: NO HDR FILE FOUND, DELETING: %s\n', printcount(i, length(in)), in{i});
+        delete(in{i});
+        continue
+    end
+    fprintf('%s: %s\n', printcount(i, length(in)), in{i});
+    nii = nii_tool('load', in{i});
+    outname = fullfile(pat, [nam '.nii']); 
+    if compress, outname = [outname '.gz']; end
+    nii_tool('save', nii, outname);
+    if ~keeporiginal
+        delete(in{i}); 
+        delete(fullfile(pat, [nam '.hdr'])); 
+    end
     
 end
 

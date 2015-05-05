@@ -39,7 +39,7 @@ for r = 1:nroi
     effsize = nanmean(con(roi(:,r)>0)); 
     effvar  = nanmean(var(roi(:,r)>0));
     str = sprintf('Effect Size = %2.4f, Variance = %2.4f', effsize, effvar); 
-    disp(printmsg(str, roiname))
+    disp(printmsg(str, 'msgtitle', roiname))
     for nsub = nrange
         c_x     = ones(nsub,1);
         c_con   = 1; 

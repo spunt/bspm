@@ -1,7 +1,7 @@
 function img = dicm_img(s, xpose)
-% img = dicm_img(metaStructOrFilename, xpose);
+% Read image of a dicom file.
 % 
-% DICM_IMG reads image from a dicom file.
+% img = dicm_img(metaStructOrFilename, xpose);
 % 
 % The mandatory first input is the dicom file name, or the struct returned by
 % dicm_hdr. The output keeps the data type in dicom file.
@@ -33,6 +33,7 @@ function img = dicm_img(s, xpose)
 % 150109 Transpose img by default. dicm2nii needs xpose=0 to avoid transpose.
 % 150115 SamplesPerPixel>1 works: put it as dim3, and push rest to dim4.
 % 150211 dim3 reserved for RGB, even if SamplesPerPixel=1 (like dicomread). 
+% 150404 Add 'if' block for numeric s.PixelData (BVfile). 
 
 persistent flds dict;
 if isempty(flds)
@@ -45,6 +46,11 @@ if ischar(s), [s, err] = dicm_hdr(s, dict); end % input is file name
 if isempty(s), error(err); end
 if isfield(s, 'SamplesPerPixel'), spp = double(s.SamplesPerPixel);
 else spp = 1;
+end
+
+if isnumeric(s.PixelData) % data already in hdr
+    img = s.PixelData;
+    return;
 end
 
 if all(isfield(s, {'BitsStored' 'HighBit'})) && s.BitsStored ~= s.HighBit+1

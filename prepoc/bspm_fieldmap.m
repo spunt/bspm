@@ -24,7 +24,8 @@ function matlabbatch = bspm_fieldmap(mag, phase, epi, epi_rot, varargin)
 %
 %	$Revision Date: Aug_20_2014
 if nargin<4, disp('USAGE: matlabbatch = bspm_fieldmap(mag, phase, epi, epi_rot, varargin)'); return; end
-def = { 'ets',          [], ...
+def = { 'ets',          [2.55 5.01], ...
+        'writeunwarped', 0, ...
         'blip',         -1, ...
         'jacob',        0, ...
         'method',       'Mark3D'};
@@ -78,7 +79,7 @@ else
 end
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.matchvdm = 1;
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.sessname = 'run';
-matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.writeunwarped = 1;
+matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.writeunwarped = writeunwarped;
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.anat = '';
 matlabbatch{1}.spm.tools.fieldmap.presubphasemag.subj.matchanat = 0;
 

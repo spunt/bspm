@@ -1,5 +1,5 @@
 function varargout = sort_dicm(srcDir)
-% SORT_DICM sorts dicom files for different subjects into subject folders. 
+% Sort dicom files for different subjects into subject folders. 
 % 
 % subjects = SORT_DICM(dicmFolder);
 % The optional input is the top folder containing dicom file and/or subfodlers

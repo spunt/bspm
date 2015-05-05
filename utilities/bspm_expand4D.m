@@ -3,15 +3,26 @@ function fn = bspm_expand4D(fn4D)
 %   USAGE: fn = bspm_expand4D(fn4D)
 %
 if nargin<1, error('USAGE: fn = bspm_expand4D(fn4D)'); end
-if iscell(fn4D), fn4D = char(fn4D); end
-[pcim, ncim, ecim] = fileparts(fn4D);
-if strcmp(ecim, '.gz')
-    gunzip(fn4D); 
-    fn4D = fullfile(pcim, ncim); 
+if ischar(fn4D), fn4D = cellstr(fn4D); end
+fn      = [];
+fn4D    = regexprep(fn4D, ',\d+$', '');
+[pcim, ncim, ecim] = cellfun(@fileparts, fn4D, 'unif', false); 
+for i = 1:length(fn4D)
+    
+    % | If compressed, try to decompress
+    if strcmp(ecim{i}, '.gz')
+        try
+            pigz(fn4D{i})
+        catch
+            gunzip(fn4D{i});
+        end
+        fn4D = cellstr(fullfile(pcim{i}, ncim{i}));  
+    end
+    nii     = nifti(fn4D{i}); 
+    nvol    = size(nii.dat, 4); 
+    append  = cellfun(@num2str, num2cell(1:nvol)', 'Unif', false);
+    fn      = [fn; strcat(fn4D{i}, {','}, append)]; 
 end
-nvol    = length(spm_vol(fn4D)); 
-append  = cellfun(@num2str, num2cell(1:nvol)', 'Unif', false);
-fn      = strcat(fn4D, {','}, append);
 end
  
  

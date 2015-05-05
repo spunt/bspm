@@ -3,9 +3,13 @@ function ref = bspm_dicomref(filepat)
 %
 %   USAGE: ref = bspm_dicomref(filepat)
 %
-pdir    = pwd; 
-[a,b]   = regexpi(pdir, 'Matlab');
-pdir    = pdir(1:b); 
-ref     = files(fullfile(pdir, 'dicom_refs', filepat));
+%         amy_2pt5
+%         conte
+%         lois
+%         surf
+% 
+if nargin==0, disp('USAGE: ref = bspm_dicomref(filepat)'); end
+bdir    = fileparts(whichdir('spm.m')); 
+ref     = files(fullfile(bdir, 'dicom_refs', filepat));
 end
  

@@ -45,7 +45,7 @@ pmnames         = regexprep(covnames(covidx), '_', '');
 pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
 analysisname    = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
-printmsg(analysisname, 'Analysis Name');
+printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
 % | IMAGING PARAMETERS
 % | ========================================================================
@@ -64,12 +64,12 @@ for s = 1:length(subdir)
     % | Check Subject and Define Folders
     % | ========================================================================
     rundir      = files([subdir{s} filesep 'raw' filesep runid]);
-    if isempty(rundir), printmsg('Valid run directory not found, moving on...', subnam{s}); continue; end
+    if isempty(rundir), printmsg('Valid run directory not found, moving on...', 'msgtitle', subnam{s}); continue; end
     analysisdir = fullfile(subdir{s}, 'analysis', analysisname); 
     if any([exist(fullfile(analysisdir, 'mask.img'), 'file') exist(fullfile(analysisdir, 'mask.nii'), 'file')])
-        printmsg('Level 1 job probably already estimated, moving on...', subnam{s}); continue; 
+        printmsg('Level 1 job probably already estimated, moving on...', 'msgtitle', subnam{s}); continue; 
     end
-    printmsg(sprintf('Building Level 1 Job for %d Runs', length(rundir)), subnam{s}); 
+    printmsg(sprintf('Building Level 1 Job for %d Runs', length(rundir)), 'msgtitle', subnam{s}); 
 
     % | Behavioral and Nuisance Regressor Files
     % | ========================================================================

@@ -1,4 +1,4 @@
-function out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outname)
+function out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outname, doposneg, ndilate)
 % BSPM_THRESHOLD_IMAGE
 %
 % USAGE: out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outname)
@@ -19,11 +19,12 @@ function out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outna
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
+if nargin<6, doposneg = 0; end
 if nargin<5, outname = []; end; 
 if nargin<4, binflag = 0; end;
-if nargin<3, disp('USAGE: out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outname)'); return; end
+if nargin<3, disp('USAGE: out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outnamem, doposneg)'); return; end
 if iscell(in), in = char(in); end;
+if nargin<7, ndilate = 0; end
 
 
 % load images
@@ -43,8 +44,14 @@ if ismember(heightThresh,[.10 .05 .01 .005 .001 .0005 .0001]);
     df = str2num(tmp(idx1+1:idx2-1));
     heightThresh = bob_p2t(heightThresh, df);
 end
-in(in<heightThresh) = NaN;
 in(in==0)=NaN;
+in0 = in; 
+if doposneg
+    in(abs(in) < heightThresh) = NaN;
+else
+    in(in<heightThresh) = NaN;
+end
+
 
 % grab voxels
 % ------------------------------------------------------
@@ -60,8 +67,18 @@ cl_vox      = voxels(:, any(cl_pass, 2));
 cl_idx      = sub2ind(imdims, cl_vox(1,:), cl_vox(2,:), cl_vox(3,:)); 
 out         = nan(size(in)); 
 out(cl_idx) = in(cl_idx);
-if binflag, out = out>0; else out(out==0) = NaN; end
-
+m = double(~isnan(out));
+if ndilate
+    kernel = cat(3,[0 0 0; 0 1 0; 0 0 0],[0 1 0; 1 1 1; 0 1 0],[0 0 0; 0 1 0; 0 0 0]);
+    for i = 1:ndilate, m = spm_dilate(m, kernel); end
+    out = in0; 
+    out(m~=1) = NaN; 
+end
+if binflag
+    out =  m; 
+else
+    out(out==0) = NaN; 
+end
 if ~isempty(outname)
     
     h = in_hdr;

@@ -22,16 +22,21 @@ def = { 'dvars_thresh',     2.5,  ...
         'include_rp',       1,    ...
         'maskfile',         []};
 vals = setargs(def, varargin);
-if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end 
+if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
+
+% | get data and apply implicit masking
+if ischar(epi), epi = cellstr(epi); end
+fprintf('\n | - Loading Data'); 
+cfg.plot            = 0; 
+if isempty(maskfile)
+    cfg.vol     = bspm_read_vol(epi, 'implicit');
+else
+    cfg.vol     = bspm_read_vol(epi, 'mask', maskfile); 
+end
 
 % | create output filename
-if ischar(epi), epi = cellstr(epi); end
 outfile     = sprintf('badscan_dvars%dframewise%d_%s.txt', dvars_thresh*100, framewise_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
-nvol        = length(epi);
-if nvol==1
-   epi      = bspm_expand4D(epi); 
-   nvol     = length(epi); 
-end
+nvol        = size(cfg.vol, 4); 
 epidir      = fileparts(epi{1});
 
 % | motion parameters
@@ -39,15 +44,6 @@ rp                  = load(char(files(fullfile(epidir, 'rp_*txt'))));
 rp(:,4:6)           = rp(:,4:6)*57.3;
 framewise           = zeros(nvol,1);
 framewise(2:end)    = max(abs(diff(rp)), [], 2);
-
-% | get data and apply implicit masking
-fprintf('\n | - Loading Data for %d Volumes', nvol); 
-cfg.plot            = 0; 
-if isempty(maskfile)
-    cfg.vol     = bspm_read_vol(epi, 'implicit');
-else
-    cfg.vol     = bspm_read_vol(epi, 'mask', maskfile); 
-end
 
 % | use BRAMILA tools to compute dvars and framewise displacement
 fprintf('\n | - Identifying Scans with DVARS > %2.2f and framewise displacement > %2.2f', dvars_thresh, framewise_thresh);
@@ -58,12 +54,13 @@ zdvars          = oneoutzscore(dvars(2:end), 1);
 badidx          = zeros(nvol, 2);
 badidx(2:end,1) = zdvars > dvars_thresh; 
 badidx(:,2)     = framewise > framewise_thresh;
-badidx          = any(badidx, 2); 
-tsinfo.pctbad   = round(100*(sum(badidx)/nvol));
-fprintf('\n | - %d (%d%%) scans identified as bad', sum(badidx), tsinfo.pctbad);
+badidx          = find(any(badidx, 2));
+nbad            = length(badidx); 
+tsinfo.pctbad   = round(100*(nbad/nvol));
+fprintf('\n | - %d (%d%%) scans identified as bad', nbad, tsinfo.pctbad);
 
 % | create bad volume regressor
-scrubmat = zeros(nvol, sum(badidx)); 
+scrubmat = zeros(nvol, nbad); 
 for i = 1:length(badidx), scrubmat(badidx(i),i) = 1; end
 if include_rp==1, scrubmat = [rp scrubmat]; end
 

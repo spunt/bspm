@@ -16,7 +16,6 @@ function bspm_dilate_roi(in, size)
 
 if nargin < 1, disp('USAGE: bspm_dilate_roi(in, size)'); return; end
 if nargin < 2, size = 1; end
-if ~iscell(in) && strfind(in,'*'); in = files(in); end
 if ischar(in), in = cellstr(in); end
 
 for i = 1:length(in)

@@ -14,8 +14,10 @@ function out = bspm_autobrightness(in, nowrite)
 % __________________________________________________________________________
 if nargin < 1, disp('USAGE: out = bspm_autobrightness(in, *lim, *nowrite)	*optional input'); return; end
 if nargin < 2, nowrite = 0; end
-lim = 0.5; 
-[in,h] = bspm_read_vol(in);
+lim = 0.5;
+if iscell(in), in = char(in); end
+h       = spm_vol(in);
+in      = spm_read_vols(h);
 dat.min = min(in(in>0)); 
 dat.max = max(in(in>0));
 dat.dim = size(in); 

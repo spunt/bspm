@@ -21,7 +21,7 @@ elseif iscell(outname)
     outname = char(outname);
 end
 [pat,nam,ext] = fileparts(outname);
-outname = fullfile(pat, nam, '.nii'); 
+outname = fullfile(pat, [nam '.nii']); 
 if compress, outname = [outname '.gz']; end
 nii = struct('img', img, 'hdr', hdr); 
 nii_tool('save', nii, outname); 

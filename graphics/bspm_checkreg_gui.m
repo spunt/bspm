@@ -237,14 +237,7 @@ function checkreg(F, images, xyz, title)
     w  = 1/n;
     h  = 1/m;
     ds = (w+h)*0.02;
-    if nargin==4
-        if mn==2, 
-            set(get(gca,'Title'), 'String', title, 'FontSize', 24, 'FontName', 'Arial', 'FontWeight', 'Bold', 'Position', [0.6 0.5]); 
-        elseif mn>2,
-            set(get(gca,'Title'), 'String', title, 'FontSize', 24, 'FontName', 'Arial', 'FontWeight', 'Bold', 'HorizontalAlignment', 'Center'); 
-        end
-        axis off; 
-    end
+    
     for ij=1:mn
         i = 1-h*(floor((ij-1)/n)+1);
         j = w*rem(ij-1,n);
@@ -261,7 +254,22 @@ function checkreg(F, images, xyz, title)
         end
     end
     spm_orthviews('Reposition', xyz); 
-    set(findobj(gcf, 'type', 'line'), 'color',[0.7020    0.8039    0.8902], 'linewidth', 1);  
+    set(findobj(gcf, 'type', 'line'), 'color',[0.7020    0.8039    0.8902], 'linewidth', 1);
+%     spm_orthviews('Xhairs','off')
+    spm_orthviews('Zoom', 0)
+    
+    if nargin==4
+        hax = findobj(gcf, 'type', 'axes'); 
+        if mn==2, 
+            set(get(gca,'Title'), 'String', title, 'FontSize', 32, 'FontName', 'Arial', 'FontWeight', 'Bold', 'Position', [0.6 0.5]);
+        elseif mn==1
+            set(get(hax(3), 'title'), 'units', 'norm', 'string', title, 'Position', [1.66 0.50], 'FontSize', 60, 'FontName', 'Arial', 'horiz', 'center', 'vert', 'middle'); 
+        else
+            set(get(gca,'Title'), 'String', title, 'FontSize', 32, 'FontName', 'Arial', 'FontWeight', 'Bold', 'HorizontalAlignment', 'Center'); 
+        end
+        
+        axis off;
+    end
 end 
  
  

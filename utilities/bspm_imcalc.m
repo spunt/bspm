@@ -46,20 +46,18 @@ function [] = bspm_imcalc(in, outname, operation)
 
 if nargin<3, disp('USAGE: bspm_imcalc(in, outname, operation)'); return, end
 
-% check variable formats
+% | check variable formats
 if ischar(in), in = cellstr(in); end
 if iscell(operation), operation = char(operation); end
     
-% read in data
-for i = 1:length(in)
-    hdr{i} = spm_vol(in{i});
-    im(:,:,:,i) = spm_read_vols(hdr{i});
-end
+% | read in data
+% [im, hdr] = bnii_read(in);
+[im, hdr] = bspm_read_vol(in);
+if size(hdr)>1, hdr = hdr(1); end
 
-% apply the operation
+% | apply the operation
 tag = 0;
-operation = lower(operation);
-switch operation
+switch lower(operation)
     case {'prod'}
         outim = eval([operation '(im,4);']);
     case {'sum', 'mean', 'median'}
@@ -86,9 +84,9 @@ switch operation
             outim(idx) = i;
         end
     case {'zscore'}
-        i1 = strfind(hdr{1}.descrip,'[');
-        i2 = strfind(hdr{1}.descrip,']');
-        df = str2num(hdr{1}.descrip(i1+1:i2-1));
+        i1 = strfind(hdr.descrip,'[');
+        i2 = strfind(hdr.descrip,']');
+        df = str2num(hdr.descrip(i1+1:i2-1));
         outim = im; 
         outim(abs(outim) > 0) = bob_t2z(outim(abs(outim) > 0),df);
         outim(outim==Inf) = max(outim(outim~=Inf))*1.01;
@@ -110,20 +108,19 @@ switch operation
 end
 
 % construct outname and write image
-h = hdr{1};
-h.fname = outname;
 if ~tag
-    tmp = h.descrip;
+    tmp = hdr.descrip;
     idx = regexp(tmp,'SPM{T','ONCE');
     if ~isempty(idx)
         tmp(regexp(tmp,'-')+2:end) = [];
-        h.descrip = [tmp upper(operation) ' IMAGE'];
+        hdr.descrip = [tmp upper(operation) ' IMAGE'];
     else
-        h.descrip = [upper(operation) ' IMAGE'];
+        hdr.descrip = [upper(operation) ' IMAGE'];
     end
 end
-spm_write_vol(h,outim);
-    
+hdr.fname = outname; 
+spm_write_vol(hdr, outim); 
+% bnii_write(outim, hdr, 'outname', outname)    
  
  
  

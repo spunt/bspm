@@ -1,5 +1,5 @@
-function matlabbatch = wrapper_level1(covidx, varargin)
-% matlabbatch = wrapper_level1(covidx, varargin)
+function matlabbatch = wrapper_level1_vmpfc(covidx, varargin)
+% matlabbatch = wrapper_level1_vmpfc(covidx, varargin)
 %
 % To show default settings, run without any arguments.
 %
@@ -12,20 +12,22 @@ function matlabbatch = wrapper_level1(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'HPF',              128,            ...
-            'armethod',         1,              ... 
+            'HPF',              100,            ...
+            'armethod',         2,              ... 
             'nuisancepat',      'bad*txt',      ...
-            'epipat',           'lswbua*nii',   ...
-            'subid',            'RA*',          ...
-            'runid',            'EP*LOIS*',     ...
-            'behavid',          'loi*mat',      ...
-            'basename',         'LOIS',         ...
+            'epipat',           'lsw*nii*',     ...
+            'subid',            'CC*',         ...
+            'runid',            'EP*LOI*',    ...
+            'behavid',          'loi_sb*mat',   ...
+            'basename',         'LOI2',         ...
             'brainmask',        '',             ...
-            'model',            '2x3',          ...
-            'fcontrast',        1,              ...
+            'model',            '1X2',          ...
+            'fcontrast',        0,              ...
             'nskip',            2,              ...
             'runtest',          0,              ...
-            'is4D',             1               ...
+            'is4D',             1,              ...
+            'TR',               2.5,            ...
+            'yesnokeys',        [2 3]           ...
              };
 vals = setargs(defaults, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
@@ -33,23 +35,26 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
 % | ===========================================================================
-studydir = '/Users/bobspunt/Documents/fmri/lois';
-if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/lois'; end
+studydir = '/Users/bobspunt/Documents/fmri/vmpfc';
+if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/vmpfc'; end
 [subdir, subnam] = files([studydir filesep subid]);
 
 % | ANALYSIS NAME
 % | ===========================================================================
 armethodlabels  = {'NoAR1' 'AR1' 'WLS'};
 covnames        = {'Duration' 'Errors' 'FoilErrors'};
-pmnames         = regexprep(covnames(covidx), '_', '');
-pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
-analysisname    = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
+if ~isempty(covidx)
+    pmnames         = regexprep(covnames(covidx), '_', '');
+    pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
+else
+    pmstr = 'None'; 
+end
+analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
-printmsg(analysisname, 'Analysis Name');
+printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
 % | IMAGING PARAMETERS
 % | ========================================================================
-TR              = 2.5; 
 adjons          = TR*nskip;
                                     
 % | RUNTIME OPTIONS
@@ -64,12 +69,12 @@ for s = 1:length(subdir)
     % | Check Subject and Define Folders
     % | ========================================================================
     rundir      = files([subdir{s} filesep 'raw' filesep runid]);
-    if isempty(rundir), printmsg('Valid run directory not found, moving on...', subnam{s}); continue; end
+    if isempty(rundir), printmsg('Valid run directory not found, moving on...', 'msgtitle', subnam{s}); continue; end
     analysisdir = fullfile(subdir{s}, 'analysis', analysisname); 
     if any([exist(fullfile(analysisdir, 'mask.img'), 'file') exist(fullfile(analysisdir, 'mask.nii'), 'file')])
-        printmsg('Level 1 job probably already estimated, moving on...', subnam{s}); continue; 
+        printmsg('Level 1 job probably already estimated, moving on...', 'msgtitle', subnam{s}); continue; 
     end
-    printmsg(sprintf('Building Level 1 Job for %d Runs', length(rundir)), subnam{s}); 
+    printmsg(sprintf('Building Level 1 Job for %d Runs', length(rundir)),'msgtitle', subnam{s}); 
 
     % | Behavioral and Nuisance Regressor Files
     % | ========================================================================
@@ -87,7 +92,7 @@ for s = 1:length(subdir)
         if isempty(images{r})
             error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); 
         end
-        b = get_behavior(behav{r}, model);
+        b = get_behavior(behav{r}, model, yesnokeys);
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
         
         % | Columns for b.blockwise
@@ -109,16 +114,18 @@ for s = 1:length(subdir)
         
         % | Floating Parametric Modulators
         % | =====================================================================
-        allpm           = b.blockwise(:,4:6);
-        modelpm         = allpm(:,covidx);
-        modelpmnames    = pmnames; 
-        novaridx = find(nanstd(modelpm)==0);
-        if ~isempty(novaridx), modelpm(:,novaridx) = []; modelpmnames(novaridx) = []; end
-        for p = 1:length(modelpmnames)
-            runs(r).floatingpm(p).name = modelpmnames{p};
-            runs(r).floatingpm(p).onsets = b.blockwise(:,3); 
-            runs(r).floatingpm(p).durations = b.blockwise(:,4); 
-            runs(r).floatingpm(p).values = modelpm(:,p);
+        if ~isempty(covidx)
+            allpm           = b.blockwise(:,4:6);
+            modelpm         = allpm(:,covidx);
+            modelpmnames    = pmnames; 
+            novaridx = find(nanstd(modelpm)==0);
+            if ~isempty(novaridx), modelpm(:,novaridx) = []; modelpmnames(novaridx) = []; end
+            for p = 1:length(modelpmnames)
+                runs(r).floatingpm(p).name = modelpmnames{p};
+                runs(r).floatingpm(p).onsets = b.blockwise(:,3); 
+                runs(r).floatingpm(p).durations = b.blockwise(:,4); 
+                runs(r).floatingpm(p).values = modelpm(:,p);
+            end
         end
         
     end
@@ -144,8 +151,11 @@ for s = 1:length(subdir)
     % | ========================================================================
     ncond   = length(b.condlabels);
     w1      = eye(ncond);
-    w2      = [ 1 0 0 -1 0 0; 0 1 0 0 -1 0; 0 0 1 0 0 -1; -.5 .5 0 .5 -.5 0; ...
-                -.5 0 .5 .5 0 -.5; -.5 .5 0 -.5 .5 0; -.5 0 .5 -.5 0 .5];
+    if ncond==2
+        w2 = [1 -1]; 
+    else
+        w2 = [.5 .5 -.5 -.5; .5 -5 .5 -.5];
+    end
     weights = [w1; w2]; 
     ncon    = size(weights,1);
     for c = 1:ncon
@@ -172,7 +182,7 @@ end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, opt)
+function b = get_behavior(in, opt, yesnokeys)
 % GET_BEHAVIOR
 %
 %   USAGE: b = get_behavior(in, opt)
@@ -191,10 +201,11 @@ function b = get_behavior(in, opt)
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
 % =========================================================================
-if nargin < 1, error('USAGE: b = get_behavior(in, opt)'); end
+if nargin < 1, error('USAGE: b = get_behavior(in, opt, yesnokeys)'); end
 if nargin < 2, opt = '2x2'; end
+if nargin < 3, yesnokeys = [1 2]; end
 if iscell(in), in = char(in); end
- 
+
 % | read data
 % | ========================================================================
 d = load(in);
@@ -202,16 +213,16 @@ b.subjectID = d.subjectID;
 if ismember({'result'},fieldnames(d))
     data        = d.result.trialSeeker;
     blockwise   = d.result.blockSeeker; 
-    items       = d.result.preblockcues(d.result.blockSeeker(:,4));
 else
     data        = d.trialSeeker;
     blockwise   = d.blockSeeker; 
-    items       = d.ordered_questions;
 end
 
 % | blockwise accuracy and durations
 % | ========================================================================
 ntrials         = length(data(data(:,1)==1,1));
+data(data(:,8)==yesnokeys(1), 8) = 1; 
+data(data(:,8)==yesnokeys(2), 8) = 2; 
 data(:,10)      = data(:,4)~=data(:,8); % errors
 data(data(:,8)==0, 7:8) = NaN; % NR to NaN
 blockwise(:,3)  = data(data(:,2)==1, 6);
@@ -226,15 +237,22 @@ end
 
 % | re-code data
 % | ========================================================================
-con = blockwise(:,2);
-switch opt
-    case {'2x3'}
-        b.condlabels = {'Why_NS' 'Why_Face' 'Why_Hand' 'How_NS' 'How_Face' 'How_Hand'};
-    case {'2x3to2x2'}
-        b.condlabels = {'WhyFace' 'WhyHand' 'HowFace' 'HowHand'};
-        blockwise(ismember(con,[2 3]), 2)       = 2;
-        blockwise(con==4, 2)                    = 3;
-        blockwise(ismember(con,[5 6]), 2)       = 4;
+con     = blockwise(:,2);
+condata = data(:,3); 
+switch lower(opt)
+    case {'2x2'}
+        b.condlabels = {'Why_Face' 'Why_Hand' 'How_Face' 'How_Hand'};
+    case {'1x2'}
+        b.condlabels = {'Why' 'How'};
+        blockwise(con==2, 2)                    = 1;
+        data(condata==2, 3)                     = 1; 
+        blockwise(ismember(con,[3 4]), 2)       = 2;
+        data(ismember(condata,[3 4]), 3)        = 2; 
+end
+for i = 1:length(unique(data(:,3)))
+    cdata = data(data(:,3)==i, [7 10]);
+    b.accuracy(i)  = 100*(sum(cdata(:,2)==0)/size(cdata,1));
+    b.rt(i)        = nanmean(cdata(:,1)); 
 end
 b.blockwise = blockwise;
 b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Total_Errors' 'Foil_Errors'};  

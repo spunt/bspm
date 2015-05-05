@@ -20,7 +20,7 @@ if ischar(fname3d), fname3d = cellstr(fname3d); end
 
 % | Find Them! 
 % | ========================================================================
-[fpath, fname4d] = cellfun(@fileparts, fname3d, 'unif', false); 
+[fpath, fname4d] = cellfun(@fileparts, fname3d, 'unif', false);
 fname4d     = regexp(fname4d, delimiter, 'split');
 nelem       = length(fname4d{1});  
 fname4d     = [fname4d{:}]; 
@@ -28,7 +28,7 @@ fname4d     = reshape(fname4d, nelem, length(fname3d))';
 uname       = zeros(nelem, 1); 
 for i = 1:nelem, uname(i) = length(unique(fname4d(:,i))); end
 fname4d     = fname4d(1, uname==1);
-fname4d     = strcat(fname4d, '-');
-fname4d     = strcat(fname4d{:}, '4D.nii');
+fname4d     = strcat(fname4d, '_');
+fname4d     = strcat(fname4d{:}, sprintf('T%d_4D.nii', length(fname3d)));
 if addgz, fname4d = [fname4d '.gz']; end
 fname4d     = fullfile(fpath{1}, fname4d); 

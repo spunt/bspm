@@ -21,11 +21,13 @@ function matlabbatch = bspm_level2_ostt(cons, varargin)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-def = { 'outdir',       [],     ... 
+def = { 'outdir',       [],     ...
+        'tag',          [],     ...
         'implicit',     1,      ...
         'mask',         '',     ...
         'pctgroup',     [],     ...
         'viewit',       0,      ...
+        'negativecon',  0,      ...
         'nan2zero',     0 };
 vals = setargs(def, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
@@ -50,8 +52,12 @@ if isempty(outdir)
     
     % | Analysis Name
     [p, level1name]  = fileparts(fileparts(cons{1})); 
-    gadir       = fullfile(parentpath(cons), '_groupstats_', level1name); 
-    gasubdir    = fullfile(gadir, sprintf('OSTT_N=%d_%s_%s', length(cons), mtag, bspm_timestamp(1)));
+    gadir       = fullfile(parentpath(cons), '_groupstats_', level1name);
+    if tag
+        gasubdir    = fullfile(gadir, sprintf('OSTT_%s_N=%d_%s_%s', tag, length(cons), mtag, bspm_timestamp(1)));
+    else
+        gasubdir    = fullfile(gadir, sprintf('OSTT_N=%d_%s_%s', length(cons), mtag, bspm_timestamp(1)));
+    end
     outdir      = fullfile(gasubdir, cname);
 
     % | Make Directories
@@ -100,10 +106,14 @@ matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
 matlabbatch{3}.spm.stats.con.spmmat{1} = fullfile(outdir,'SPM.mat');
 matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = 'Positive';
 matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = 1;
+matlabbatch{3}.spm.stats.con.consess{1}.tcon.convec = 1;
 matlabbatch{3}.spm.stats.con.consess{1}.tcon.sessrep = 'none';
-matlabbatch{3}.spm.stats.con.consess{2}.tcon.name = 'Negative';
-matlabbatch{3}.spm.stats.con.consess{2}.tcon.weights = -1;
-matlabbatch{3}.spm.stats.con.consess{2}.tcon.sessrep = 'none';
+if negativecon
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.name = 'Negative';
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.weights = -1;
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.convec = -1;
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.sessrep = 'none';
+end
 matlabbatch{3}.spm.stats.con.delete = 1;
 
 % | RUN IF NO OUTPUT ARGS SPECIFIED

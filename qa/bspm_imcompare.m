@@ -34,7 +34,7 @@ if ischar(in), in = cellstr(in); end
 % read in data
 for i = 1:length(in)
     
-    tmp = bob_reslice(in{i},in{1},1,1);
+    tmp = bspm_reslice(in{i},in{1},1,1);
     tmp(tmp==0) = NaN;
     mim(:,i) = tmp(:);
     tmp = (tmp(:)/max(tmp(:)));

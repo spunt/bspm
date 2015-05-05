@@ -1,7 +1,7 @@
-function matlabbatch = bspm_convert_dcm(subdirs, dcmdirpat)
+function bspm_convert_dcm(subdirs, varargin)
 % BSPM_CONVERT_DCM
 %
-% USAGE: matlabbatch = bspm_convert_dcm(subdirs, dcmdirpat)
+% USAGE: bspm_convert_dcm(subdirs, varargin)
 %
 %   subdirs = paths to subject folders containing dicom directory
 %
@@ -12,48 +12,56 @@ function matlabbatch = bspm_convert_dcm(subdirs, dcmdirpat)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: bspm_convert_dcm(subdirs, dcmdirpat)'); return; end
-if nargin<2, dcmdirpat = '*'; end
+def = { ...
+    'dcmdirpat',        '*', ...
+	'do3dto4d',         0,	...
+	'omitfirstN',		0,	...
+    'outputdir',        'raw', ...
+    'adddirs',          {'analysis' 'behav'} ...
+	};
+vals = setargs(def, varargin);
+if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
 if ischar(subdirs), subdirs = cellstr(subdirs); end
 nsubs = length(subdirs);
-count = 0; 
 for sub = 1:nsubs
 
     subDIR          = subdirs{sub};
     [p, subnam, e]  = fileparts(subDIR);
-    tmp = files([subDIR filesep dcmdirpat], 'dironly', 1);
-    [p, n, e] = fileparts(char(tmp));
-    if ~strcmp(n,'dicom'), movefile(tmp{1},[subDIR filesep 'dicom']); end
-    dirnames = {'raw' 'analysis' 'notes' 'behav'};
-    for i = 1:length(dirnames), mkdir([subDIR filesep dirnames{i}]); end
-    dicomDIR    = fullfile(subDIR, 'dicom');
-    dothese     = files(fullfile(dicomDIR, '*'));
+    fprintf('\n| Working on: %s', subnam);
+    alldcm          = files(fullfile(subDIR, '**', '*dcm'));
+    if isempty(alldcm)
+        fprintf('\n!!! COULD NOT FIND .DCM FILES FOR THIS SUBJECT, MOVING ON !!!'); 
+        continue
+    end
+    [dothese, ia, ic] = unique(cellfun(@fileparts, alldcm, 'unif', false));
+    fprintf('\n| Running DICM2NII on %d dicom folders\n', length(dothese));
+    disp(dothese);
+    rawDIR = fullfile(subDIR, 'raw'); mkdir(rawDIR); 
+    fprintf('| Output directory: %s\n', rawDIR);
     for s = 1:length(dothese)
-
-        currentDIR = dothese{s};
-        dicomfiles = files([currentDIR filesep '*.dcm']);
-        if isempty(dicomfiles), dicomfiles = files([currentDIR filesep '*']); end
-        dcmref  = dicomfiles{floor(length(dicomfiles)/2)}; 
-        dcminfo = bspm_get_dicom_info(dcmref, 0); 
-        outputDIR = fullfile(subDIR, 'raw', sprintf('%s_%s_%02d', dcminfo.sequenceinfo.type(1:2), dcminfo.sequenceinfo.name, dcminfo.sequenceinfo.order));
-        mkdir(outputDIR);
-        copyfile(dcmref, fullfile(outputDIR, 'dicom_reference.dcm'));
-        if strcmpi(dcminfo.sequenceinfo.type(1:2), 'EP')
-            save(fullfile(outputDIR, 'dicom_info.mat'), 'dcminfo');
-        end
         
-        % | Job
-        count = count + 1; 
-        matlabbatch{count}.spm.util.import.dicom.data = cellstr(dicomfiles);
-        matlabbatch{count}.spm.util.import.dicom.root = 'flat';
-        matlabbatch{count}.spm.util.import.dicom.outdir{1} = outputDIR;
-        matlabbatch{count}.spm.util.import.dicom.protfilter = '.*';
-        matlabbatch{count}.spm.util.import.dicom.convopts.format = 'nii';
-        matlabbatch{count}.spm.util.import.dicom.convopts.icedims = 0;
-
-    end;
+        dicomfiles  = alldcm(ic==s); 
+        dcmref      = dicomfiles{floor(length(dicomfiles)/2)}; 
+        dcminfo     = bspm_get_dicom_info(dcmref, 0); 
+        outputDIR   = fullfile(rawDIR, sprintf('%s_%s_%02d', dcminfo.sequenceinfo.type(1:2), dcminfo.sequenceinfo.name, dcminfo.sequenceinfo.order));
+        mkdir(outputDIR);
+        dicm2nii(dothese{s}, outputDIR, 4);
+        if strcmp(dcminfo.sequenceinfo.type, 'EP')
+           nii = files(fullfile(outputDIR, '*nii')); 
+           if omitfirstN, delete(nii{1:omitfirstN}); nii(1:omitfirstN) = []; end
+           if do3dto4d
+               bnii_3dto4d(nii, 'compress', 1, 'delete3d', 1, 'delimiter', '_'); 
+           end
+        end 
+    end
+    
+    % | Change name of parent dicom folder to "dicom"
+    if ~strcmpi(parentpath(dothese), 'dicom'), 
+        movefile(parentpath(dothese), fullfile(subDIR, 'dicom')); 
+    end
+    
+    % | Make Additional Directories
+    for i = 1:length(adddirs), mkdir([subDIR filesep adddirs{i}]); end
 
 end;
-% run
-if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
 end
