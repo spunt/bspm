@@ -14,7 +14,7 @@ function name = bspm_conweights2names(weights, covnames)
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
 if nargin < 2, disp('USAGE: names = bspm_conweights2names(weights, covnames)'); return; end
-if length(weights)~=length(covnames), error('WEIGHTS and COVNAMES must be the same length'); end   
+if size(weights, 2)~=length(covnames), error('WEIGHTS and COVNAMES must be the same length'); end 
 posidx = []; posidx = find(weights>0);
 negidx = []; negidx = find(weights<0);
 if isempty(negidx)

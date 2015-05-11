@@ -74,7 +74,7 @@ end
 % | =======================================================================
 if ~isfield(general_info, 'is4D'), general_info.is4D = 0; end
 if ~isfield(general_info, 'mt_res'), general_info.mt_res = 16; end
-if ~isfield(general_info, 'mt_onset'), general_info.mt_onset = 1; end
+if ~isfield(general_info, 'mt_onset'), general_info.mt_onset = 8; end
 if ~isfield(general_info, 'hrf_derivs'), general_info.hrf_derivs = [0 0]; end
 if ~isfield(general_info, 'maskthresh'), general_info.maskthresh = -Inf; end
 if ~isfield(general_info, 'orth'), general_info.orth = 0; end

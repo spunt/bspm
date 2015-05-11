@@ -53,7 +53,7 @@ if iscell(operation), operation = char(operation); end
 % | read in data
 % [im, hdr] = bnii_read(in);
 [im, hdr] = bspm_read_vol(in);
-if size(hdr)>1, hdr = hdr(1); end
+if length(hdr)>1, hdr = hdr(1); end
 
 % | apply the operation
 tag = 0;

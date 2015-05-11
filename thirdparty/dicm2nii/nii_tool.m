@@ -750,7 +750,7 @@ if err, errorLog(['Error during compression: ' str]); end
 % Deal with pigz/gzip on path or in nii_tool folder, and matlab gzip/gunzip
 function cmd = check_gzip
 % first, try system pigz
-[err, ~] = system('pigz -V 2>&1');
+err = system('pigz -V 2>&1');
 if ~err, cmd = 'pigz -n'; return; end
 
 % next, try pigz included with nii_tool
@@ -772,11 +772,11 @@ elseif ispc % rename back pigz for Windows. Renamed to trick Matlab Central
 end
 
 cmd = fullfile(m_dir, 'pigz -n');
-[err, ~] = system([cmd ' -V 2>&1']);
+err = system([cmd ' -V 2>&1']);
 if ~err, return; end
 
 % Third, try system gzip
-[err, ~] = system('gzip -V 2>&1'); % gzip on system path?
+err = system('gzip -V 2>&1'); % gzip on system path?
 if ~err, cmd = 'gzip -n'; return; end
 
 % Lastly, try to use Matlab gzip/gunzip. Check only one, since they are paired
@@ -806,7 +806,7 @@ if islogical(cmd)
     return;
 end
 
-[~, outName, ext] = fileparts(fname);
+[tmp, outName, ext] = fileparts(fname);
 outName = fullfile(pth, outName);
 copyfile(fname, [outName ext], 'f');
 [err, str] = system([cmd '"' outName ext '"']); % overwrite if exist
@@ -824,7 +824,7 @@ for i = 1:size(C,1)
 end
 
 hdr.version = niiVer; % for 'save', unless user asks to change
-[~, ~, hdr.machine]= fopen(fid); % use it for .img file
+[tmp, tmp2, hdr.machine]= fopen(fid); % use it for .img file
 
 [pth, nam, ext] = fileparts(fname); % fname may be .gz
 if isempty(pth)
@@ -921,11 +921,11 @@ end
 
 %% Return requested fname with ext, useful for .hdr and .img files
 function fname = nii_name(fname, ext)
-[~, f, e] = fileparts(fname);
+[tmp, f, e] = fileparts(fname);
 n = length(fname);
 if strcmpi(e, '.gz')
     n = n - 3; % 3 is length('.gz')
-    [~, ~, e] = fileparts(f); % .nii/.hdr/.img
+    [tmp, tmp2, e] = fileparts(f); % .nii/.hdr/.img
 end
 if strcmpi(e, '.nii') || strcmpi(e, ext), return; end
 if ~strcmpi(e, '.hdr') && ~strcmpi(e, '.img')
