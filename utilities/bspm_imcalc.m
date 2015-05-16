@@ -1,38 +1,12 @@
-function [] = bspm_imcalc(in, outname, operation)
+function bspm_imcalc(in, expression, varargin)
 % BSPM_IMCALC  Calculate Image based on Input Image(s)
 %
-%   USAGE: bspm_imcalc(in, outname, operation)
-%       
-%       in  =  array of images to smooth (full path)
-%       outname = name for output image
-%       operation = string specifying operation to apply
+%   USAGE: bspm_imcalc(in, operation, varargin)
 %
-%           LOGICAL OPERATORS
-%               >, <, >=, <=, ==
-%               
-%           NON-LOGICAL OPERATORS (ACROSS IMAGES)
-%               'sum'   - sum across images
-%               'prod'  - produce across images
-%               'mean'  - mean across images
-%               'median' - median across images
-%               'std'   - std across images
-%               'var'   - var across images
-%               'min'   - min across images
-%               'max'   - max across images
-%               'diff'  - contrast across images (2 only)
-%
-%           NON-LOGICAL OPERATORS (SINGLE IMAGE)
-%               'sqrt'          - square root of image
-%               'negative'      - negative of image
-%               'nan2zero'      - convert NaNs to 0s
-%               'zero2nan'      - convert 0s to NaNs
-%               'zscore'        - convert t-image to z-image
-%               'prctile'       - convert to percentile
-%               'prctilesym'    - convert to percentile for +/- separately
-%               'fill'          - uses IMFILL to fill holes in volume
-%
-%           SPECIAL OPERATORS
-%               'colorcode' - combine and colorcode multiple images
+%      'colorcode' - combine and colorcode multiple images
+%        mask     - implicit zero mask?
+%                   [defaults (missing or empty) to 0]
+%                    ( negative value implies NaNs should be zeroed )
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2013.03.20
 % CREDIT: Loosely based on functionality of spm_imcalc_ui.m (SPM8)
@@ -43,84 +17,229 @@ function [] = bspm_imcalc(in, outname, operation)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<3, disp('USAGE: bspm_imcalc(in, outname, operation)'); return, end
+def = { ... 
+    'outname',          [],             ...
+    'datatype',         'int16',        ...
+    'mask',             [],             ...
+    'interpmethod',     0,              ...
+	};
+vals = setargs(def, varargin);
+if nargin < 2, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
 
 % | check variable formats
-if ischar(in), in = cellstr(in); end
-if iscell(operation), operation = char(operation); end
-    
+if iscell(in), in = char(in); end
+if iscell(expression), expression = char(expression); end
+dtype = spm_type(datatype);
+if isempty(mask), mask = 0; end
+
 % | read in data
-% [im, hdr] = bnii_read(in);
-[im, hdr] = bspm_read_vol(in);
-if length(hdr)>1, hdr = hdr(1); end
+Vi = spm_vol(in);
+
+% | check operation
+switch lower(expression)
+    case {'colorcode'}
+        dmtx        = 0; 
+        expression  = 'i1'; 
+        for i = 2:length(Vi)
+            expression = [expression sprintf('+(i%d*%d)', i, i)];  
+        end
+end
+
+% | Check for DMTX flag
+if regexpi(expression, '\(X\)')
+    dmtx = 1; 
+elseif regexp(expression, '\W')
+    dmtx = 0; 
+else
+    expression = strcat(expression, '(X)'); 
+    dmtx = 1;
+end
+
+% | outname
+if ~isempty(outname)
+    if iscell(outname), outname = char(outname); end
+    [p,n,e] = fileparts(outname);
+    if isempty(p), p = pwd; end
+    if isempty(e), e = '.nii'; end
+    outname = fullfile(p, [n e]); 
+else
+    outname = fullfile(pwd, 'imcalc.nii');
+end
 
 % | apply the operation
-tag = 0;
-switch lower(operation)
-    case {'prod'}
-        outim = eval([operation '(im,4);']);
-    case {'sum', 'mean', 'median'}
-        operation = ['nan' operation];
-        outim = eval([operation '(im,4);']);
-    case {'min', 'max', 'std', 'var'}
-        operation = ['nan' operation];
-        outim = eval([operation '(im,[],4);']);
-    case {'negative'}
-        outim = -1*im;
-    case {'sqrt'}
-        outim = sqrt(im);
-    case {'diff'}
-        outim = -1*(eval([operation '(im,1,4);']));
-    case {'nan2zero'}
-        outim = im; outim(isnan(outim)) = 0; tag = 1;
-    case {'zero2nan'}
-        outim = im; outim(outim==0) = NaN; tag = 1;
-    case {'colorcode'}
-        outim = im(:,:,:,1);
-        for i = 1:length(in)
-            tmpim = im(:,:,:,i);
-            idx = tmpim(:)>0;
-            outim(idx) = i;
-        end
-    case {'zscore'}
-        i1 = strfind(hdr.descrip,'[');
-        i2 = strfind(hdr.descrip,']');
-        df = str2num(hdr.descrip(i1+1:i2-1));
-        outim = im; 
-        outim(abs(outim) > 0) = bob_t2z(outim(abs(outim) > 0),df);
-        outim(outim==Inf) = max(outim(outim~=Inf))*1.01;
-    case {'prctile'}
-        outim = im; 
-        outim(abs(outim) > 0) = 100*(tiedrank(outim(abs(outim) > 0)) ./ sum(abs(outim(:)) > 0));
-    case {'prctilesym'}
-        outim = im;
-        posidx = find(outim > 0); 
-        negidx = find(outim < 0); 
-        pos = 100*(tiedrank(outim(posidx)) ./ length(posidx));
-        neg = -100*(tiedrank(abs(outim(negidx))) ./ length(negidx));
-        outim(posidx) = pos;
-        outim(negidx) = neg;
-    case {'imfill'}
-        outim = imfill(im,6,'holes');
-    otherwise
-        outim = eval(['im' operation]);
+spmimcalc(Vi, outname, expression, {dmtx, mask, interpmethod, dtype}); 
+end
+function Vo = spmimcalc(Vi,Vo,f,flags)
+% Perform algebraic functions on images
+% FORMAT Vo = spm_imcalc(Vi, Vo, f [,flags [,extra_vars...]])
+% Vi            - struct array (from spm_vol) of images to work on
+%                 or a char array of input image filenames
+% Vo (input)    - struct array (from spm_vol) containing information on
+%                 output image
+%                 ( pinfo field is computed for the resultant image data, )
+%                 ( and can be omitted from Vo on input.  See spm_vol     )
+%                 or output image filename
+% f             - MATLAB expression to be evaluated
+% flags         - cell array of flags: {dmtx,mask,interp,dtype}
+%                 or structure with these fieldnames
+%      dmtx     - Read images into data matrix?
+%                 [defaults (missing or empty) to 0 - no]
+%      mask     - implicit zero mask?
+%                 [defaults (missing or empty) to 0]
+%                  ( negative value implies NaNs should be zeroed )
+%      interp   - interpolation hold (see spm_slice_vol)
+%                 [defaults (missing or empty) to 0 - nearest neighbour]
+%      dtype    - data type for output image (see spm_type)
+%                 [defaults (missing or empty) to 4 - 16 bit signed shorts]
+% extra_vars... - additional variables which can be used in expression
+%
+% Vo (output)   - spm_vol structure of output image volume after
+%                 modifications for writing
+%__________________________________________________________________________
+%
+% spm_imcalc performs user-specified algebraic manipulations on a set of
+% images, with the result being written out as an image. 
+% The images specified in Vi, are referred to as i1, i2, i3,...  in the
+% expression to be evaluated, unless the dmtx flag is setm in which
+% case the images are read into a data matrix X, with images in rows.
+%
+% Computation is plane by plane, so in data-matrix mode, X is a NxK
+% matrix, where N is the number of input images [prod(size(Vi))], and K
+% is the number of voxels per plane [prod(Vi(1).dim(1:2))].
+%
+% For data types without a representation of NaN, implicit zero masking
+% assumes that all zero voxels are to be treated as missing, and treats
+% them as NaN. NaN's are written as zero, for data types without a
+% representation of NaN.
+%
+% With images of different sizes and orientations, the size and orientation
+% of the reference image is used. Reference is the first image, if
+% Vo (input) is a filename, otherwise reference is Vo (input). A
+% warning is given in this situation. Images are sampled into this
+% orientation using the interpolation specified by the interp parameter.
+%__________________________________________________________________________
+%
+% Example expressions (f):
+%
+%    i)  Mean of six images (select six images)
+%        f = '(i1+i2+i3+i4+i5+i6)/6'
+%   ii)  Make a binary mask image at threshold of 100
+%        f = 'i1>100'
+%   iii) Make a mask from one image and apply to another
+%        f = '(i1>100).*i2'
+%        (here the first image is used to make the mask, which is applied
+%         to the second image - note the '.*' operator)
+%   iv)  Sum of n images
+%        f = 'i1 + i2 + i3 + i4 + i5 + ...'
+%   v)   Sum of n images (when reading data into data-matrix)
+%        f = 'sum(X)'
+%   vi)  Mean of n images (when reading data into data-matrix)
+%        f = 'mean(X)'
+%__________________________________________________________________________
+%
+% Furthermore, additional variables for use in the computation can be
+% passed at the end of the argument list. These should be referred to by
+% the names of the arguments passed in the expression to be evaluated. 
+% E.g. if c is a 1xn vector of weights, then for n images, using the (dmtx)
+% data-matrix version, the weighted sum can be computed using:
+%       Vi = spm_vol(spm_select(inf,'image'));
+%       Vo = 'output.img'
+%       Q  = spm_imcalc(Vi,Vo,'c*X',{1},c)
+% Here we've pre-specified the expression and passed the vector c as an
+% additional variable (you'll be prompted to select the n images).
+%__________________________________________________________________________
+% Copyright (C) 1998-2011 Wellcome Trust Centre for Neuroimaging
+
+% John Ashburner & Andrew Holmes
+% $Id: spm_imcalc.m 6124 2014-07-29 11:51:11Z guillaume $
+
+if isstruct(Vo)
+    Vchk   = spm_cat_struct(Vo,Vi);
+    refstr = 'output';
+else
+    Vchk   = Vi(:);
+    refstr = '1st';
+end
+% [sts, str] = spm_check_orientations(Vchk, false);
+% if ~sts
+%     for i=1:size(str,1)
+%         fprintf('Warning: %s - using %s image.\n',strtrim(str(i,:)),refstr);
+%     end
+% end
+
+%-Flags
+%--------------------------------------------------------------------------
+if nargin < 4, flags = {}; end
+if iscell(flags)
+    if length(flags) < 4, dtype  = []; else dtype  = flags{4}; end
+    if length(flags) < 3, interp = []; else interp = flags{3}; end
+    if length(flags) < 2, mask   = []; else mask   = flags{2}; end
+    if length(flags) < 1, dmtx   = []; else dmtx   = flags{1}; end
+else
+    if isfield(flags,'dmtx'),   dmtx   = flags.dmtx;   else dmtx   = []; end
+    if isfield(flags,'mask'),   mask   = flags.mask;   else mask   = []; end
+    if isfield(flags,'interp'), interp = flags.interp; else interp = []; end
+    if isfield(flags,'dtype'),  dtype  = flags.dtype;  else dtype  = []; end
 end
 
-% construct outname and write image
-if ~tag
-    tmp = hdr.descrip;
-    idx = regexp(tmp,'SPM{T','ONCE');
-    if ~isempty(idx)
-        tmp(regexp(tmp,'-')+2:end) = [];
-        hdr.descrip = [tmp upper(operation) ' IMAGE'];
+%-Output image
+%--------------------------------------------------------------------------
+if ischar(Vo)
+    [p, n, e] = spm_fileparts(Vo);
+    Vo = struct('fname',   fullfile(p, [n, e]),...
+                'dim',     Vi(1).dim(1:3),...
+                'dt',      [dtype spm_platform('bigend')],...
+                'pinfo',   [Inf Inf Inf]',...
+                'mat',     Vi(1).mat,...
+                'n',       1);
+    if numel(Vi) > 1
+        tmp = vertcat(Vi.descrip);
+        tmp(:, sum(diff(tmp))~=0) = [];
+        tmp = tmp(1,:);
     else
-        hdr.descrip = [upper(operation) ' IMAGE'];
+        tmp = Vi.descrip; 
     end
+    Vo.descrip = [tmp ' - ' upper(f) ':SPM_IMCALC']; 
 end
-hdr.fname = outname; 
-spm_write_vol(hdr, outim); 
-% bnii_write(outim, hdr, 'outname', outname)    
+
+
+%-Computation
+%==========================================================================
+n = numel(Vi);
+Y = zeros(Vo.dim(1:3));
+
+%-Loop over planes computing result Y
+%--------------------------------------------------------------------------
+for p = 1:Vo.dim(3)
+    B = spm_matrix([0 0 -p 0 0 0 1 1 1]);
+
+    if dmtx, X = zeros(n,prod(Vo.dim(1:2))); end
+    for i = 1:n
+        M = inv(B * inv(Vo.mat) * Vi(i).mat);
+        d = spm_slice_vol(Vi(i), M, Vo.dim(1:2), [interp,NaN]);
+        if (mask < 0), d(isnan(d)) = 0; end
+        if (mask > 0) && ~spm_type(Vi(i).dt(1),'nanrep'), d(d==0)=NaN; end
+        if dmtx, X(i,:) = d(:)'; else eval(['i',num2str(i),'=d;']); end
+    end
+    
+    try
+        eval(['Yp = ' f ';']);
+    catch
+        l = lasterror;
+        error('%s\nCan''t evaluate "%s".',l.message,f);
+    end
+    if prod(Vo.dim(1:2)) ~= numel(Yp)
+        error(['"',f,'" produced incompatible image.']); end
+    if (mask < 0), Yp(isnan(Yp)) = 0; end
+    Y(:,:,p) = reshape(Yp,Vo.dim(1:2));
+
+end
+
+%-Write output image
+%--------------------------------------------------------------------------
+Vo = spm_write_vol(Vo,Y);
+
+end
  
  
  

@@ -99,7 +99,7 @@ for i = 1:length(allim)
 end
 
 %% Save to Excel %%
-[day, tme] = bob_timestamp;
+[day, tme] = bspm_timestamp;
 outname = ['multi_table_I' num2str(intensity) '_S' num2str(separation) '_' day '_' tme '.xls'];
 try 
     xlwrite(outname,combinedcell);
@@ -127,6 +127,10 @@ delete *_peaks_*clusters.nii
 
 
 
+ 
+ 
+ 
+ 
  
  
  

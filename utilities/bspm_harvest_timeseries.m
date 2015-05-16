@@ -25,7 +25,7 @@ dims = size(ts);
 
 %% load in roi and reslice if necessary %%
 roi_hdr = spm_vol(roi); roi = spm_read_vols(roi_hdr);
-if dims(1:3)~=size(roi), roi = bob_reslice(roi_hdr.fname, hdr(1).fname, 1, 1); end
+if dims(1:3)~=size(roi), roi = bspm_reslice(roi_hdr.fname, hdr(1).fname, 1, 1); end
 
 %% extract signal from roi %%
 roi = roi(:);
@@ -43,10 +43,10 @@ end
 
 %% SUBFUNCTION %%
 
-function [out outmat] = bob_reslice(in, ref, int, nowrite)
+function [out outmat] = bspm_reslice(in, ref, int, nowrite)
 % BOB_RESLICE 
 %
-% USAGE: [out M] = bob_reslice(in, ref, int, nowrite)
+% USAGE: [out M] = bspm_reslice(in, ref, int, nowrite)
 %
 % ARGUMENTS
 %   in: path to image to reslice
@@ -64,7 +64,7 @@ function [out outmat] = bob_reslice(in, ref, int, nowrite)
 % --------------------------------------------------------------------------
 if nargin<4, nowrite = 0; end
 if nargin<3, int = 1; end
-if nargin<2, display('USAGE: out = bob_reslice(in, ref, int, nowrite)'); return; end
+if nargin<2, display('USAGE: out = bspm_reslice(in, ref, int, nowrite)'); return; end
 if iscell(in); in = char(in); end
 if iscell(ref); ref = char(ref); end
 
@@ -109,6 +109,10 @@ if ~nowrite
     spm_write_vol(OutHead,out);
 end
 end
+ 
+ 
+ 
+ 
  
  
  

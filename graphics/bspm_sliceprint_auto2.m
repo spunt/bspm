@@ -148,7 +148,7 @@ text(x(1),sum(y)/2,sprintf('%2.1f',info.min),'FontUnits','pixels','FontName','Ar
     'HorizontalAlignment','Left','VerticalAlignment','Middle','FontSize',fs,'Color',[0 0 0]);
 text(x(end),sum(y)/2,sprintf('%2.1f',info.max),'FontUnits','pixels','FontName','Arial', ...
     'HorizontalAlignment','Right','VerticalAlignment','Middle','FontSize',fs,'Color',[1 1 1]);
-bob_save_figure('colorbar1.png');
+bspm_save_figure('colorbar1.png');
 close all
 
 figure('color','white','position',pos);
@@ -164,13 +164,17 @@ text(x(1),sum(y)/2,sprintf('%2.1f',infoneg.min),'FontUnits','pixels','FontName',
     'HorizontalAlignment','Left','VerticalAlignment','Middle','FontSize',fs,'Color',[0 0 0]);
 text(x(end),sum(y)/2,sprintf('%2.1f',infoneg.max),'FontUnits','pixels','FontName','Arial', ...
     'HorizontalAlignment','Right','VerticalAlignment','Middle','FontSize',fs,'Color',[1 1 1]);
-bob_save_figure('colorbar2.png');
+bspm_save_figure('colorbar2.png');
 close all
 
 
 
 
 
+ 
+ 
+ 
+ 
  
  
  

@@ -41,7 +41,7 @@ tmp = nanmean(ts_rs);
 maskidx = find(tmp>mean(tmp)/8);
 fprintf('\nCleaning Timeseries: ');
 ts_rs(:,maskidx) = spm_filter(K,ts_rs(:,maskidx));
-ts_rs_clean(:,maskidx) = bob_residuals(ts_rs(:,maskidx), covariates);
+ts_rs_clean(:,maskidx) = bspm_residuals(ts_rs(:,maskidx), covariates);
 fprintf('Complete!\n');
 % for i = 1:length(maskidx);
 %     
@@ -61,6 +61,10 @@ for i = 1:length(hdr)
 end
 fprintf('Complete!\n\n');
     
+ 
+ 
+ 
+ 
  
  
  

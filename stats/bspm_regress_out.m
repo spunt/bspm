@@ -31,7 +31,7 @@ ts_rs = reshape(ts,prod(dims(1:3)),dims(4))';
 tmp = nanmean(ts_rs);
 maskidx = find(tmp>mean(tmp)/8);
 fprintf('\nRunning Voxelwise Regression: ');
-ts_rs_clean = bob_residuals(ts_rs, X);
+ts_rs_clean = bspm_residuals(ts_rs, X);
 fprintf('Complete!\n');
 ts_clean = reshape(ts_rs_clean',dims);
 fprintf('Writing New Volumes: ');
@@ -44,6 +44,10 @@ for i = 1:length(hdr)
 end
 fprintf('Complete!\n\n');
     
+ 
+ 
+ 
+ 
  
  
  

@@ -30,7 +30,7 @@ data        = spm_read_vols(hdr);
 datadim     = size(data); 
 fprintf('Realignment parameter file: %s\n', rpfile);
 fprintf('Processing %d functional volumes...\n', size(data,4));
-if ~isempty(maskfile), cfg.mask = bob_reslice(maskfile, epifiles{1}, 1, 1); end
+if ~isempty(maskfile), cfg.mask = bspm_reslice(maskfile, epifiles{1}, 1, 1); end
 cfg.vol     = data; 
 cfg.plot    = plotit; 
 TS.dvars    = bramila_dvars(cfg);
@@ -1482,5 +1482,9 @@ end
 
 
 
+ 
+ 
+ 
+ 
  
  

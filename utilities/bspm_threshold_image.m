@@ -42,7 +42,7 @@ if ismember(heightThresh,[.10 .05 .01 .005 .001 .0005 .0001]);
     idx1 = regexp(tmp,'[','ONCE');
     idx2 = regexp(tmp,']','ONCE');
     df = str2num(tmp(idx1+1:idx2-1));
-    heightThresh = bob_p2t(heightThresh, df);
+    heightThresh = bspm_p2t(heightThresh, df);
 end
 in(in==0)=NaN;
 in0 = in; 
@@ -95,6 +95,10 @@ end
 
 
 
+ 
+ 
+ 
+ 
  
  
  

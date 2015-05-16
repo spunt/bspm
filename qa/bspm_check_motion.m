@@ -49,7 +49,7 @@ sub = [sub gnames];
 disptable(data,cols,sub,'%2.2f');
 
 if writereport
-    [d t] = bob_timestamp;
+    [d t] = bspm_timestamp;
     outname = sprintf('motion_report_%s_%s.xls',d,t);
     allcell = [[{''} cols]; [sub' num2cell(data)]];
     xlwrite(outname, allcell);
@@ -59,6 +59,10 @@ end
 
     
     
+ 
+ 
+ 
+ 
  
  
  

@@ -56,17 +56,13 @@ for i = 1:nanalysis
         end
     end
 end
-
 if plotflag
-    
     plotdata = [];
     groupidx = [];
     for d = 1:length(data)
-        
         pos = size(plotdata,2);
         plotdata = [plotdata data{d}];
         groupidx(d,:) = pos+1:pos+size(data{d},2);
-        
     end
     fontsizes = [10 12 12];
     labels.y = '% Signal Change';
@@ -75,23 +71,13 @@ if plotflag
     labels.title = '';
     labels.legend = regexprep(connam,'_',' ');
     labels.legend_title = 'Condition';
-    
-    % plot!
-    figure('Color', 'white')
-    bob_bargraph(plotdata, groupidx, labels, fontsizes)
-% OPTIONAL ARGUMENTS
-%   groupidx: each row indexes a different grouping
-%   labels: a structure with the following fields (all optional)
-%       title = plot title
-%       x = x-axis label
-%       y = y-axis label
-%       groups = labels for groupings of bars
-%       legend = labels for bars (in each group if applicable)
-%       legend_title = label for the legend title
-%   fontsizes: 1 x 3 vector with sizes for
-%       Cell 1 = x and y axis labels
-%       Cell 2 = legend and group labels
-%       Cell 3 = plot title 
+    bspm_barpatch(plotdata,         ...
+        'groupidx',     groupidx,   ...
+        'groupname',    roinam,     ...
+        'xl',           'Region of Interest',   ...
+        'yl',           'Mean Contrast',        ...
+        'barname',      regexprep(connam,'_',' '), ...
+        'fontsize',     12)
 end
         
 

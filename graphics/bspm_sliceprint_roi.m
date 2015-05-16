@@ -67,5 +67,9 @@ currento = paint(o);
 tobj = findobj(gcf, 'type', 'text');
 set(tobj, 'units', 'data', 'fontsize', .15, 'string', regexprep(get(tobj, 'string'), ' ', '')); 
 name = sprintf('%s_%s_%02d.jpg',basename,view,slices);
-bob_save_figure(name, 'crop', 1); 
+bspm_save_figure(name, 'crop', 1); 
 end
+ 
+ 
+ 
+ 

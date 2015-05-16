@@ -109,7 +109,7 @@ for i = 1:length(slices)
 
     %% save
     name = sprintf('%s_%02d_%s_%02d.jpg',basename,i,view,slices(i));
-    bob_save_figure(name);
+    bspm_save_figure(name);
     close all
     %     imwrite(im, name, 'jpg');
     %     close all
@@ -138,10 +138,14 @@ set(gca,'yticklabel',[]);
 % text(x(end),sum(y)/2,sprintf('%2.1f',info.max),'FontUnits','pixels','FontName','Arial', ...
 %     'HorizontalAlignment','Right','VerticalAlignment','Middle','FontSize',fs,'Color',[0 0 0]);
 outname = sprintf('%s_%2.2fto%2.2f_colorbar.png',basename,info.min,info.max);
-bob_save_figure(outname);
+bspm_save_figure(outname);
 close all
 
 
+ 
+ 
+ 
+ 
  
  
  

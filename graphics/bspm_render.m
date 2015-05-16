@@ -73,7 +73,7 @@ function out = threshold_image(in, thresh, extent)
         idx1 = regexp(tmp,'[','ONCE');
         idx2 = regexp(tmp,']','ONCE');
         df = str2num(tmp(idx1+1:idx2-1));
-        thresh = bob_p2t(thresh, df);
+        thresh = bspm_p2t(thresh, df);
     end
     in(in<thresh) = NaN;
     in(in==0)=NaN;
@@ -806,6 +806,10 @@ shading interp
 end
 
 end
+ 
+ 
+ 
+ 
  
  
  

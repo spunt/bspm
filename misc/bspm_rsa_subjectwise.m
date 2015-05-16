@@ -21,7 +21,7 @@ if nargin < 1, error('USAGE: bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag
 
 % %% MASK
 % if iscell(mask), mask = char(mask); end
-% mask = bob_reslice(mask,maps{1},1,1);
+% mask = bspm_reslice(mask,maps{1},1,1);
 
 %% MAPS
 if ischar(maps), maps = cellstr(maps); end
@@ -77,6 +77,10 @@ fishz(isinf(fishz)) = NaN;
 
 
 
+ 
+ 
+ 
+ 
  
  
  

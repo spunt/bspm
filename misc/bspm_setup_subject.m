@@ -40,7 +40,7 @@ fwhm = 8;
 % ----------------
 
 subs = files([studydir filesep subpat]);
-bob_display_message(sprintf('Setting up %d subjects in %s', length(subs), studydir));
+bspm_display_message(sprintf('Setting up %d subjects in %s', length(subs), studydir));
 
 % for s = 1:length(subs)
 for s = 8
@@ -48,7 +48,7 @@ for s = 8
     subdir = subs{s};
     [path sub ext] = fileparts(subdir);
     notedir = [subdir filesep 'notes'];
-    bob_display_message(sprintf('Working on: %s', subs{s}), '-');
+    bspm_display_message(sprintf('Working on: %s', subs{s}), '-');
 
     if do_convert
         % convert dicom to nii - bspm_convert_dcm(subDIR, format)
@@ -110,7 +110,7 @@ for s = 8
     % run badscan, then slice time correct if desired
     for i = 1:length(epidirs)
         
-        bob_badscan(epidirs{i}, 'u*nii', skip, thresh, rpTAG, filename)
+        bspm_badscan(epidirs{i}, 'u*nii', skip, thresh, rpTAG, filename)
         
         if do_slice_timing
             % get info for slice timing
@@ -156,6 +156,14 @@ end
 
 
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  

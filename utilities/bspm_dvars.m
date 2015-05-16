@@ -36,7 +36,7 @@ hdr         = spm_vol(char(epi));
 data        = spm_read_vols(hdr);
 datadim     = size(data); 
 fprintf('Mask File: %s\n', maskfn);
-if exist(maskfn, 'file'), cfg.mask = bob_reslice(maskfn, epi{1}, 1, 1); end
+if exist(maskfn, 'file'), cfg.mask = bspm_reslice(maskfn, epi{1}, 1, 1); end
 cfg.vol     = data; 
 cfg.plot    = 0; 
 fprintf('Running BRAMILA_DVARS...\n', length(epi), fileparts(epi{1})); 
@@ -52,7 +52,7 @@ for i = 1:length(TS.nuisidx)
 end
 nuisance = [rp TS.nuisance];
 if ~nosave
-    outname = sprintf('nuisance_%dSDcut_%s.txt',cutoff*100,bob_timestamp);
+    outname = sprintf('nuisance_%dSDcut_%s.txt',cutoff*100,bspm_timestamp);
     save(fullfile(epidir, outname), 'nuisance', '-ascii'); 
     fprintf('Output filename: %s\n\n', outname); 
 end
@@ -1501,5 +1501,13 @@ end
 
 
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  

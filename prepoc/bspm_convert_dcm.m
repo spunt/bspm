@@ -29,19 +29,15 @@ for sub = 1:nsubs
     [p, subnam, e]  = fileparts(subDIR);
     fprintf('\n| Working on: %s', subnam);
     alldcm          = files(fullfile(subDIR, '**', '*dcm'));
-    if isempty(alldcm)
-        fprintf('\n!!! COULD NOT FIND .DCM FILES FOR THIS SUBJECT, MOVING ON !!!'); 
-        continue
-    end
+    if isempty(alldcm), fprintf('\n!!! NO .DCM FILES FOR THIS SUBJECT, MOVING ON...'); continue; end
     [dothese, ia, ic] = unique(cellfun(@fileparts, alldcm, 'unif', false));
     fprintf('\n| Running DICM2NII on %d dicom folders\n', length(dothese));
     disp(dothese);
     rawDIR = fullfile(subDIR, 'raw'); mkdir(rawDIR); 
     fprintf('| Output directory: %s\n', rawDIR);
     for s = 1:length(dothese)
-        
         dicomfiles  = alldcm(ic==s); 
-        dcmref      = dicomfiles{floor(length(dicomfiles)/2)}; 
+        dcmref      = dicomfiles{ceil(length(dicomfiles)/2)}; 
         dcminfo     = bspm_get_dicom_info(dcmref, 0); 
         outputDIR   = fullfile(rawDIR, sprintf('%s_%s_%02d', dcminfo.sequenceinfo.type(1:2), dcminfo.sequenceinfo.name, dcminfo.sequenceinfo.order));
         mkdir(outputDIR);
@@ -49,9 +45,7 @@ for sub = 1:nsubs
         if strcmp(dcminfo.sequenceinfo.type, 'EP')
            nii = files(fullfile(outputDIR, '*nii')); 
            if omitfirstN, delete(nii{1:omitfirstN}); nii(1:omitfirstN) = []; end
-           if do3dto4d
-               bnii_3dto4d(nii, 'compress', 1, 'delete3d', 1, 'delimiter', '_'); 
-           end
+           if do3dto4d, bnii_3dto4d(nii, 'compress', 1, 'delete3d', 1, 'delimiter', '_'); end
         end 
     end
     

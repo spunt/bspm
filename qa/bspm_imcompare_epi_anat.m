@@ -40,19 +40,19 @@ for i = 1:length(epi)
     tmp = [];
     
     % epi
-    tmpepi = bob_reslice(epi{i},epi{1},1,1);
+    tmpepi = bspm_reslice(epi{i},epi{1},1,1);
     tmpepi(tmpepi==0) = NaN;
     mim(:,i) = tmpepi(:);
     tmp(:,1) = (tmpepi(:)/max(tmpepi(:)));
 
     % anat
-    tmpanat = bob_reslice(anat{i},epi{1},1,1);
+    tmpanat = bspm_reslice(anat{i},epi{1},1,1);
     tmpanat(tmpanat==0) = NaN;
     mimanat(:,i) = tmpanat(:);
     tmp(:,2) = (tmpanat(:)/max(tmpanat(:)));
     
     % compare
-    tmp = bob_scalematrix(tmp);
+    tmp = bspm_scaledata(tmp);
     out(i,1) = nanmean(diff(tmp').^2);
     out(i,2) = corr(tmp(:,1),tmp(:,2),'rows','pairwise','type','Spearman');
     
@@ -69,6 +69,14 @@ data.result = result;
 data.varnames = {'MSS' 'FLAG' 'MCORR' 'FLAG'};
 data.bad = bad; 
     
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  

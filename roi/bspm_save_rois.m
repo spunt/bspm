@@ -150,10 +150,10 @@ end
 % -------------------------------------------------------------------------
 % SUBFUNCTIONS
 % -------------------------------------------------------------------------
-function [out, outmat] = bob_reslice(in, ref, int, nowrite)
+function [out, outmat] = bspm_reslice(in, ref, int, nowrite)
 % BOB_RESLICE 
 %
-% USAGE: [out M] = bob_reslice(in, ref, int, nowrite)
+% USAGE: [out M] = bspm_reslice(in, ref, int, nowrite)
 %
 % ARGUMENTS
 %   in: path to image to reslice
@@ -171,7 +171,7 @@ function [out, outmat] = bob_reslice(in, ref, int, nowrite)
 % --------------------------------------------------------------------------
 if nargin<4, nowrite = 0; end
 if nargin<3, int = 1; end
-if nargin<2, display('USAGE: out = bob_reslice(in, ref, int, nowrite)'); return; end
+if nargin<2, display('USAGE: out = bspm_reslice(in, ref, int, nowrite)'); return; end
 if iscell(in); in = char(in); end
 if iscell(ref); ref = char(ref); end
 
@@ -214,10 +214,10 @@ if ~nowrite
     spm_write_vol(OutHead,out);
 end
 end
-function t = bob_p2t(alpha, df)
+function t = bspm_p2t(alpha, df)
 % BOB_P2T Get t-value from p-value + df
 %
-%   USAGE: t = bob_p2t(alpha, df)
+%   USAGE: t = bspm_p2t(alpha, df)
 %       
 %   OUTPUT
 %       t = crtical t-value
@@ -227,7 +227,7 @@ function t = bob_p2t(alpha, df)
 %       df = degrees of freedom
 %
 % =========================================
-if nargin<2, disp('USAGE: bob_p2t(p, df)'); return, end
+if nargin<2, disp('USAGE: bspm_p2t(p, df)'); return, end
 t = tinv(1-alpha, df);
 end
 function out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outname)
@@ -266,7 +266,7 @@ if ismember(heightThresh,[.10 .05 .01 .005 .001 .0005 .0001]);
     idx1 = regexp(tmp,'[','ONCE');
     idx2 = regexp(tmp,']','ONCE');
     df = str2num(tmp(idx1+1:idx2-1));
-    heightThresh = bob_p2t(heightThresh, df);
+    heightThresh = bspm_p2t(heightThresh, df);
 end
 in(in<heightThresh) = NaN;
 in(in==0)=NaN;
@@ -308,6 +308,14 @@ end
 end
 
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  

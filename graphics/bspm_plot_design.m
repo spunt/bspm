@@ -72,14 +72,14 @@ for r = runs
     
     if trantag
           
-        imagesc(bob_scalematrix(cx)'); colormap('gray');
+        imagesc(bspm_scaledata(cx)'); colormap('gray');
         set(gca, 'FontName', 'Arial');
         set(gca, 'YTick', 1:length(cn), 'XTick', (0:25:size(cx,1)));
         set(gca, 'YTickLabel', cn);
 
     else
         
-        imagesc(bob_scalematrix(cx)); colormap('gray');
+        imagesc(bspm_scaledata(cx)); colormap('gray');
         
         set(gca, 'FontName', 'Arial');
         set(gca, 'XTick', 1:length(cn), 'YTick', (0:25:size(cx,1)));
@@ -100,6 +100,10 @@ end
 
 
 
+ 
+ 
+ 
+ 
  
  
  

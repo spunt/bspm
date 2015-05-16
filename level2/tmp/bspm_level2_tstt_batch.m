@@ -29,12 +29,16 @@ for c = 1:length(conlist)
     
     cons1 = files([analpat1 filesep conlist{c}]);
     cons2 = files([analpat2 filesep conlist{c}]);
-    bob_display_message(sprintf('Working on Contrast %d of %d: %s', c, length(conlist), conlist{c}));
-    bob_display_message(sprintf('%s: %d   %s:%d', labels{1}, length(cons1), labels{2}, length(cons2)), '-');
+    bspm_display_message(sprintf('Working on Contrast %d of %d: %s', c, length(conlist), conlist{c}));
+    bspm_display_message(sprintf('%s: %d   %s:%d', labels{1}, length(cons1), labels{2}, length(cons2)), '-');
     bspm_level2_tstt(cons1, cons2, labels, outaffix, mask);
     
 end
     
+ 
+ 
+ 
+ 
  
  
  

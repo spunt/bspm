@@ -18,7 +18,7 @@ if nargin<2, error('USAGE: bspm_nanmaskout(in, mask, outprefix)'); end
 if nargin<3, outprefix = 'nanout'; end
 if ischar(in), in = cellstr(in); end
 if iscell(mask), mask = char(mask); end
-mask = bob_reslice(mask, in{1}, 1, 1); 
+mask = bspm_reslice(mask, in{1}, 1, 1); 
 mask = mask > 0;
 for i = 1:length(in)
     
@@ -32,6 +32,10 @@ for i = 1:length(in)
     
 end
 
+ 
+ 
+ 
+ 
  
  
  

@@ -34,7 +34,7 @@ elseif iscell(mask), mask = char(mask); end;
 
 % write current images to command window
 % ------------------------------------------------------
-bob_display_message('Looking for Cluster');
+bspm_display_message('Looking for Cluster');
 fprintf('\nSource Image: %s\nMask Image: %s\nnHeight Threshold: %d\nSizeThreshold: %d\n', in, mask, heightThresh, sizeThresh);
 
 % load images
@@ -48,10 +48,10 @@ if ismember(heightThresh,[.10 .05 .01 .005 .001 .0005 .0001]);
     idx1 = regexp(tmp,'[','ONCE');
     idx2 = regexp(tmp,']','ONCE');
     df = str2num(tmp(idx1+1:idx2-1));
-    heightThresh = bob_p2t(heightThresh, df);
+    heightThresh = bspm_p2t(heightThresh, df);
 end
 if maskflag
-    mask = bob_reslice(mask,in_hdr.fname,1,1);
+    mask = bspm_reslice(mask,in_hdr.fname,1,1);
 else
     mask = in>0;
 end
@@ -124,6 +124,18 @@ end
 
 
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  
