@@ -28,8 +28,8 @@ if any(cellfun(@iscell, varargin))
     varargin{cellfun(@iscell, varargin)} = char(varargin{cellfun(@iscell, varargin)}); 
 end
 if ischar(in), in = cellstr(in); end
-data    = bnii_read(in);
-hdr     = spm_vol(char(in)); 
+hdr     = spm_vol(char(in));
+data    = spm_read_vols(hdr);
 nvol    = length(hdr);
 if optional
     varargin = lower(varargin);

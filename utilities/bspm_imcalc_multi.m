@@ -1,38 +1,20 @@
-function bspm_imcalc(in, outname, operation)
+function bspm_imcalc_multi(in, expression, varargin)
 % BSPM_IMCALC  Calculate Image based on Input Image(s)
 %
-%   USAGE: bspm_imcalc(in, outname, operation)
-%       
-%       in  =  array of images to smooth (full path)
-%       outname = name for output image
-%       operation = string specifying operation to apply
+%   USAGE: bspm_imcalc(in, expression, varargin)
 %
-%           LOGICAL OPERATORS
-%               >, <, >=, <=, ==
-%               
-%           NON-LOGICAL OPERATORS (ACROSS IMAGES)
-%               'sum'   - sum across images
-%               'prod'  - produce across images
-%               'mean'  - mean across images
-%               'median' - median across images
-%               'std'   - std across images
-%               'var'   - var across images
-%               'min'   - min across images
-%               'max'   - max across images
-%               'diff'  - contrast across images (2 only)
-%
-%           NON-LOGICAL OPERATORS (SINGLE IMAGE)
-%               'sqrt'          - square root of image
-%               'negative'      - negative of image
-%               'nan2zero'      - convert NaNs to 0s
-%               'zero2nan'      - convert 0s to NaNs
-%               'zscore'        - convert t-image to z-image
-%               'prctile'       - convert to percentile
-%               'prctilesym'    - convert to percentile for +/- separately
-%               'fill'          - uses IMFILL to fill holes in volume
-%
-%           SPECIAL OPERATORS
-%               'colorcode' - combine and colorcode multiple images
+%   SPECIAL EXPRESSIONS (single image)
+%       'sqrt'          - square root of image
+%       'negative'      - negative of image
+%       'nan2zero'      - convert NaNs to 0s
+%       'zero2nan'      - convert 0s to NaNs
+%       'zscore'        - convert t-image to z-image
+%       'prctile'       - convert to percentile
+%       'prctilesym'    - convert to percentile for +/- separately
+%       'fill'          - uses IMFILL to fill holes in volume
+% 
+%   SPECIAL EXPRESSIONS (multiple images)
+%       'colorcode' - combine and colorcode multiple images
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2013.03.20
 % CREDIT: Loosely based on functionality of spm_imcalc_ui.m (SPM8)
@@ -43,112 +25,59 @@ function bspm_imcalc(in, outname, operation)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<3, disp('USAGE: bspm_imcalc(in, outname, operation)'); return, end
+def = { ...
+    'outname',          [],             ...
+    'datatype',         'int16',        ...
+    'mask',             [],             ...
+    'interpmethod',     0,              ...
+	};
+vals = setargs(def, varargin);
+if nargin < 2, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
 
 % | check variable formats
-if ischar(in), in = cellstr(in); end
-if iscell(operation), operation = char(operation); end
-[p, n, e] = fileparts(outname); 
-if isempty(p), p = pwd; end
-if isempty(e), e = '.nii'; end
-outname = fullfile(p, [n e]); 
-    
+if iscell(in), in = char(in); end
+if iscell(expression), expression = char(expression); end
+dtype = spm_type(datatype);
+if isempty(mask), mask = 0; end
+
 % | read in data
-hdr  = spm_vol(char(in)); 
-nvol = length(hdr);
+Vi = spm_vol(in);
+
+% | check operation
+switch lower(expression)
+    case {'colorcode'}
+        dmtx        = 0; 
+        expression  = 'i1'; 
+        for i = 2:length(Vi)
+            expression = [expression sprintf('+(i%d*%d)', i, i)];  
+        end
+end
+
+% | Check for DMTX flag
+if regexpi(expression, '\(X\)')
+    dmtx = 1; 
+elseif regexp(expression, '\W')
+    dmtx = 0; 
+else
+    expression = strcat(expression, '(X)'); 
+    dmtx = 1;
+end
+
+% | outname
+if ~isempty(outname)
+    if iscell(outname), outname = char(outname); end
+    [p,n,e] = fileparts(outname);
+    if isempty(p), p = pwd; end
+    if isempty(e), e = '.nii'; end
+    outname = fullfile(p, [n e]); 
+else
+    outname = fullfile(pwd, 'imcalc.nii');
+end
 
 % | apply the operation
-tag = 0;
-if nvol > 1
-    switch lower(operation)
-    case {'colorcode'}
-        expression  = 'i1'; 
-        for i = 2:length(hdr), expression = [expression sprintf('+(i%d*%d)', i, i)]; end
-    case {'prod'}
-        expression  = 'i1'; 
-        for i = 2:nvol, expression = [expression sprintf('.*i%d', i)]; end
-    case {'sum', 'mean', 'median'}
-        expression = strcat('nan', operation, '(X)'); 
-    case {'min', 'max', 'std', 'var'}
-        expression = strcat('nan', operation, '(X)'); 
-    case {'diff'}
-        if nvol > 2
-            disp('ERROR: ''diff'' operation only works with 2 input images'); 
-        else
-            expression = 'i1-i2'; 
-        end
-    end
-    if regexpi(expression, '\(X\)')
-        dmtx = 1; 
-    elseif regexp(expression, '\W')
-        dmtx = 0; 
-    else
-        expression = strcat(expression, '(X)'); 
-        dmtx = 1;
-    end
-    outhdr = hdr(1);
-    if regexpi(outhdr.descrip, 'SPM{T')
-        names   = bspm_con2name(in);
-        names(2:end)   = strcat({', '}, names(2:end)); 
-        str     = regexp(outhdr.descrip, ' - ', 'split');
-        outhdr.descrip = char(strcat(str{1}, {' - '}, upper(operation), {': '}, names{:}));
-    else
-        outhdr.descrip = [upper(operation) ' IMAGE'];
-    end
-    outhdr.fname = outname; 
-    spmimcalc(hdr, outhdr, expression, {dmtx});
-    return
-else
-    im = spm_read_vols(hdr);
-    switch lower(operation)
-        case {'negative'}
-            outim = -1*im;
-        case {'sqrt'}
-            outim = sqrt(im);
-        case {'nan2zero'}
-            outim = im; outim(isnan(outim)) = 0; tag = 1;
-        case {'zero2nan'}
-            outim = im; outim(outim==0) = NaN; tag = 1;
-        case {'zscore'}
-            i1 = strfind(hdr.descrip,'[');
-            i2 = strfind(hdr.descrip,']');
-            df = str2num(hdr.descrip(i1+1:i2-1));
-            outim = im; 
-            outim(abs(outim) > 0) = bspm_t2z(outim(abs(outim) > 0),df);
-            outim(outim==Inf) = max(outim(outim~=Inf))*1.01;
-        case {'prctile'}
-            outim = im; 
-            outim(abs(outim) > 0) = 100*(tiedrank(outim(abs(outim) > 0)) ./ sum(abs(outim(:)) > 0));
-        case {'prctilesym'}
-            outim = im;
-            posidx = find(outim > 0); 
-            negidx = find(outim < 0); 
-            pos = 100*(tiedrank(outim(posidx)) ./ length(posidx));
-            neg = -100*(tiedrank(abs(outim(negidx))) ./ length(negidx));
-            outim(posidx) = pos;
-            outim(negidx) = neg;
-        case {'imfill'}
-            outim = imfill(im,6,'holes');
-        otherwise
-            outim = eval(['im' operation]);
-    end
-    % construct outname and write image
-    if ~tag
-        tmp = hdr.descrip;
-        idx = regexp(tmp,'SPM{T','ONCE');
-        if ~isempty(idx)
-            tmp(regexp(tmp,'-')+2:end) = [];
-            hdr.descrip = [tmp upper(operation) ' IMAGE'];
-        else
-            hdr.descrip = [upper(operation) ' IMAGE'];
-        end
-    end
-    hdr.fname = outname; 
-    spm_write_vol(hdr, outim);
+spmimcalc(Vi, outname, expression, {dmtx, mask, interpmethod, dtype}); 
 end
-end
-function Vo = spmimcalc(Vi,Vo,f,flags)
+function Vo     = spmimcalc(Vi,Vo,f,flags)
 % Perform algebraic functions on images
 % FORMAT Vo = spm_imcalc(Vi, Vo, f [,flags [,extra_vars...]])
 % Vi            - struct array (from spm_vol) of images to work on
@@ -260,10 +189,6 @@ else
     if isfield(flags,'interp'), interp = flags.interp; else interp = []; end
     if isfield(flags,'dtype'),  dtype  = flags.dtype;  else dtype  = []; end
 end
-if isempty(interp), interp = 0; end
-if isempty(mask),   mask   = 0; end
-if isempty(dmtx),   dmtx   = 0; end
-if isempty(dtype),  dtype  = spm_type('int16'); end
 
 %-Output image
 %--------------------------------------------------------------------------
@@ -319,12 +244,7 @@ end
 %--------------------------------------------------------------------------
 Vo = spm_write_vol(Vo,Y);
 
-end  
- 
- 
- 
- 
- 
+end 
  
  
  
