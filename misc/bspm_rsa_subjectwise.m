@@ -55,6 +55,7 @@ if eigenplot
     axis([1,length(eigvals),min(eigvals),max(eigvals)*1.1]);
     xlabel('Eigenvalue number');
     ylabel('Eigenvalue');
+    setfigpapersize(gcf); 
 end
 
 %% REPRESENTATIONAL DISSIMILARITY MATRIX OR CORR MAP
@@ -68,11 +69,18 @@ colormap(jet);
 colorbar('SouthOutside');
 axis('square');
 box off;
+setfigpapersize(gcf); 
 
 %% CLEANUP DIAGONAL
 fishz = rho;
 fishz(:) = fisherz(rho);
 fishz(isinf(fishz)) = NaN;
+end
+function setfigpapersize(figh)
+set(figh, 'units', 'points', 'paperunits', 'points');
+figpos = get(figh, 'pos');
+set(figh, 'papersize', figpos(3:4), 'paperposition', [0 0 figpos(3:4)]);
+end
 
 
 

@@ -1,4 +1,4 @@
-function [s, info] = dicm_hdr(fname, dict, iFrames)
+function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % Return header of a dicom file in a struct.
 % 
 % [s, err] = dicm_hdr(dicomFileName, dict, iFrames);
@@ -80,7 +80,12 @@ function [s, info] = dicm_hdr(fname, dict, iFrames)
 % 150227 Avoid error due to empty file (thx Kushal).
 % 150316 Avoid error due to empty item dat for search method (thx VG).
 % 150324 philips_par/afni_head: make up SeriesInstanceUID for dicm2nii.
-% 150405 Implement bv_file to read BV fmr/vmr/dmr.
+% 150405 Implement bv_file to read non-transformed BV fmr/vmr/dmr.
+% 150504 bv_file: fix multiple STCdata; bug fix for VMRData.
+% 150513 return dict as 3rd output for dicm2nii in case of vendor change.
+% 150517 fix manufacturer check problem for Octave: no re-read.
+% 150522 PerFrameSQ ind: fix the case if numel(ind)~=nFrame.
+% 150526 read_sq: use ItemDelimitationItem instead of empty dat1 as SQ end.
 
 persistent dict_full;
 s = []; info = '';
@@ -95,37 +100,41 @@ if nargin<3, iFrames = []; end
 fid = fopen(fname);
 if fid<0, info = ['File not exists: ' fname]; return; end
 cln = onCleanup(@() fclose(fid));
-fseek(fid, 128, -1);
+empty = fseek(fid, 128, -1);
+if empty
+    info = ['Invalid file: ' fname];
+    return;
+end
 sig = fread(fid, 4, '*char')';
 isDicm = strcmp(sig, 'DICM');
 isTruncated = false;
 if ~isDicm
     fseek(fid, 0, -1);
     a = fread(fid, 1, 'uint16');
-    if ~isempty(a) && (a==2 || a==8) % not safe, but no better way
+    if a==2 || a==8 % not safe, but no better way
         fseek(fid, 0, -1);
         isTruncated = true;
     end
 end
 if ~isDicm && ~isTruncated % may be PAR or HEAD file
     [~, ~, ext] = fileparts(fname);
-    if strcmpi(ext, '.PAR') % || strcmpi(ext, '.REC')
-        func = @philips_par;
-    elseif strcmpi(ext, '.HEAD') % || strcmpi(ext, '.BRIK')
-        func = @afni_head;
-    elseif any(strcmpi(ext, {'.vmr' '.fmr' '.dmr'})) % BrainVoyager
-        func = @bv_file;
-    else
-        info = ['Unknown file type: ' fname];
-        return;
-    end
-    try [s, info] = feval(func, fname);
+    try
+        if strcmpi(ext, '.PAR') % || strcmpi(ext, '.REC')
+            [s, info] = philips_par(fname);
+        elseif strcmpi(ext, '.HEAD') % || strcmpi(ext, '.BRIK')
+            [s, info] = afni_head(fname);
+        elseif any(strcmpi(ext, {'.vmr' '.fmr' '.dmr'})) % BrainVoyager
+            [s, info] = bv_file(fname);
+        else
+            info = ['Unknown file type: ' fname];
+            return;
+        end
     catch me
         info = me.message;
         return;
     end
     if ~isempty(s), return; end
-    info = ['Not dicom file: ' fname]; 
+    if isempty(info), info = ['Not dicom file: ' fname]; end
     return; 
 end
 
@@ -172,19 +181,24 @@ if toSearch % search each tag if only a few fields
     for k = 1:numel(dict.tag)
         tg = char(typecast(dict.tag(k), 'uint8'));
         tg = tg([3 4 1 2]);
-        if expl, tg = [tg uint8(dict.vr{k})]; end %#ok safer with vr
         i = (strfind(b8, tg)+1) / 2;
         if isempty(i), continue;
         elseif numel(i)>1 % +1 tags found. use non-search method
-            i = 1;
-            toSearch = false;
-            break; % re-do in regular way
+            if expl, tg = [tg uint8(dict.vr{k})]; end %#ok add vr
+            i = (strfind(b8, tg)+1) / 2;
+            if isempty(i), continue;
+            elseif numel(i)>1 % +1 tags found. use non-search method
+                i = 1;
+                toSearch = false;
+                break; % re-do in regular way
+            end
         end
         [dat, name, info] = read_item(i);
         if isnumeric(name) || isempty(dat), continue; end
         s.(name) = dat;
-        [s, info, updated] = checkManufacturer(s, info, name);
-        if updated, return; end
+        if strcmp(name, 'Manufacturer') && ~strncmpi(dat, dict.vendor, 2)
+            updateManufacturer(dat);
+        end
     end
 end
 
@@ -211,8 +225,9 @@ while ~toSearch
     if strncmp(info, 'Given up', 8), break; end
     if isnumeric(name) || isempty(dat), continue; end
     s.(name) = dat;
-    [s, info, updated] = checkManufacturer(s, info, name);
-    if updated, return; end
+    if strcmp(name, 'Manufacturer') && ~strncmpi(dat, dict.vendor, 2)
+        updateManufacturer(dat);
+    end
     if strcmp(name, 'TransferSyntaxUID')
         expl = ~strcmp(dat, '1.2.840.10008.1.2'); % may be wrong for some
     end
@@ -263,7 +278,7 @@ vr = 'CS'; % CS for Manufacturer and TransferSyntaxUID
 group = b(i); i=i+1;
 elmnt = b(i); i=i+1;
 tag = uint32(group)*65536 + uint32(elmnt);
-if tag == 4294893581 % FFFE E00D ItemDelimitationItem for Philips SQ
+if tag == 4294893581 %|| tag == 4294893789 % FFFE E00D ItemDelimitationItem
     i = i+2; % skip length, in case there is another SQ Item
     name = '';
     return;
@@ -293,12 +308,14 @@ elseif tag==131088 % can't skip TransferSyntaxUID even if not in dict
     name = 'TransferSyntaxUID';
 elseif fullHdr
     if elmnt==0, i=i+n; return; end % skip GroupLength
-    name = sprintf('Private_%04x_%04x', group, elmnt);
+    if mod(group, 2), name = sprintf('Private_%04x_%04x', group, elmnt);
+    else              name = sprintf('Unknown_%04x_%04x', group, elmnt);
+    end
     if ~explVR, vr = 'UN'; end
 elseif n<2147483647.5 % no skip for SQ with length 0xffffffff
     i=i+n; return;
 end
-% compressed PixelData can be 0xffffffff
+% compressed PixelData, n can be 0xffffffff
 if ~explVR && n==2147483647.5, vr = 'SQ'; end % best guess
 if (n+i>len) && (~strcmp(vr, 'SQ')), i = i+n; return; end % re-do
 % fprintf('(%04x %04x) %s %g %s\n', group, elmnt, vr, n*2, name);
@@ -312,7 +329,6 @@ if ~isempty(strfind(chDat, vr)) % char data
 elseif strcmp(vr, 'SQ')
     isPerFrameSQ = strcmp(name, 'PerFrameFunctionalGroupsSequence');
     [dat, info, i] = read_sq(i, min(i+n,len), isPerFrameSQ);
-    return;
 else % numeric data, or UN
     fmt = vr2format(vr);
     if isempty(fmt)
@@ -326,13 +342,12 @@ end % nested func
 
 % Nested function: decode SQ, called by read_item (recursively)
 function [rst, info, i] = read_sq(i, nEnd, isPerFrameSQ)
-rst = []; info = ''; j = 0;
+rst = []; info = ''; j = 0; % j is frame index
 
 while i<nEnd
     tag = typecast(b(i+(0:1)), 'uint32'); i=i+2;
     n = typecast(b(i+(0:1)), 'uint32'); i=i+2; % n may be 0xffff ffff
     if tag ~= 3758161918, return; end % only do FFFE E000, Item
-
     if isPerFrameSQ && ~ischar(iFrames)
         if j==0, i0 = i; j = 1; % always read 1st frame
         elseif j==1 % always read 2nd frame, and find ind for all frames
@@ -341,11 +356,24 @@ while i<nEnd
             tag1 = tag1([3 4 1 2]);
             ind = strfind(char(typecast(b(i0:(iPixelData+1)/2), 'uint8')), tag1);
             ind = (ind-1)/2 + i0;
-            iFrames = unique([1 2 round(iFrames) numel(ind)]);
+            nInd = numel(ind);
+            if isfield(s, 'NumberOfFrames') && nInd~=s.NumberOfFrames
+                tag1PerF = nInd / s.NumberOfFrames;
+                if mod(tag1PerF, 1)>0 % not integer, read all frames
+                    iFrames = 'all'; rst = []; j = 0; i = i0-4; % re-do the SQ
+                    fprintf(2, ['Failed to determine indice for frames. ' ...
+                        'Will read all frames.\nFile: %s\n'], s.Filename);
+                    continue;
+                elseif tag1PerF>1 % more than one ind for each frame
+                    ind = ind(1:tag1PerF:nInd);
+                    nInd = s.NumberOfFrames;
+                end
+            end
+            iFrames = unique([1 2 round(iFrames) nInd]);
         else
             iItem = iItem + 1;
             j = iFrames(iItem);
-            i = ind(j);
+            i = ind(j); % start of tag1 for a frame
         end
     else
         j = j + 1;
@@ -357,28 +385,22 @@ while i<nEnd
     while i<n
         [dat1, name1, info, i, tag] = read_item(i);
         if isnumeric(name1), continue; end % 0-length or skipped item
-        if isempty(dat1), break; end
+        if tag == 4294893581, break; end % FFFE E00D ItemDelimitationItem
+        if isempty(dat1), continue; end
         if isempty(rst), tag1 = tag; end % first wanted tag in SQ
         rst.(Item_n).(name1) = dat1;
     end
 end
 end % nested func
 
-    function [s, info, updated] = checkManufacturer(s, info, name)
-        updated = strcmp(name, 'Manufacturer') && ...
-            ~isempty(dict.vendor) && ~strncmp(dict.vendor, s.Manufacturer, 2);
-        if ~updated, return; end    
-        dict_full = dicm_dict(s.Manufacturer); % update vendor
-        if fullHdr, dict = [];
-        else
-            if isfield(dict, 'fields')
-                dict = dicm_dict(s.Manufacturer, dict.fields);
-            else
-                dict = dicm_dict(s.Manufacturer);
-            end
-        end
-        [s, info] = dicm_hdr(s.Filename, dict, iFrames);
+function updateManufacturer(vendor)
+    dict_full = dicm_dict(vendor); % update vendor
+    if ~fullHdr && isfield(dict, 'fields')
+        dict = dicm_dict(vendor, dict.fields);
+    else
+        dict = dict_full;
     end
+end
 
 end % main func
 
@@ -521,12 +543,8 @@ if ~isempty(foo)
     end
 end
 s.MRAcquisitionType = par_key('Scan mode', '%s');
-foo = par_key('Preparation direction', '%s');
-if ~isempty(foo)
-    s.Stack.Item_1.MRStackPreparationDirection = foo(regexp(foo, '\<.'));
-end
 s.ScanningSequence = par_key('Technique', '%s'); % ScanningTechnique
-s.ImageType = s.ScanningSequence;
+s.ImageType = ['PhilipsPAR\' s.ScanningSequence];
 % foo = strkey(str, 'Scan resolution', '%g'); % before reconstruction
 % s.AcquisitionMatrix = [foo(1) 0 0 foo(2)]'; % depend on slice ori
 s.RepetitionTime = par_key('Repetition time');
@@ -549,6 +567,14 @@ isDTI = par_key('Diffusion')>0;
 if isDTI
     s.ImageType = [s.ImageType '\DIFFUSION\'];
     s.DiffusionEchoTime = par_key('Diffusion echo time'); % ms
+end
+
+foo = par_key('Preparation direction', '%s'); % Anterior-Posterior
+if ~isempty(foo)
+    foo = foo(regexp(foo, '\<.')); % 'AP'
+    s.Stack.Item_1.MRStackPreparationDirection = foo;
+    iPhase = strfind('LRAPFH', foo(1));
+    iPhase = ceil(iPhase/2); % 1/2/3
 end
 
 % Get list of para meaning for the table, and col index of each para
@@ -645,10 +671,9 @@ getTableVal('echo_time', 'EchoTime');
 % getTableVal('dyn_scan_begin_time', 'TimeOfAcquisition', 1:nImg);
 if isDTI
     getTableVal('diffusion_b_factor', 'B_value', iVol);
-    fld = 'DiffusionGradientDirection';
+    fld = 'bvec_original';
     getTableVal('diffusion', fld, iVol);
     if isfield(s, fld), s.(fld) = s.(fld)(:, [3 1 2]); end
-    s.BvecAvailable = true;
 end
 getTableVal('TURBO factor', 'TurboFactor');
 
@@ -683,18 +708,17 @@ s.SpacingBetweenSlices = s.SpacingBetweenSlices + s.SliceThickness;
 % s.PixelSpacing = FOV(ixyz(1:2)) ./ [s.Columns s.Rows]';
 % s.SpacingBetweenSlices = FOV(ixyz(3)) ./ nSL;
 
-% iPhase = strfind('LRAPSIFH', s.Stack.Item_1.MRStackPreparationDirection(1));
-% iPhase = ceil(iPhase/2); 
-% if iPhase>3, iPhase = 3; end % 1/2/3 for LR AP FH
-% foo = 'COL';
-% if iPhase == ixyz(1), foo = 'ROW'; end
-% s.InPlanePhaseEncodingDirection = foo;
+if exist('iPhase', 'var')
+    foo = 'COL';
+    if iPhase == ixyz(1), foo = 'ROW'; end
+    s.InPlanePhaseEncodingDirection = foo;
+end
 
 R = R(:, ixyz); % dicom rotation matrix
 s.ImageOrientationPatient = R(1:6)';
 R = R * diag([s.PixelSpacing; s.SpacingBetweenSlices]);
 R = [R posMid; 0 0 0 1]; % 4th col is mid slice center position
-% x = ([s.Columns s.Rows nSL] -1) / 2; % some V4.2 seeem to use this
+% x = ([s.Columns s.Rows nSL] -1) / 2; % some V4.2 seem to use this
 x = [s.Columns s.Rows nSL-1] / 2; % ijk of mid slice center 
 
 c0 = R(iOri,3:4) * [-x(3) 1]'; % 1st slice center loc based on current slice dir
@@ -764,7 +788,7 @@ s.ProtocolName = foo;
 s.SeriesNumber = SN; SN = SN+1; % make it unique for multilple files
 s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
     datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
-s.ImageType = afni_key('TYPESTRING');
+s.ImageType = ['AFNIHEAD\' afni_key('TYPESTRING')];
 
 foo = afni_key('BYTEORDER_STRING');
 if strcmp(foo(1), 'M'), err = 'BYTEORDER_STRING not supported'; s = []; return; end
@@ -902,12 +926,13 @@ catch
         tmp = tempname; % temp gz file
         fid = fopen([tmp '.gz'], 'w');
         if fid<0, return; end
-        cln = onCleanup(@() delete([tmp '.*'])); % delete gz and unziped files
+        cln = onCleanup(@() delete([tmp '*'])); % delete gz and unziped files
         fwrite(fid, gz_bytes, 'uint8');
         fclose(fid);
         
-        cmd = fullfile(fileparts(which(mfilename)), 'pigz -f -d ');
-        system([cmd '"' tmp '.gz"']);
+        gunzipOS = nii_tool('func_handle', 'gunzipOS');
+        gunzipOS([tmp '.gz']);
+        
         fid = fopen(tmp);
         bytes = fread(fid, '*uint8');
         fclose(fid);
@@ -929,11 +954,20 @@ catch me
     return;
 end
 
+if ~isempty(bv.Trf)
+    for i = 1:length(bv.Trf)
+        if ~isequal(diag(bv.Trf(i).TransformationValues), [1 1 1 1]')
+            err = 'Data has been transformed: skipped.';
+            return;
+        end
+    end
+end
+
 persistent SN subj folder % folder is used to update subj
 if isempty(SN), SN = 1; subj = ''; folder = ''; end
 s.Filename = bv.FilenameOnDisk;
 fType = bv.filetype;
-s.ImageType = fType;
+s.ImageType = ['BrainVoyagerFile\' fType];
 
 % Find a fmr/dmr, and get subj based on dicom file name in BV format.
 % Suppose BV files in the folder are for the same subj
@@ -996,7 +1030,7 @@ if strcmpi(fType, 'vmr')
             R3 = abs(R(iSL,3)) * s.SpacingBetweenSlices;
             nSL = round(abs(diff(pos(iSL,:))) / R3) + 1;
             iz = floor((bv.DimZ - nSL)/2);
-            s.PixelData = bv.PixelData(ix+(1:s.Columns), iy+(1:s.Rows), iz+(1:nSL), :);
+            s.PixelData = bv.VMRData(ix+(1:s.Columns), iy+(1:s.Rows), iz+(1:nSL), :);
         end
     end
     s.LocationsInAcquisition = nSL;
@@ -1027,7 +1061,10 @@ elseif strcmpi(fType, 'fmr') || strcmpi(fType, 'dmr')
     end
     if strcmpi(fType, 'fmr')
         bv.LoadSTC;
-        s.PixelData = permute(bv.Slice.STCData , [1 2 4 3]);
+        s.PixelData = permute(bv.Slice(1).STCData , [1 2 4 3]);
+        for i = 2:length(bv.Slice)
+            s.PixelData(:,:,i,:) = permute(bv.Slice(i).STCData , [1 2 4 3]);
+        end
     else % dmr
         s.ImageType = [s.ImageType '\DIFFUSION\'];
         bv.LoadDWI;
@@ -1054,8 +1091,7 @@ elseif strcmpi(fType, 'fmr') || strcmpi(fType, 'dmr')
 %                 fprintf(2, str);
 %                 err = [err str];
 %             end
-            s.DiffusionGradientDirection = a;
-            s.BvecAvailable = true; % for dicm2nii
+            s.bvec_original = a;
         end
     end
     

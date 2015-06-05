@@ -707,7 +707,7 @@ elseif strncmpi(vendor, 'Philips', 7)
     C = [C; {
     '2001' '1001' 'FL' 'ChemicalShift'
     '2001' '1002' 'IS' 'ChemicalShiftNumberMR'
-    '2001' '1003' 'FL' 'B_value' % B_factor
+    '2001' '1003' 'FL' 'B_factor'
     '2001' '1004' 'CS' 'DiffusionDirection'
     '2001' '1006' 'CS' 'ImageEnhanced'
     '2001' '1007' 'CS' 'ImageTypeEDES'
@@ -1000,7 +1000,7 @@ elseif strncmpi(vendor, 'Philips', 7)
     '2005' '1450' 'SS' 'MRNrOfPatientOtherIDs'
     '2005' '1455' 'FD' 'ImageVelocityEncodingDirection'
     '2050' '0020' 'CS' 'PresentationLUTShape' }];
-% elseif strncmpi(vendor, 'OtherVendor', 7)
+% elseif strncmpi(vendor, 'OtherVendor', n)
 end
 
 dict.tag = uint32(hex2dec(strcat(C(:,1), C(:,2))));
@@ -1009,9 +1009,9 @@ dict.name = C(:,4);
 
 if nargin>1 && ~isempty(flds) % use only provided fields
     flds = cellstr(flds);
-    ind = [];
+    ind = false(size(dict.tag,1), 1);
     for i = 1:length(flds)
-        ind = [ind; find(strcmp(flds{i}, dict.name))]; %#ok include duplicate
+        ind = ind | strcmp(flds{i}, dict.name); % include duplicate
     end
     dict.fields = flds; % remember the requested fields
     dict.tag  = dict.tag(ind);

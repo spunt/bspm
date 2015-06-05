@@ -100,20 +100,29 @@ else % rely on imread for decompression
     end
     img = zeros(s.Rows, s.Columns, spp, nFrame, fmt(2:end)); % pre-allocate
     
+    useMemmapfile = ~isempty(which('memmapfile'));
     fname = tempname;
-    fid = fopen(fname, 'w');
-    n = double(s.Columns) * double(s.Rows) * double(s.BitsAllocated) / 8 * spp;
-    fwrite(fid, zeros(n, 1, 'uint8')); % large enough: 1 frame w/o compression
-    fclose(fid); 
-    m = memmapfile(fname, 'Writable', true);
+    if useMemmapfile
+        fid = fopen(fname, 'w');
+        n = double(s.Columns) * double(s.Rows) * double(s.BitsAllocated) / 8 * spp;
+        fwrite(fid, zeros(n, 1, 'uint8')); % large enough: 1 frame w/o compression
+        fclose(fid); 
+        m = memmapfile(fname, 'Writable', true);
+    end
     deleteTemp = onCleanup(@() delete(fname)); % after memmapfile
     
     for j = 1:nFrame
         i = i+4; % delimiter: FFFE E000
         n = typecast(b(i+uint32(1:4)), 'uint32'); i = i+4;
-        m.Data(1:n) = b(i+(1:n)); i = i+n;
+        if useMemmapfile
+            m.Data(1:n) = b(i+(1:n)); i = i + n;
+        else
+            fid = fopen(fname, 'w');
+            fwrite(fid, b(i+(1:n)), 'uint8'); i = i + n;
+            fclose(fid); 
+        end
         img(:,:,:,j) = imread(fname); % take care of decompression
-        if i>=nEnd % in case false delimiter in data was counted
+        if i>nEnd % in case false delimiter in data was counted
             img(:,:,:,j+1:end) = [];
             break;
         end

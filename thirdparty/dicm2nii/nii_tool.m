@@ -107,8 +107,8 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % nii_tool will take care of rest when you 'save' nii to a file.
 % 
-% In case a NIfTI ext causes problem (for example, FSL 5.0.5 and 5.0.6 have
-% problem in reading NIfTI img with ecode=40), one can remove ext easily:
+% In case a NIfTI ext causes problem (for example, some FSL builds have problem
+% in reading NIfTI img with ecode>30), one can remove the ext easily:
 % 
 %  nii = nii_tool('load', 'file_with_ext.nii'); % load the file with ext
 %  nii.ext = []; % or nii = rmfield(nii, 'ext'); % remove ext
@@ -220,8 +220,10 @@ function varargout = nii_tool(cmd, varargin)
 % 150208 Add 4th input for 'save', allowing to save SPM 3D files
 % 150210 Add 'cat3D' to load SPM 3D files
 % 150226 Assign all 8 char for 'magic' (version 2 needs it)
-% 150321 swapbytes(nByte) for ecode=40 with big endian.
-% 150401 Add 'default' to set/query version and rgb_dim default setting.
+% 150321 swapbytes(nByte) for ecode=40 with big endian
+% 150401 Add 'default' to set/query version and rgb_dim default setting
+% 150514 read_ext: decode txt edata by dicm2nii.m
+% 150517 fhandle: provide a way to use gunzipOS etc from outside
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -270,7 +272,7 @@ elseif strcmpi(cmd, 'save')
     [pth, fname, fext] = fileparts(fname);
     do_gzip = strcmpi(fext, '.gz');
     if do_gzip
-        [tmptmp, fname, fext] = fileparts(fname); % get .nii .img .hdr
+        [~, fname, fext] = fileparts(fname); % get .nii .img .hdr
     end
     if isempty(fext), fext = '.nii'; end % default single .nii file
     fname = fullfile(pth, fname); % without file ext
@@ -524,6 +526,8 @@ elseif strcmpi(cmd, 'default')
         fprintf(2, 'Failed to save default parameters for future use.\n');
         fprintf(2, '%s\n', me.message);
     end
+elseif strcmpi(cmd, 'func_handle') % make a local function avail to outside 
+    varargout{1} = eval(['@' varargin{1}]);
 else
     error('Invalid command for nii_tool: %s', cmd);
 end
@@ -750,7 +754,7 @@ if err, errorLog(['Error during compression: ' str]); end
 % Deal with pigz/gzip on path or in nii_tool folder, and matlab gzip/gunzip
 function cmd = check_gzip
 % first, try system pigz
-err = system('pigz -V 2>&1');
+[err, ~] = system('pigz -V 2>&1');
 if ~err, cmd = 'pigz -n'; return; end
 
 % next, try pigz included with nii_tool
@@ -772,11 +776,11 @@ elseif ispc % rename back pigz for Windows. Renamed to trick Matlab Central
 end
 
 cmd = fullfile(m_dir, 'pigz -n');
-err = system([cmd ' -V 2>&1']);
+[err, ~] = system([cmd ' -V 2>&1']);
 if ~err, return; end
 
 % Third, try system gzip
-err = system('gzip -V 2>&1'); % gzip on system path?
+[err, ~] = system('gzip -V 2>&1'); % gzip on system path?
 if ~err, cmd = 'gzip -n'; return; end
 
 % Lastly, try to use Matlab gzip/gunzip. Check only one, since they are paired
@@ -790,7 +794,7 @@ cmd = true; % use slower matlab gzip/gunzip
 %% Try to use in order of pigz, system gunzip, then matlab gunzip
 function outName = gunzipOS(fname)
 persistent cmd; % command to run gupzip
-while isempty(cmd)
+if isempty(cmd)
     cmd = check_gzip;
     if ischar(cmd)
     	cmd = [cmd ' -f -d ']; % overwrite if exist
@@ -798,7 +802,6 @@ while isempty(cmd)
         error('None of system pigz, gunzip or Matlab gunzip is available');
     end
 end
-
 pth = tempdir; % unzip into temp dir
 
 if islogical(cmd)
@@ -806,9 +809,9 @@ if islogical(cmd)
     return;
 end
 
-[tmp, outName, ext] = fileparts(fname);
+[pth1, outName, ext] = fileparts(fname);
 outName = fullfile(pth, outName);
-copyfile(fname, [outName ext], 'f');
+if ~strcmp([pth1 filesep], pth), copyfile(fname, [outName ext], 'f'); end
 [err, str] = system([cmd '"' outName ext '"']); % overwrite if exist
 if err, fprintf(2, 'Error during decompression:\n%s\n', str); end
 
@@ -824,7 +827,7 @@ for i = 1:size(C,1)
 end
 
 hdr.version = niiVer; % for 'save', unless user asks to change
-[tmp, tmp2, hdr.machine]= fopen(fid); % use it for .img file
+[~, ~, hdr.machine]= fopen(fid); % use it for .img file
 
 [pth, nam, ext] = fileparts(fname); % fname may be .gz
 if isempty(pth)
@@ -859,6 +862,35 @@ while ftell(fid) < nEnd
         fclose(fid1);
         deleteMat = onCleanup(@() delete(tmp)); % delete temp file after done
         ext(i).edata_decoded = load(tmp); % load into struct
+    elseif ext(i).ecode == 6 % plain text
+        str = char(ext(i).edata');
+        if isempty(strfind(str, 'dicm2nii.m'))
+            ext(i).edata_decoded = deblank(str);
+        else % created by dicm2nii.m
+            ss = struct;
+            ind = strfind(str, [';' char([0 10])]); % strsplit error in Octave
+            ind = [-2 ind]; % -2+3=1: start of first para
+            for j = 1:numel(ind)-1
+                a = str(ind(j)+3 : ind(j+1));
+                a(a==0) = []; % to be safe. strtrim wont remove null
+                a = strtrim(a);
+                if isempty(a), continue; end
+                try 
+                    eval(['ss.' a]); % put all into struct
+                catch me
+                    fprintf(2, '%s\n', me.message);
+                    fprintf(2, 'Unrecognized text: %s\n', a);
+                end
+            end
+            flds = fieldnames(ss); % make all vector column
+            for j = 1:length(flds)
+                val = ss.(flds{j});
+                if isnumeric(val) && isrow(val), ss.(flds{j}) = val'; end
+            end
+            ext(i).edata_decoded = ss;
+        end
+    elseif ext(i).ecode == 4 % AFNI
+        ext(i).edata_decoded = deblank(char(ext(i).edata)');
     elseif ext(i).ecode == 2 % dicom
         no_dicm_hdr = isempty(which('dicm_hdr'));
         if no_dicm_hdr && isempty(which('dicominfo')), return; end 
@@ -872,8 +904,6 @@ while ftell(fid) < nEnd
         else
             ext(i).edata_decoded = dicm_hdr(tmp);
         end
-    elseif any(ext(i).ecode == [4 6]) % AFNI or plain text
-        ext(i).edata_decoded = deblank(char(ext(i).edata)');
     end
     i = i + 1;
 end
@@ -921,11 +951,11 @@ end
 
 %% Return requested fname with ext, useful for .hdr and .img files
 function fname = nii_name(fname, ext)
-[tmp, f, e] = fileparts(fname);
+[~, f, e] = fileparts(fname);
 n = length(fname);
 if strcmpi(e, '.gz')
     n = n - 3; % 3 is length('.gz')
-    [tmp, tmp2, e] = fileparts(f); % .nii/.hdr/.img
+    [~, ~, e] = fileparts(f); % .nii/.hdr/.img
 end
 if strcmpi(e, '.nii') || strcmpi(e, ext), return; end
 if ~strcmpi(e, '.hdr') && ~strcmpi(e, '.img')
