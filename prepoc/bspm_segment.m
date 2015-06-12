@@ -7,11 +7,11 @@ function matlabbatch = bspm_segment(in, varargin)
 %
 %   VARARGINS:
 %      1 - dartel_imported      [1 1 0 0 0 0]
-%      2 - native_space         [1 1 1 0 0 0]
+%      2 - native_space         [0 0 0 0 0 0]
 %      3 - ngaus                [1 1 2 3 4 2]
-%      4 - forward_deform       0
-%      5 - backward_deform      0
-%      6 - sampling_dist        3
+%      4 - forward_deform       0       (native -> MNI)
+%      5 - backward_deform      0       (MNI -> native)
+%      6 - sampling_dist        3       (smaller -> uses more data, slower speed)
 %      7 - biasfield            0
 %      8 - biascorrected        0
 %      9 - biasreg              0.001

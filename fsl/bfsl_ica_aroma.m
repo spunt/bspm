@@ -24,14 +24,17 @@ if nargin < 2, TR = []; end
 if nargin < 3, outdir = fileparts(infile); end
 
 % | - Configure Path
-aromadir = fullfile(fileparts(fileparts(mfilename('fullpath'))), 'thirdparty', 'ICA-AROMA');  
-icaaroma = fullfile(aromadir, 'ICA_AROMA.py'); 
+gitdir      = '/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/_functions_/git'; 
+aromadir    = fullfile(gitdir, 'thirdparty', 'ICA-AROMA');  
+icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
+if ~exist(icaaroma, 'file')
+    fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); 
+    return; 
+end
 rpfile      = char(files(fullfile(fileparts(infile), 'rp*txt')));
 if isempty(TR)
-    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s &', icaaroma, infile, outdir, rpfile);
+    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s', icaaroma, infile, outdir, rpfile);
 else
-    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s -tr %d &', icaaroma, infile, outdir, rpfile, TR);
+    cmd = sprintf('python2.7 %s -i %s -o %s -mc %s -tr %d', icaaroma, infile, outdir, rpfile, TR);
 end
-if nargin==0
-    system(cmd);
-end
+if nargout==0, system(cmd); end

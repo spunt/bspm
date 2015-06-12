@@ -4,8 +4,11 @@ function matlabbatch = bspm_deformations(in, field, varargin)
 %   USAGE: matlabbatch = bspm_deformations(in, field, varargin)
 %
 %   ARGUMENTS:
-%       in = cell array of images to apply deformation field to
-%       field = deformation field to use
+%       in      = images to deform
+%       field   = deformation field, e.g.
+%               iy_*    = forward (native -> MNI)
+%               y_*     = backward (MNI -> native)
+%               
 %
 
 % --------------------- Copyright (C) 2014 ---------------------

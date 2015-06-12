@@ -53,7 +53,6 @@ if strcmpi(template, 'younger'), templatetag = 0; end
 % | BUILD JOB
 matlabbatch{1}.spm.tools.MRI.MRnormseg.anat             = strcat(t1, ',1');
 matlabbatch{1}.spm.tools.MRI.MRnormseg.les              = strcat(lesion, ',1');
-matlabbatch{1}.spm.tools.MRI.MRnormseg.t2               = '';
 matlabbatch{1}.spm.tools.MRI.MRnormseg.clinicaltemplate = templatetag;
 matlabbatch{1}.spm.tools.MRI.MRnormseg.clean            = cleanuplevel;
 matlabbatch{1}.spm.tools.MRI.MRnormseg.bb               = boundingbox;

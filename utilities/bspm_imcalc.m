@@ -29,7 +29,7 @@ function bspm_imcalc(in, outname, operation)
 %               'zscore'        - convert t-image to z-image
 %               'prctile'       - convert to percentile
 %               'prctilesym'    - convert to percentile for +/- separately
-%               'fill'          - uses IMFILL to fill holes in volume
+%               'imfill'        - uses IMFILL to fill holes in volume
 %
 %           SPECIAL OPERATORS
 %               'colorcode' - combine and colorcode multiple images
@@ -64,10 +64,10 @@ if nvol > 1
     switch lower(operation)
     case {'colorcode'}
         expression  = 'i1'; 
-        for i = 2:length(hdr), expression = [expression sprintf('+(i%d*%d)', i, i)]; end
+        for i = 2:length(hdr), operation = [operation sprintf('+(i%d*%d)', i, i)]; end
     case {'prod'}
         expression  = 'i1'; 
-        for i = 2:nvol, expression = [expression sprintf('.*i%d', i)]; end
+        for i = 2:nvol, operation = [operation sprintf('.*i%d', i)]; end
     case {'sum', 'mean', 'median'}
         expression = strcat('nan', operation, '(X)'); 
     case {'min', 'max', 'std', 'var'}
@@ -79,12 +79,12 @@ if nvol > 1
             expression = 'i1-i2'; 
         end
     end
-    if regexpi(expression, '\(X\)')
+    if regexpi(operation, '\(X\)')
         dmtx = 1; 
-    elseif regexp(expression, '\W')
+    elseif regexp(operation, '\W')
         dmtx = 0; 
     else
-        expression = strcat(expression, '(X)'); 
+        operation = strcat(operation, '(X)'); 
         dmtx = 1;
     end
     outhdr = hdr(1);
@@ -97,7 +97,7 @@ if nvol > 1
         outhdr.descrip = [upper(operation) ' IMAGE'];
     end
     outhdr.fname = outname; 
-    spmimcalc(hdr, outhdr, expression, {dmtx});
+    spmimcalc(hdr, outhdr, operation, {dmtx});
     return
 else
     im = spm_read_vols(hdr);

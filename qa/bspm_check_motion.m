@@ -14,15 +14,11 @@ function out = bspm_check_motion(rpfiles, writereport)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
 if nargin<2, writereport = 0; end
 if nargin<1, display('USAGE: out = bspm_check_motion(rpfiles, writereport)'); return; end
 if ischar(rpfiles), rpfiles = cellstr(rpfiles); end
-
 cols = {'Max Trans' 'Max Rot' 'Max Diff'};
-
-for i = 1:length(rpfiles)
-        
+for i = 1:length(rpfiles)  
     [path name ext] = fileparts(rpfiles{i});
     [path name ext] = fileparts(path);
     run{i} = name;
@@ -35,8 +31,7 @@ for i = 1:length(rpfiles)
     movement = max(rp) - min(rp);
     maxtrans(i) = max(movement(1:3));
     maxrot(i) = max(movement(4:6));
-    maxdiff(i) = max(max(rpdiff));
-    
+    maxdiff(i) = max(max(rpdiff));   
 end
 data = [maxtrans' maxrot' maxdiff'];
 out.data = data; 
@@ -47,10 +42,8 @@ data = [data; gdata];
 gnames = {'MEAN' 'SD' 'MAX'};
 sub = [sub gnames];
 disptable(data,cols,sub,'%2.2f');
-
 if writereport
-    [d t] = bspm_timestamp;
-    outname = sprintf('motion_report_%s_%s.xls',d,t);
+    outname = sprintf('motion_report_%s.xls', bspm_timestamp);
     allcell = [[{''} cols]; [sub' num2cell(data)]];
     xlwrite(outname, allcell);
 end

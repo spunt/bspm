@@ -1,7 +1,7 @@
-function bspm_movie(in, slice)
+function bspm_movie_multi(in, slice)
 % BSPM_MOVIE
 %
-% USAGE: bspm_movie(in, slice)
+% USAGE: bspm_movie_multi(in, slice)
 %
 
 % ------ Copyright (C) 2014 ------
@@ -11,15 +11,19 @@ function bspm_movie(in, slice)
 %
 %	$Revision Date: Aug_20_2014
 if nargin < 1, error('USAGE: bspm_movie(in, [slice])'); end
-if iscell(in), in = char(in); end
-h       = spm_vol(in);
-nvol    = length(h);
-dimvol  = h(1).dim; 
-if nargin < 2, slice = round(dimvol(1)/2); end
-fprintf('\n | - Reading data for %d image volumes', nvol);
-d       = spm_read_vols(h);
-d       = imrotate(squeeze(d(slice, :, :, :)), 90);
-fprintf(' - DONE\n');
+if ischar(in), in = cellstr(in); end
+ndisp   = length(in);
+for i = 1:ndisp
+   mov(i).h         = spm_vol(in{i});
+   mov(i).nvol      = length(mov(i).h);
+   mov(i).dimvol    = mov(i).h(1).dim;
+   fprintf('\n | - %d: Reading data for %d image volumes', i, mov(i).nvol);
+   mov(i).d         = spm_read_vols(mov(i).h);
+   if nargin < 2, mov(i).slice = round(mov(i).dimvol(1))/2; end
+   mov(i).d         = imrotate(squeeze(mov(i).d(mov(i).slice, :, :, :)), 90);
+   fprintf(' - DONE\n');
+end
+
 playagain = 1; 
 while playagain==1
     ddim = size(d);
