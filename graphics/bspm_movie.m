@@ -1,7 +1,7 @@
-function bspm_movie(in, slice)
+function bspm_movie(in, dim, slice)
 % BSPM_MOVIE
 %
-% USAGE: bspm_movie(in, slice)
+% USAGE: bspm_movie(in, dim, slice)
 %
 
 % ------ Copyright (C) 2014 ------
@@ -10,15 +10,22 @@ function bspm_movie(in, slice)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin < 1, error('USAGE: bspm_movie(in, [slice])'); end
+if nargin < 1, error('USAGE: bspm_movie(in, dim, [slice])'); end
 if iscell(in), in = char(in); end
 h       = spm_vol(in);
 nvol    = length(h);
-dimvol  = h(1).dim; 
-if nargin < 2, slice = round(dimvol(1)/2); end
+dimvol  = h(1).dim;
+if nargin < 2, dim = 1; end
+if nargin < 3, slice = round(dimvol(dim)/2); end
 fprintf('\n | - Reading data for %d image volumes', nvol);
 d       = spm_read_vols(h);
-d       = imrotate(squeeze(d(slice, :, :, :)), 90);
+if dim==1
+    d       = imrotate(squeeze(d(slice, :, :, :)), 90);
+elseif dim==2
+    d       = imrotate(squeeze(d(:, slice, :, :)), 90);
+else
+    d       = imrotate(squeeze(d(:, :, slice, :)), 90);
+end
 fprintf(' - DONE\n');
 playagain = 1; 
 while playagain==1
@@ -31,7 +38,7 @@ while playagain==1
     hold on; 
     for i=1:nvol
         set(t, 'String', sprintf(['Volume ' f ' of ' f], i, nvol)); 
-        set(h1,'CData',d(:,:,i));
+        set(h1,'CData',autobrightvol(d(:,:,i)));
         pause(1/15);
     end;
     playagain = input('Play it again? [1=Yes, 2=No] ');
@@ -58,6 +65,14 @@ if isequal(imname,0) || isequal(pname,0)
 else
     vol = fullfile(pname, strcat(imname));
 end
+end
+function out = autobrightvol(in)
+d = [min(in(:)) max(in(:))];
+out = in; 
+out(:) = scaledata(out(:), [0 1]);
+out = imadjust(out);
+out(:) = scaledata(out(:), d); 
+
 end
 
  

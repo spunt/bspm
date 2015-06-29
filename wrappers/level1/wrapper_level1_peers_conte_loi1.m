@@ -1,29 +1,24 @@
-function allinput = wrapper_level1_peers_conte_loi2(covidx, varargin)
-% matlabbatch = wrapper_level1_conte(covidx, varargin)
+function allinput = wrapper_level1_peers_conte_loi1(varargin)
+% matlabbatch = wrapper_level1_loi1(varargin)
 %
 % To show default settings, run without any arguments.
 %
-%     COVIDX 
-%       01 - Duration          
-%       02 - Errors (Total)
-%       03 - Errors (Foils)
 % 
 
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Desktop/Dropbox/Bob/Research/caltech/PEERS/data',      ...
-            'HPF',              100,            ...
-            'armethod',         1,              ...
+            'covidx',           [],             ...
             'epifname',         [],             ...
+            'HPF',              100,            ...
+            'armethod',         2,              ... 
             'nuisancepat',      'bad*txt',      ...
-            'epipat',           'swbu*nii',      ...
+            'epipat',           'swbu*nii',     ...
             'subid',            'RA*',          ...
-            'runid',            'EP*LOI_2*',     ...
-            'behavid',          'loi2*mat',     ...
-            'basename',         'ALLSESS_LOI2',         ...
+            'runid',            'EP*LOI_1*',    ...
+            'behavid',          'loi1*mat',     ...
+            'basename',         'LOI1',         ...
             'brainmask',        '',             ...
-            'model',            '2X2',          ...
             'fcontrast',        1,              ...
             'nskip',            4,              ...
             'runtest',          0,              ...
@@ -37,23 +32,22 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
 % | ===========================================================================
+studydir = '/Users/bobspunt/Desktop/Dropbox/Bob/research/caltech/PEERS/data';
 if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/peers'; end
 [subdir, subnam] = files([studydir filesep subid]);
 
 % | EPI FNAME
 % | ===========================================================================
+fnepi = []; 
 if ~isempty(epifname)
     epifname = fullfile(studydir, epifname); 
     if exist(epifname, 'file')
         fnepi = load(epifname); 
     else
         disp('epifname could not be found!');
-        fnepi = []; 
     end
-else
-    fnepi = []; 
 end
-
+    
 % | ANALYSIS NAME
 % | ===========================================================================
 armethodlabels  = {'NoAR1' 'AR1' 'WLS'};
@@ -64,7 +58,7 @@ if ~isempty(covidx)
 else
     pmstr = 'None'; 
 end
-analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
+analysisname  = sprintf('%s_Pmodby_%s_%s_%ds_%s', basename, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
@@ -78,7 +72,7 @@ if runtest, subdir = subdir(1); end
 
 % | SUBJECT LOOP
 % | ===========================================================================
-allinput = [];  
+allinput = []; 
 for s = 1:length(subdir)
     
     % | Check Subject and Define Folders
@@ -112,12 +106,10 @@ for s = 1:length(subdir)
     end
     
     % | Run Loop
-    % | ======================================================================== 
+    % | ========================================================================
     for r = 1:length(rundir)
 
-        % | Data for Current Run
-        % | =====================================================================
-        b = get_behavior(behav{r}, model, yesnokeys);
+        b = get_behavior(behav{r});
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
         
         % | Columns for b.blockwise
@@ -176,11 +168,7 @@ for s = 1:length(subdir)
     % | ========================================================================
     ncond   = length(b.condlabels);
     w1      = eye(ncond);
-    if ncond==2
-        w2 = [1 -1]; 
-    else
-        w2 = [.5 .5 -.5 -.5; .5 -5 .5 -.5; 1 0 -1 0; 0 1 0 -1; 1 -1 0 0; 0 0 1 -1];
-    end
+    w2      = [1 0 -1; 0 1 -1; 1 -1 0; .5 .5 -1]; 
     weights = [w1; w2]; 
     ncon    = size(weights,1);
     for c = 1:ncon
@@ -200,35 +188,29 @@ for s = 1:length(subdir)
 
     % | Cleanup Workspace
     % | ========================================================================
-    clear general_info runs contrasts b modelpm modelpmnames
+    clear general_info runs contrasts b modelpm modelpmnames images
 
 end
 end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, opt, yesnokeys)
+function b = get_behavior(in)
 % GET_BEHAVIOR
 %
-%   USAGE: b = get_behavior(in, opt)
+%   USAGE: b = get_behavior(in)
 %       
 %       in      behavioral data filename (.mat)
-%       opt     '2x2'  - full design
-%               '1x2'  - why vs. how
 %
 %       Columns for b.blockwise
 %          1 - Block
 %          2 - Cond
 %          3 - Onset
 %          4 - Duration
-%          5 - Total_Errors
-%          6 - Foil_Errors
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
 % =========================================================================
-if nargin < 1, error('USAGE: b = get_behavior(in, opt, yesnokeys)'); end
-if nargin < 2, opt = '2x2'; end
-if nargin < 3, yesnokeys = [1 2]; end
+if nargin < 1, error('USAGE: b = get_behavior(in)'); end
 if iscell(in), in = char(in); end
 
 % | read data
@@ -242,45 +224,21 @@ else
     data        = d.trialSeeker;
     blockwise   = d.blockSeeker; 
 end
+blockwise(:,3:4) = 0; 
 
-% | blockwise accuracy and durations
+% | blockwise onsets and durations
 % | ========================================================================
-ntrials         = length(data(data(:,1)==1,1));
-data(data(:,8)==yesnokeys(1), 8) = 1; 
-data(data(:,8)==yesnokeys(2), 8) = 2; 
-data(:,10)      = data(:,4)~=data(:,8); % errors
-data(data(:,8)==0, 7:8) = NaN; % NR to NaN
-blockwise(:,3)  = data(data(:,2)==1, 6);
-blockwise(:,4)  = data(data(:,2)==ntrials, 9) - data(data(:,2)==1, 6); 
-
-% | compute block-wise error counts
-% | ========================================================================
-for i = 1:size(blockwise, 1)
-    blockwise(i,5) = sum(data(data(:,1)==i,10));  % all errors
-    blockwise(i,6) = sum(data(data(:,1)==i & data(:,4)==2, 10)); % foil errors
-end
-
-% | re-code data
-% | ========================================================================
-con     = blockwise(:,2);
-condata = data(:,3); 
-switch lower(opt)
-    case {'2x2'}
-        b.condlabels = {'Why_Face' 'Why_Hand' 'How_Face' 'How_Hand'};
-    case {'1x2'}
-        b.condlabels = {'Why' 'How'};
-        blockwise(con==2, 2)                    = 1;
-        data(condata==2, 3)                     = 1; 
-        blockwise(ismember(con,[3 4]), 2)       = 2;
-        data(ismember(condata,[3 4]), 3)        = 2; 
-end
-for i = 1:length(unique(data(:,3)))
-    cdata = data(data(:,3)==i, [7 10]);
-    b.accuracy(i)  = 100*(sum(cdata(:,2)==0)/size(cdata,1));
-    b.rt(i)        = nanmean(cdata(:,1)); 
+nblocks     = size(blockwise, 1);
+for i = 1:nblocks
+   cblock = data(data(:,1)==i,:);
+   blockwise(i, 3) = cblock(1, 6); 
+   blockwise(i, 4) = cblock(end, 9) - cblock(1, 6); 
 end
 b.blockwise = blockwise;
-b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Total_Errors' 'Foil_Errors'};  
+b.condlabels = {'Face' 'Hand' 'Scram'}; 
+b.varlabels = {'Block' 'Cond' 'Onset' 'Duration'};
+b.num_hits = sum(data(:,3)==4 & data(:,7)>0);
+b.num_misses = sum(data(:,3)~=4 & data(:,7)>0); 
 end    
 function mfile_showhelp(varargin)
 % MFILE_SHOWHELP
