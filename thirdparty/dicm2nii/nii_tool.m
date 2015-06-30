@@ -60,11 +60,10 @@ function varargout = nii_tool(cmd, varargin)
 % supported.
 % 
 % nii_tool returns img with the same data type as it is stored, while numeric
-% values in hdr are in double. This also applies to the struct returned by any
-% nii_tool loading sub-functions.
+% values in hdr are in double regardless the data type in the file.
 % 
 % The optional third input is needed only if img contains RGB/RGBA data. It
-% specifies which dimension in img is for RGB or RGBA. In other words, if a
+% specifies which dimension in img encodes for RGB or RGBA. In other words, if a
 % non-empty third input is provided, img will be interpreted as RGB or RGBA
 % data.
 % 
@@ -169,43 +168,42 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % oldStyle = nii_tool('RGBStyle', 'afni');
 % 
-% - Set/query the method to save/load RGB or RGBA NIfTI file. The default method
-% can be set by nii_tool('default', [version rgb_dim]), where rgb_dim can be 1,
-% 3 or 4, as explained below.
+% - Set/query the method to save RGB or RGBA NIfTI file. The default method can
+% be set by nii_tool('default', 'rgb_dim', dimN), where dimN can be 1, 3 or 4,
+% or 'afni', 'mricron' or 'fsl', as explained below.
 % 
 % The default style is 'afni' style (or 1), which is defined by NIfTI standard,
-% but is not well supported by fsl or mricron.
+% but is not well supported by fslview till v5.0.8 or mricron till v20140804
 % 
-% If the second input is set to 'mricron' (or 3), nii_tool will save/load file
-% using the old RGB fashion (dim 3 for RGB). This works for mricron at least
-% till version 4 August 2014.
+% If the second input is set to 'mricron' (or 3), nii_tool will save file
+% using the old RGB fashion (dim 3 for RGB). This works for mricron v20140804 or
+% earlier. The later mricron works for both rgb_dim of 1 and 3.
 % 
-% If the second input is set to 'fsl' (or 4), nii_tool will save/load RGB or
-% RGBA layer into 4th dimension (and the file is not encoded as RGB data, but as
-% normal file). This violates the NIfTI rule, but it seems it is the only way,
-% for now (till fsl version 5.0.8), to work for fslview.
+% If the second input is set to 'fsl' (or 4), nii_tool will save RGB or RGBA
+% layer into 4th dimension, and the file is not encoded as RGB data, but as
+% normal NIfTI. This violates the NIfTI rule, but it seems it is the only way
+% to work for fslview (at least till fsl v5.0.8).
 % 
 % If no new style (second input) is provided, it means to query the current
 % style (one of 'afni', 'mricron' and 'fsl').
 % 
-% Following shows how to convert between mricron style and fsl style:
+% Following shows how to convert into fsl style:
 % 
-%  nii_tool('RGBStyle', 'mricron'); % later load/save uses mricron style
-%  nii = nii_tool('load', 'mricronStyle.nii'); % load dim3-RGB file
-%  nii_tool('RGBStyle', 'fsl'); % switch to fsl style
+%  nii = nii_tool('load', 'non_fsl_style.nii'); % load RGB file
+%  nii_tool('RGBStyle', 'fsl'); % switch to fsl style for later save
 %  nii_tool('save', nii, 'fslRGB.nii'); % fsl can read it as RGB
 % 
 % Note that, if one wants to convert fsl style (non-RGB file by NIfTI standard)
 % to other styles, an extra step is needed to change the RGB dim from 4th to 8th
 % dim before 'save':
 % 
-%  nii = nii_tool('load', 'fslStyleFile.nii'); % no need to set 'RGBStyle'
+%  nii = nii_tool('load', 'fslStyleFile.nii'); % it is normal NIfTI
 %  nii.img = permute(nii.img, [1:3 5:8 4]); % force it to be RGB data
-%  nii_tool('RGBStyle', 'mricron'); % switch to RGB mricron style
-%  nii_tool('save', nii, 'mricronRGB.nii'); % now mricron can read it as RGB
+%  nii_tool('RGBStyle', 'afni'); % switch to NIfTI RGB style
+%  nii_tool('save', nii, 'afni_RGB.nii'); % now AFNI can read it as RGB
 % 
 % Also note that the setting by nii_tool('RGBStyle') is effective only for
-% current Matlab session. If one clears all, or starts a new Matlab session, the
+% current Matlab session. If one clears all or starts a new Matlab session, the
 % default style by nii_tool('default') will take effect.
  
 % More information for NIfTI format:
@@ -224,6 +222,7 @@ function varargout = nii_tool(cmd, varargin)
 % 150401 Add 'default' to set/query version and rgb_dim default setting
 % 150514 read_ext: decode txt edata by dicm2nii.m
 % 150517 fhandle: provide a way to use gunzipOS etc from outside
+% 150617 auto detect rgb_dim 1&3 for 'load' etc using ChrisR method
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -314,12 +313,10 @@ elseif strcmpi(cmd, 'save')
     end
         
     % re-arrange img for special datatype: RGB/RGBA/Complex.
-    % mis-use unused data_type to store rgb_dim in nifti FILE
     if any(nii.hdr.datatype == [128 511 2304]) % RGB or RGBA
-        nii.hdr.data_type = sprintf('rgb_dim=%g', para.rgb_dim);
         if para.rgb_dim == 1 % AFNI style
             nii.img = permute(nii.img, [8 1:7]);
-        elseif para.rgb_dim == 3 % mricron
+        elseif para.rgb_dim == 3 % old mricron style
             nii.img = permute(nii.img, [1 2 8 3:7]);
         elseif para.rgb_dim == 4 % for fslview
             nii.img = permute(nii.img, [1:3 8 4:7]); % violate nii rule
@@ -918,20 +915,18 @@ end
 dim = hdr.dim(2:8);
 dim(hdr.dim(1)+1:7) = 1; % avoid some error in file
 dim(dim<1) = 1;
-n = prod(dim) * para.valpix(ind); % num of values
+valpix = para.valpix(ind);
+n = prod(dim); % num of values
 fseek(fid, hdr.vox_offset, 'bof');
-img = fread(fid, n, ['*' para.format{ind}]); % * to keep original class
+img = fread(fid, n*valpix, ['*' para.format{ind}]); % * to keep original class
 
 if any(hdr.datatype == [128 511 2304]) % RGB or RGBA
-    j = para.rgb_dim;
-    if isfield(hdr, 'data_type')
-        a = hdr.data_type;
-        if numel(a)>8 && strncmp(a, 'rgb_dim=', 8) % override user's RGB_dim
-            a = str2double(a(9));
-            if any(a == [1 3 4]), j = a; end % 4 is not possible
-        end
-    end
-    dim = [dim(1:j-1) para.valpix(ind) dim(j:7)]; % length=8 now
+    a = reshape(single(img), valpix, n); % assume rgbrgbrgb...
+    d1 = abs(a - a(:,[2:end 1])); % how similar are voxels to their neighbor
+    a = reshape(a, prod(dim(1:2)), valpix*prod(dim(3:7))); % rr...rgg...gbb...b
+    d2 = abs(a - a([2:end 1],:));
+    j = (sum(d1(:))>sum(d2(:)))*2 + 1; % 1 for afni, 3 for mricron
+    dim = [dim(1:j-1) valpix dim(j:7)]; % length=8 now
     img = reshape(img, dim);
     img = permute(img, [1:j-1 j+1:8 j]); % put RGB(A) to dim8
 elseif any(hdr.datatype == [32 1792]) % complex single/double
@@ -941,12 +936,6 @@ elseif any(hdr.datatype == [32 1792]) % complex single/double
 else % all others: valpix=1
     if hdr.datatype==1, img = logical(img); end
     img = reshape(img, dim);
-    % this will cause problem if user permutes img again, so better off
-%     if isfield(hdr, 'data_type') && strcmp(hdr.data_type, 'rgb_dim=4') && ...
-%           ((hdr.datatype==2 && any(dim(4) == [3 4])) || ... % uint8 RGB/RGBA
-%           (hdr.datatype==16 && dim(4)==3)) % single RGB
-%         img = permute(img, [1:3 5:8 4]); % put RGB(A) to dim8
-%     end
 end
 
 %% Return requested fname with ext, useful for .hdr and .img files
