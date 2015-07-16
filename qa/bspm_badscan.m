@@ -7,7 +7,8 @@ function tsinfo = bspm_badscan(epi, varargin)
 %    epi = cell array of EPI filenames
 %   'dvars_thresh',     2.5,  
 %   'framewise_thresh', 0.5,  
-%   'include_rp',       1,    
+%   'include_rp',       1,
+%   'prefix',           'badscan', 
 %   'maskfile',         []
 %   
 % 
@@ -20,6 +21,7 @@ function tsinfo = bspm_badscan(epi, varargin)
 def = { 'dvars_thresh',     2.5,  ...
         'framewise_thresh', 0.5,  ...
         'include_rp',       1,    ...
+        'prefix',           'badscan', ...
         'maskfile',         []};
 vals = setargs(def, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
@@ -35,7 +37,7 @@ else
 end
 
 % | create output filename
-outfile     = sprintf('badscan_dvars%dframewise%d_%s.txt', dvars_thresh*100, framewise_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
+outfile     = sprintf('%s_dvars%dframewise%d_%s.txt', prefix, dvars_thresh*100, framewise_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
 nvol        = size(cfg.vol, 4); 
 epidir      = fileparts(epi{1});
 

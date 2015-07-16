@@ -12,6 +12,7 @@ function allinput = wrapper_level1_conte_loi2(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
+            'studydir',         '/Users/bobspunt/Documents/fmri/conte',            ...
             'HPF',              100,            ...
             'armethod',         1,              ...
             'epifname',         'epifn_loi2.mat' ...
@@ -36,7 +37,6 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
 % | ===========================================================================
-studydir = '/Users/bobspunt/Documents/fmri/conte';
 if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/conte'; end
 [subdir, subnam] = files([studydir filesep subid]);
 

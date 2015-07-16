@@ -12,6 +12,7 @@ function matlabbatch = wrapper_level1_vmpfc(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
+            'studydir',         '/Users/bobspunt/Documents/fmri/vmpfc',            ...
             'HPF',              100,            ...
             'armethod',         1,              ... 
             'nuisancepat',      'rp*txt',       ...
@@ -35,7 +36,6 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
 % | ===========================================================================
-studydir = '/Users/bobspunt/Documents/fmri/vmpfc';
 if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/vmpfc'; end
 [subdir, subnam] = files([studydir filesep subid]);
 

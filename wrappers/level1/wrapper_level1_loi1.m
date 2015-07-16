@@ -8,6 +8,7 @@ function matlabbatch = wrapper_level1_loi1(varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
+            'studydir',         '/Users/bobspunt/Documents/fmri/vmpfc',            ...
             'covidx',           [],             ...
             'HPF',              100,            ...
             'armethod',         2,              ... 
@@ -31,7 +32,6 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
 % | ===========================================================================
-studydir = '/Users/bobspunt/Documents/fmri/vmpfc';
 if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/vmpfc'; end
 [subdir, subnam] = files([studydir filesep subid]);
 
