@@ -1,14 +1,15 @@
 home; clear all
 
 % | options
-runit.omitvols      = 0; 
+runit.omitvols      = 1; 
 runit.slicetime     = 1;
 opt.slice_times     = 0; % 1 do slice-timing using actual times, 0 will do using order
-opt.coreg_epi2t1    = 1; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
-runit.segment       = 0;
+opt.coreg_epi2t1    = 0; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
+runit.segment       = 1;
 
 % | paths for relevant folders
 path.study  = '/Users/bobspunt/Documents/fmri/peers';
+path.study = '/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/ASD/data';
 if regexp(pwd,'/home/spunt'), path.study = regexprep(path.study, '/Users/bobspunt/Documents/fmri', '/home/spunt/data'); end
 path.qa     = fullfile(path.study, '_notes_', 'qa');
 if ~exist(path.qa, 'dir'), mkdir(path.qa); end
@@ -26,8 +27,8 @@ if ~exist(path.qa, 'dir'), mkdir(path.qa); end
 %     );
 pattern = struct( ...
     'subdir',   'RA*',                      ...
-    'epidir',   'EP*POST_SOCNS*',          ...
-    't1dir',    'GR*POST_T1*',       ...
+    'epidir',   'EP*SOCNS*',          ...
+    't1dir',    'GR*T1*',       ...
     'fmdir',    'GR*Field*',    ...
     'fmimg',    'Fie*nii', ...
     'anatimg',  'T1*nii',       ...
@@ -52,7 +53,7 @@ if ~isempty(omitpat), subdirs(cellstrfind(subdirs, omitpat)) = []; end
 
 % | Omit Initial Volumes
 if runit.omitvols
-    omitpat = {'fad*1-000001*nii' 'fad*2-000002*nii' 'fad*3-000003*nii' 'fad*4-000004*nii'};
+    omitpat = {'SOCNS*00001*nii' 'SOCNS*00002*nii'};
     bspm_omit_vols(fullfile(path.study, pattern.subdir, 'raw', pattern.epidir), omitpat);
 end
 

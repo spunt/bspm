@@ -731,7 +731,18 @@ for i = 1:nRun
         n = ndims(img);
         if n == 2 % for most dicom files
             img(:, :, 2:nFile) = 0; % pre-allocate
-            for j = 2:nFile, img(:,:,j) = dicm_img(h{i}{j}, 0); end
+            for j = 2:nFile
+                try
+                    img(:,:,j) = dicm_img(h{i}{j}, 0);
+                catch
+                    tmp = squeeze(dicm_img(h{i}{j}, 0)); 
+                    if size(tmp,3)==2 & isequal(tmp(:,:,1), tmp(:,:,2))
+                       img(:,:,j) = tmp(:,:,1); 
+                    else
+                        error('- | UNABLE TO READ %s | -', h{i}{j}.Filename); 
+                    end
+                end
+            end
         elseif n == 3 % SamplesPerPixel>1 is the only case I know for now
             img(:, :, :, 2:nFile) = 0; % pre-allocate
             for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
