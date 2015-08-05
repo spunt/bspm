@@ -44,10 +44,9 @@ if iscell(in), in = char(in); end
 [p, n, e] = fileparts(in);
 if strcmpi(e, '.mat')
     h = load(in);
-    while length(fieldnames(h)) > 1
-        h = getfield(h, char(fieldnames(h)))
-    end
-    hdr = getfield(h, char(fieldnames(h))); 
+    hdr = getnestedfield(h, 'hdr');
+    if iscell(hdr), hdr = hdr{1}; end
+    hdr = orderfields(hdr); 
 else
     hdr = orderfields(dicm_hdr(in)); 
 end
@@ -115,7 +114,9 @@ dicominfo.sequenceinfo.FOVread = str2num(tmp);
 if strcmp(hdr.ScanningSequence, 'EP')
     
     % | Volume Dimensions
-    dicominfo.parameterinfo.dim = double([hdr.('AcquisitionMatrix')([1 4])' length([hdr.('MosaicRefAcqTimes')])]);
+    try
+        dicominfo.parameterinfo.dim = double([hdr.('AcquisitionMatrix')([1 4])' length([hdr.('MosaicRefAcqTimes')])]);
+
     
     % | Slice Timing Information
     dicominfo.sliceinfo = struct( ...
@@ -134,6 +135,10 @@ if strcmp(hdr.ScanningSequence, 'EP')
     dicominfo.unwarpinfo.effechospacing     = es;
     dicominfo.unwarpinfo.readouttime        = es*hdr.('AcquisitionMatrix')(1);
     dicominfo.unwarpinfo.unwarpdirection    = uwdir; 
+    
+    catch
+
+    end
 
 end
 

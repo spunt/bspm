@@ -7,26 +7,29 @@ function matlabbatch = wrapper_level1_lois(covidx, varargin)
 %       01 - Duration          
 %       02 - Errors (Total)
 %       03 - Errors (Foils)
+%       04 - No Response Trials
 % 
 
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Documents/fmri/asd',            ...
-            'HPF',              128,            ...
-            'armethod',         1,              ... 
-            'nuisancepat',      'bad*txt',      ...
-            'epipat',           'ialsw*nii',    ...
-            'subid',            'RA*',          ...
-            'runid',            'EP*LOI*',     ...
-            'behavid',          'lois_*mat',      ...
-            'basename',         'LOIS',         ...
-            'brainmask',        bspm_brainmask, ...
-            'model',            '2x3',          ...
-            'fcontrast',        1,              ...
-            'nskip',            2,              ...
-            'runtest',          0,              ...
-            'is4D',             1               ...
+            'studydir',         '/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/ASD/data',            ...
+            'HPF',              128,                    ...
+            'armethod',         2,                      ... 
+            'nuisancepat',      'bad*noaroma*txt',      ...
+            'epipat',           'lsw*nii',              ...
+            'subid',            'RA*',                  ...
+            'runid',            'EP*LOI*',              ...
+            'behavid',          'lois_*mat',            ...
+            'basename',         'LOIS',                 ...
+            'brainmask',        bspm_brainmask,         ...
+            'model',            '2x3',                  ...
+            'fcontrast',        1,                      ...
+            'pmcontrast',       1,                      ...
+            'nskip',            2,                      ...
+            'TR',               2.5,                    ...
+            'runtest',          0,                      ...
+            'is4D',             1                      ...
              };
 vals = setargs(defaults, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
@@ -40,17 +43,12 @@ if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/conte'; end
 % | ANALYSIS NAME
 % | ===========================================================================
 armethodlabels  = {'NoAR1' 'AR1' 'WLS'};
-covnames        = {'Duration' 'Errors' 'FoilErrors'};
+covnames        = {'Duration' 'Errors' 'FoilErrors' 'NoResponse'};
 pmnames         = regexprep(covnames(covidx), '_', '');
 pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
 analysisname    = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
-
-% | IMAGING PARAMETERS
-% | ========================================================================
-TR              = 2.5; 
-adjons          = TR*nskip;
                                     
 % | RUNTIME OPTIONS
 % | ===========================================================================           
@@ -62,7 +60,6 @@ matlabbatch = [];
 for s = 1:length(subdir)
     
     % | Check Subject and Define Folders
-    % | ========================================================================
     rundir      = files([subdir{s} filesep 'raw' filesep runid]);
     if isempty(rundir), printmsg('Valid run directory not found, moving on...', 'msgtitle', subnam{s}); continue; end
     analysisdir = fullfile(subdir{s}, 'analysis', analysisname); 
@@ -72,35 +69,31 @@ for s = 1:length(subdir)
     printmsg(sprintf('Building Level 1 Job for %d Runs', length(rundir)), 'msgtitle', subnam{s}); 
 
     % | Behavioral and Nuisance Regressor Files
-    % | ========================================================================
     nuisance    = files([subdir{s} filesep 'raw' filesep runid filesep nuisancepat]);
     behav       = files([subdir{s} filesep 'behav' filesep behavid]);
     
     % | Run Loop
-    % | ========================================================================
-    images          = cell(size(rundir)); 
+    images = cell(size(rundir)); 
     for r = 1:length(rundir)
 
         % | Data for Current Run
-        % | =====================================================================
         images{r}   = files([rundir{r} filesep epipat]);
         if isempty(images{r})
             error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); 
         end
         b = get_behavior(behav{r}, model);
-        b.blockwise(:,3) = b.blockwise(:,3) - adjons;
+        b.blockwise(:,3) = b.blockwise(:,3) - (TR*nskip);
         
         % | Columns for b.blockwise
-        % | =====================================================================
         % 1 - Block
         % 2 - Cond
         % 3 - Onset
         % 4 - Duration
         % 5 - Total_Errors
         % 6 - Foil_Errors
+        % 7 - No_Response
         
         % | Conditions
-        % | =====================================================================
         for c = 1:length(b.condlabels)
             runs(r).conditions(c).name      = b.condlabels{c};
             runs(r).conditions(c).onsets    = b.blockwise(b.blockwise(:,2)==c, 3); 
@@ -108,11 +101,10 @@ for s = 1:length(subdir)
         end
         
         % | Floating Parametric Modulators
-        % | =====================================================================
-        allpm           = b.blockwise(:,4:6);
+        allpm           = b.blockwise(:,4:7);
         modelpm         = allpm(:,covidx);
         modelpmnames    = pmnames; 
-        novaridx = find(nanstd(modelpm)==0);
+        novaridx        = find(nanstd(modelpm)==0);
         if ~isempty(novaridx), modelpm(:,novaridx) = []; modelpmnames(novaridx) = []; end
         for p = 1:length(modelpmnames)
             runs(r).floatingpm(p).name = modelpmnames{p};
@@ -128,7 +120,6 @@ for s = 1:length(subdir)
     end
 
     % | General Information
-    % | ========================================================================
     general_info.analysis           = analysisdir; 
     general_info.is4D               = is4D; 
     general_info.TR                 = TR;
@@ -140,23 +131,49 @@ for s = 1:length(subdir)
     general_info.mt_res             = 16; 
     general_info.mt_onset           = 1;
 
-    % | Contrasts
-    % | ========================================================================
+    % | Contrasts Weights
     ncond   = length(b.condlabels);
-    w1      = eye(ncond);
-    w2      = [ 1 0 0 -1 0 0; 0 1 0 0 -1 0; 0 0 1 0 0 -1; -.5 .5 0 .5 -.5 0; ...
-                -.5 0 .5 .5 0 -.5; -.5 .5 0 -.5 .5 0; -.5 0 .5 -.5 0 .5];
-    weights = [w1; w2]; 
+    npm     = length(pmnames); 
+    tmp     = eye(ncond+npm);
+    w1      = tmp(1:ncond,:);
+    w2      =   [
+                    1  0  0 -1  0  0; 
+                    0  1  0  0 -1  0; 
+                    0  0  1  0  0 -1; 
+                   -1  1  0  1 -1  0; 
+                   -1  0  1  1  0 -1; 
+                   -1  1  0 -1  1  0; 
+                   -1  0  1 -1  0  1;
+                    0  1 -1  0  1 -1;
+                    0  1 -1  0 -1  1;
+                   -2  1  1  2 -1 -1;
+                   -2  1  1 -2  1  1;
+                ];
+    w2pos = w2;w2pos(w2<0) = 0;
+    wscale = sum(w2pos, 2);
+    w2 = w2./repmat(wscale, 1, size(w2, 2));
+    weights = w1; 
+    weights(end+1:end+size(w2,1),:) = 0; 
+    weights(size(w1,1)+1:end,1:size(w2,2)) = w2;
+    if npm
+        b.condlabels = [b.condlabels pmnames];
+        wpm = tmp(ncond+1:end,:);
+        wpm(strcmp(pmnames, 'NoResponse'),:) = []; 
+        weights = [weights; wpm]; 
+    end
     ncon    = size(weights,1);
+    % | T-Contrast
     for c = 1:ncon
         contrasts(c).type       = 'T';
         contrasts(c).weights    = weights(c,:);
         contrasts(c).name       = bspm_conweights2names(weights(c,:), b.condlabels);
     end
+    
+    % | F-Contrast
     if fcontrast
         contrasts(ncon+1).type      = 'F';
         contrasts(ncon+1).name      = 'Omnibus';
-        contrasts(ncon+1).weights   = eye(ncond);
+        contrasts(ncon+1).weights   = eye(length(b.condlabels));
     end
 
     % | Make Job
@@ -215,13 +232,15 @@ ntrials         = length(data(data(:,1)==1,1));
 data(:,10)      = data(:,4)~=data(:,8); % errors
 data(data(:,8)==0, 7:8) = NaN; % NR to NaN
 blockwise(:,3)  = data(data(:,2)==1, 6);
-blockwise(:,4)  = data(data(:,2)==ntrials, 9) - data(data(:,2)==1, 6); 
+blockwise(:,4)  = data(data(:,2)==ntrials, 9) - data(data(:,2)==1, 6);
 
 % | compute block-wise error counts
 % | ========================================================================
+
 for i = 1:size(blockwise, 1)
     blockwise(i,5) = sum(data(data(:,1)==i,10));  % all errors
     blockwise(i,6) = sum(data(data(:,1)==i & data(:,4)==2, 10)); % foil errors
+    blockwise(i,7) = sum(isnan(data(data(:,1)==i,7))); % no response
 end
 
 % | re-code data

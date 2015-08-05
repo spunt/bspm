@@ -192,15 +192,15 @@ if docon
         else repl_tag = contrasts(c).repl_tag; end
         if repl_tag, repl_choice = 'repl'; else repl_choice = 'none'; end
         if strcmpi(contrasts(c).type, 'T')
-            matlabbatch{3}.spm.stats.con.consess{c}.tcon.name = contrasts(c).name;
-            matlabbatch{3}.spm.stats.con.consess{c}.tcon.weights = contrasts(c).weights; % SPM12
-            matlabbatch{3}.spm.stats.con.consess{c}.tcon.convec = contrasts(c).weights; % SPM8
-            matlabbatch{3}.spm.stats.con.consess{c}.tcon.sessrep = repl_choice;
+            matlabbatch{3}.spm.stats.con.consess{c}.tcon.name       = contrasts(c).name;
+            matlabbatch{3}.spm.stats.con.consess{c}.tcon.weights    = contrasts(c).weights; % SPM12
+            matlabbatch{3}.spm.stats.con.consess{c}.tcon.convec     = contrasts(c).weights; % SPM8
+            matlabbatch{3}.spm.stats.con.consess{c}.tcon.sessrep    = repl_choice;
         else
-            matlabbatch{3}.spm.stats.con.consess{c}.fcon.name = contrasts(c).name;
-            matlabbatch{3}.spm.stats.con.consess{c}.fcon.weights = contrasts(c).weights; % SPM12
-            matlabbatch{3}.spm.stats.con.consess{c}.fcon.convec = contrasts(c).weights; % SPM8
-            matlabbatch{3}.spm.stats.con.consess{c}.fcon.sessrep = repl_choice;
+            matlabbatch{3}.spm.stats.con.consess{c}.fcon.name       = contrasts(c).name;
+            matlabbatch{3}.spm.stats.con.consess{c}.fcon.weights    = contrasts(c).weights; % SPM12
+            matlabbatch{3}.spm.stats.con.consess{c}.fcon.convec{1}  = contrasts(c).weights; % SPM8
+            matlabbatch{3}.spm.stats.con.consess{c}.fcon.sessrep    = repl_choice;
         end
     end
 end

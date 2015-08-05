@@ -67,9 +67,10 @@ end
 matlabbatch{s}.spm.stats.con.spmmat{1} = spmmat;
 matlabbatch{s}.spm.stats.con.delete = delete_tag;
 for c = 1:ncon
-    matlabbatch{s}.spm.stats.con.consess{c}.tcon.name = connames{c};
-    matlabbatch{s}.spm.stats.con.consess{c}.tcon.weights = weights(c,:);
-    matlabbatch{s}.spm.stats.con.consess{c}.tcon.sessrep = repl_choice;
+    matlabbatch{s}.spm.stats.con.consess{c}.tcon.name       = connames{c};
+    matlabbatch{s}.spm.stats.con.consess{c}.tcon.weights    = weights(c,:); % SPM12
+    matlabbatch{s}.spm.stats.con.consess{c}.tcon.convec     = weights(c,:); % SPM8
+    matlabbatch{s}.spm.stats.con.consess{c}.tcon.sessrep    = repl_choice;
 end
 
 end

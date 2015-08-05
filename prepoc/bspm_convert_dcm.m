@@ -50,8 +50,9 @@ for sub = 1:nsubs
     end
     
     % | Change name of parent dicom folder to "dicom"
-    if ~strcmpi(parentpath(dothese), 'dicom'), 
+    try
         movefile(parentpath(dothese), fullfile(subDIR, 'dicom')); 
+    catch
     end
     
     % | Make Additional Directories

@@ -1,8 +1,14 @@
-function bspm_runbatch(job, doparfor)
+function bspm_runbatch(job, varargin)
 % USAGE: bspm_runbatch(job, doparfor)
 %
-if nargin<1, disp('USAGE: bspm_runbatch(job, doparfor)'); return; end
-if nargin<2, doparfor = 0; end
+def = { 'doparfor',                0,          ...
+        'quitdropboxbefore',             0,          ...
+        'opendropboxafter',        0            ...
+        };
+vals = setargs(def, varargin);
+if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
+fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
+if quitdropboxbefore, macapp('Dropbox', 'close'); end
 % | Initialize SPM config 
 bspm_init;
 njob = length(job);
@@ -44,6 +50,7 @@ else
     save(outfile, 'joblog'); 
     printmsg(sprintf('Error Data Saved To: %s', outfile), 'msgtitle', sprintf('%d Failed Jobs', numerrs), 'msgtop', '=', 'msgbottom', '='); 
 end
+if opendropboxafter, macapp('Dropbox', 'open'); end
 end
 
  
