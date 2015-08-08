@@ -1,4 +1,4 @@
-function bspm_checkreg(images, captions, xyz, title)
+function bspm_checkreg(images, addmniref, captions, xyz, title)
 % A visual check of image registration quality.
 %
 % USAGE: bspm_checkreg(images, captions, xyz, title)
@@ -20,8 +20,10 @@ if ~nargin
     [images, sts] = spm_select([1 15],'image','Select images');
     if ~sts, return; end
 end
-if nargin < 2, captions = cellfun(@num2str, num2cell(1:length(images)), 'Unif', false); end
+if nargin < 2, addmniref = 0; end
+if nargin < 3, captions = cellfun(@num2str, num2cell(1:length(images)), 'Unif', false); end
 if ischar(images), images = cellstr(images); end
+if addmniref, images = vertcat({bspm_template}, images{:}); end
 if iscell(images{1}), images = spm_vol(vertcat(images{:})); end
 spm_figure('GetWin','Graphics');
 spm_figure('Clear','Graphics');
@@ -32,7 +34,7 @@ m  = ceil(mn/n);
 w  = 1/n;
 h  = 1/m;
 ds = (w+h)*0.02;
-if nargin==4,
+if nargin==5,
     if mn==2, 
         set(get(gca,'Title'), 'String', title, 'FontSize', 20, 'FontName', 'Arial', 'FontWeight', 'Bold', 'Position', [0.6 0.5]); 
     elseif mn>2,

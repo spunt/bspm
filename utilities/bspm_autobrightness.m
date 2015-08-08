@@ -18,10 +18,12 @@ lim = 0.5;
 if iscell(in), in = char(in); end
 h       = spm_vol(in);
 in      = spm_read_vols(h);
-dat.min = min(in(in>0)); 
-dat.max = max(in(in>0));
-dat.dim = size(in); 
-in = double(in)./255;
+iszero  = in==0;
+in(iszero) = NaN;
+dat.min = nanmin(in(:)); 
+dat.max = nanmax(in(:));
+dat.dim = size(in);
+% in = double(in)./255;
 in = cat(4,in,in,in); 
 for p = 1:3
     for s = 1:dat.dim(p)
@@ -35,8 +37,9 @@ for p = 1:3
     end
 end
 in = nanmean(in, 4); 
-in(in>0) = scaledata(in(in>0), [dat.min dat.max]);
-out = in;
+in(iszero) = 0; 
+in(~iszero) = scaledata(in(~iszero), [dat.min dat.max]);
+if nargout>0, out = in; end
 if ~nowrite
     [fpath, fname, fext] = fileparts(h.fname); 
     h.fname = fullfile(fpath, ['e' fname fext]); 

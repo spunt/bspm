@@ -1,29 +1,32 @@
-function matlabbatch = wrapper_level1_lois(covidx, varargin)
+function matlabbatch = wrapper_level1_cfsat(covidx, varargin)
 % matlabbatch = wrapper_level1_lois(covidx, varargin)
 %
 % To show default settings, run without any arguments.
 %
-%     COVIDX 
-%       01 - Duration          
-%       02 - Errors (Total)
-%       03 - Errors (Foils)
-%       04 - No Response Trials
+%   COVIDX 
+%   1 - Duration
+%   2 - Total_Errors
+%   3 - Foil_Errors
+%   4 - NoResponse
+%   5 - N_Foils
+%   6 - Word_Count
+%   7 - Char_Count
 % 
 
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/ASD/data',            ...
+            'studydir',         fullfile(dropboxPath,'Bob','Professional','Writing','Empirical','ASD','data'), ...
             'HPF',              128,                    ...
             'armethod',         2,                      ... 
             'nuisancepat',      'bad*txt',              ...
             'epipat',           'sw*nii',               ...
             'subid',            'RA*',                  ...
-            'runid',            'EP*LOI*',              ...
-            'behavid',          'lois_*mat',            ...
-            'basename',         'LOI_s8w3',             ...
+            'runid',            'EP*SAT*',              ...
+            'behavid',          'cfsat*mat',            ...
+            'basename',         'CFSAT_s8w3',           ...
             'brainmask',        bspm_brainmask,         ...
-            'model',            '2x3',                  ...
+            'model',            '2x2',                  ...
             'fcontrast',        1,                      ...
             'pmcontrast',       1,                      ...
             'nskip',            2,                      ...
@@ -43,11 +46,19 @@ if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/conte'; end
 % | ANALYSIS NAME
 % | ===========================================================================
 armethodlabels  = {'NoAR1' 'AR1' 'WLS'};
-covnames        = {'Duration' 'Errors' 'FoilErrors' 'NoResponse'};
+covnames        =   {             
+                    'Duration'    
+                    'Total_Errors'
+                    'Foil_Errors'
+                    'NoResponse'
+                    'N_Foils'
+                    'Word_Count'
+                    'Char_Count' 
+                    };  
 pmnames         = regexprep(covnames(covidx), '_', '');
 pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
 analysisname    = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
-                        pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
+                    pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
                                     
 % | RUNTIME OPTIONS
@@ -81,17 +92,20 @@ for s = 1:length(subdir)
         if isempty(images{r})
             error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); 
         end
-        b = get_behavior(behav{r}, model);
+        b = get_behavior(behav{r});
         b.blockwise(:,3) = b.blockwise(:,3) - (TR*nskip);
         
-        % | Columns for b.blockwise
-        % 1 - Block
-        % 2 - Cond
-        % 3 - Onset
-        % 4 - Duration
-        % 5 - Total_Errors
-        % 6 - Foil_Errors
-        % 7 - No_Response
+        % Columns for b.blockwise
+        %    1 - Block
+        %    2 - Cond
+        %    3 - Onset
+        %    4 - Duration
+        %    5 - # Errors
+        %    6 - # Foil Errors
+        %    7 - # No Response Trials
+        %    8 - # Foils
+        %    9 - Average Question Word Count
+        %    10 - Average Question Character Count
         
         % | Conditions
         for c = 1:length(b.condlabels)
@@ -101,7 +115,7 @@ for s = 1:length(subdir)
         end
         
         % | Floating Parametric Modulators
-        allpm           = b.blockwise(:,4:7);
+        allpm           = b.blockwise(:,4:end);
         modelpm         = allpm(:,covidx);
         modelpmnames    = pmnames; 
         novaridx        = find(nanstd(modelpm)==0);
@@ -136,19 +150,20 @@ for s = 1:length(subdir)
     npm     = length(pmnames); 
     tmp     = eye(ncond+npm);
     w1      = tmp(1:ncond,:);
-    w2      =   [
-                    1  0  0 -1  0  0; 
-                    0  1  0  0 -1  0; 
-                    0  0  1  0  0 -1; 
-                   -1  1  0  1 -1  0; 
-                   -1  0  1  1  0 -1; 
-                   -1  1  0 -1  1  0; 
-                   -1  0  1 -1  0  1;
-                    0  1 -1  0  1 -1;
-                    0  1 -1  0 -1  1;
-                   -2  1  1  2 -1 -1;
-                   -2  1  1 -2  1  1;
-                ];
+    % | Conditions
+    % 1 - How Video
+    % 2 - How Text
+    % 3 - Why Video
+    % 4 - Why Text
+    w2 =    [
+                -1  -1  1   1  
+                -1   1 -1   1  
+                -1   0  1   0   
+                 0  -1  0   1   
+                -1   1  0   0   
+                 0   0 -1   1   
+                -1   1  1  -1
+            ];
     w2pos = w2;w2pos(w2<0) = 0;
     wscale = sum(w2pos, 2);
     w2 = w2./repmat(wscale, 1, size(w2, 2));
@@ -156,7 +171,7 @@ for s = 1:length(subdir)
     weights(end+1:end+size(w2,1),:) = 0; 
     weights(size(w1,1)+1:end,1:size(w2,2)) = w2;
     if npm
-        b.condlabels = [b.condlabels pmnames];
+        b.condlabels = [b.condlabels; pmnames];
         wpm = tmp(ncond+1:end,:);
         wpm(strcmp(pmnames, 'NoResponse'),:) = []; 
         weights = [weights; wpm]; 
@@ -189,27 +204,28 @@ end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, opt)
+function b = get_behavior(in)
 % GET_BEHAVIOR
 %
-%   USAGE: b = get_behavior(in, opt)
+%   USAGE: b = get_behavior(in)
 %       
 %       in      behavioral data filename (.mat)
-%       opt     '2x3to2x2'  - social vs. nonsocial
-%               '2x3'       - face vs. hand vs. nonsocial
 %
 %       Columns for b.blockwise
 %          1 - Block
 %          2 - Cond
 %          3 - Onset
 %          4 - Duration
-%          5 - Total_Errors
-%          6 - Foil_Errors
+%          5 - # Errors
+%          6 - # Foil Errors
+%          7 - # No Response Trials
+%          8 - # Foils
+%          9 - Average Question Word Count
+%          10 - Average Question Character Count
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
 % =========================================================================
 if nargin < 1, error('USAGE: b = get_behavior(in, opt)'); end
-if nargin < 2, opt = '2x3'; end
 if iscell(in), in = char(in); end
  
 % | read data
@@ -219,44 +235,80 @@ b.subjectID = d.subjectID;
 if ismember({'result'},fieldnames(d))
     data        = d.result.trialSeeker;
     blockwise   = d.result.blockSeeker; 
-    items       = d.result.preblockcues(d.result.blockSeeker(:,4));
 else
     data        = d.trialSeeker;
     blockwise   = d.blockSeeker; 
-    items       = d.ordered_questions;
 end
+data = sortrows(data, [1 2]); % sort data by block #, then trial #
+
+% | Conditions
+% 1 - How Video
+% 2 - How Text
+% 3 - Why Video
+% 4 - Why Text
+
+% | blockSeeker
+%  1 - block #
+%  2 - condition 
+%  3 - intended block onset
+%  4 - actual block onset
+%  5 - actual block duration
+%  6 - # correct
+
+% | trialSeeker
+%  1 - block #
+%  2 - trial #
+%  3 - cond # 
+%  4 - correct/normative answer (0 = No, 1 = Yes)
+%  5 - character count
+%  6 - word count
+%  7 - actual answer
+%  8 - response time (s)
+%  9 - actual trial onset (question)
+%  10 - actual trial offset (action stimulus)
+
 
 % | blockwise accuracy and durations
 % | ========================================================================
-ntrials         = length(data(data(:,1)==1,1));
-data(:,10)      = data(:,4)~=data(:,8); % errors
-data(data(:,8)==0, 7:8) = NaN; % NR to NaN
-blockwise(:,3)  = data(data(:,2)==1, 6);
-blockwise(:,4)  = data(data(:,2)==ntrials, 9) - data(data(:,2)==1, 6);
+ntrials                 = length(data(data(:,1)==1,1)); % ntrials/block
+data(data(:,4)==0,4)    = 2;                    % recode: 1=corr, 2=incorr
+data(:,11)              = data(:,4)~=data(:,7); % errors
+data(data(:,7)==0, 7:8) = NaN;                  % NR to NaN
+blockwise(:,3)          = data(data(:,2)==1,9); % block onsets
+blockwise(:,4)          = data(data(:,2)==ntrials,10) - data(data(:,2)==1,9); % block durations
 
 % | compute block-wise error counts
 % | ========================================================================
-
 for i = 1:size(blockwise, 1)
-    blockwise(i,5) = sum(data(data(:,1)==i,10));  % all errors
-    blockwise(i,6) = sum(data(data(:,1)==i & data(:,4)==2, 10)); % foil errors
+    blockwise(i,5) = sum(data(data(:,1)==i,11));  % all errors
+    blockwise(i,6) = sum(data(data(:,1)==i & data(:,4)==2, 11)); % foil errors
     blockwise(i,7) = sum(isnan(data(data(:,1)==i,7))); % no response
+    blockwise(i,8) = sum(data(:,1)==i & data(:,4)==2); % n foils
+    blockwise(i,9) = mean(data(data(:,1)==i,4)); % mean word count
+    blockwise(i,10) = mean(data(data(:,1)==i,5)); % mean char count
 end
 
 % | re-code data
 % | ========================================================================
-con = blockwise(:,2);
-switch opt
-    case {'2x3'}
-        b.condlabels = {'Why_NS' 'Why_Face' 'Why_Hand' 'How_NS' 'How_Face' 'How_Hand'};
-    case {'2x3to2x2'}
-        b.condlabels = {'WhyFace' 'WhyHand' 'HowFace' 'HowHand'};
-        blockwise(ismember(con,[2 3]), 2)       = 2;
-        blockwise(con==4, 2)                    = 3;
-        blockwise(ismember(con,[5 6]), 2)       = 4;
-end
-b.blockwise = blockwise;
-b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Total_Errors' 'Foil_Errors'};  
+b.blockwise  = blockwise;
+b.condlabels = {
+              'How_Video' 
+              'How_Text'
+              'Why_Video'
+              'Why_Text' 
+              };
+b.varlabels = {              
+             'Block'       
+             'Cond'        
+             'Onset'       
+             'Duration'    
+             'Total_Errors'
+             'Foil_Errors'
+             'NoResponse'
+             'N_Foils'
+             'Word_Count'
+             'Char_Count' 
+             };           
 end    
 function mfile_showhelp(varargin)
 % MFILE_SHOWHELP
