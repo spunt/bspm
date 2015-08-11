@@ -29,7 +29,7 @@ def =   { ...
         'covariates',   []                      ... 
         };
 vals = setargs(def, varargin);
-if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
+if nargin<2, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
 if ischar(cons1), cons1 = cellstr(cons1); end
 if size(cons1,1)==1, cons1 = cons1'; end

@@ -12,24 +12,41 @@ function matlabbatch = bspm_level2_tstt_batch(condirpat1, condirpat2, varargin)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<6, conidx=[]; end
-if nargin<5, mask = bspm_greymask; end
-if nargin<4, outaffix = 'TSST'; end
-if nargin<3, disp('USAGE: bspm_level2_tstt_batch(analpat1, analpat2, labels, outaffix, mask, conidx)'); return; end
-tmpdirs = files(analpat1);
-conlist = files([tmpdirs{1} filesep 'con*img'], 'filename');
-conlist(conidx) = [];
-for c = 1:length(conlist)
-    
-    cons1 = files([analpat1 filesep conlist{c}]);
-    cons2 = files([analpat2 filesep conlist{c}]);
-    bspm_display_message(sprintf('Working on Contrast %d of %d: %s', c, length(conlist), conlist{c}));
-    bspm_display_message(sprintf('%s: %d   %s:%d', labels{1}, length(cons1), labels{2}, length(cons2)), '-');
-    bspm_level2_tstt(cons1, cons2, labels, outaffix, mask);
-    
+def =   { ...
+        'conpat',       'con*.nii*',                ...
+        'conidx',       [],                     ... 
+        'grouplabels',  {'Group1' 'Group2'},    ...
+        'tag',          [],                     ...
+        'implicitmask',  0,                     ...
+        'mask',         bspm_greymask,          ...
+        'pctgroup',     90,                     ...
+        'runit',        1,                      ...
+        'negativecon',   0,                     ...
+        'nan2zero',      1,                     ...
+        'covariates',   []                      ... 
+        };
+vals = setargs(def, varargin);
+if nargin<2, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
+fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
+[cpath, conlist] = files(fullfile(condirpat1, conpat)); 
+if isempty(cpath), error('No contrasts found!'); end
+[ucon, idx2ex, idx2sub] = unique(conlist);
+if ~isempty(conidx), idx2ex = idx2ex(conidx); end
+conname = bspm_con2name(cpath(idx2ex));
+conpats = conlist(idx2ex);
+if ~runit, allinput = cell(size(conname)); end
+for c = 1:length(conname)
+    cons1 = files(fullfile(condirpat1, conpats{c})); 
+    cons2 = files(fullfile(condirpat2, conpats{c})); 
+    fprintf('\n| Working on %s, %d of %d', conname{c}, c, length(conname));
+    if runit
+        bspm_level2_tstt(cons1, cons2, 'grouplabels', grouplabels, 'tag', tag, 'implicitmask', implicitmask, 'mask', mask, 'pctgroup', pctgroup, 'negativecon', negativecon, 'nan2zero', nan2zero, 'covariates', covariates); 
+    else
+        allinput{c} = bspm_level2_tstt(cons1, cons2, 'grouplabels', grouplabels, 'tag', tag, 'implicitmask', implicitmask, 'mask', mask, 'pctgroup', pctgroup, 'negativecon', negativecon, 'nan2zero', nan2zero, 'covariates', covariates); 
+    end
 end
-    
+fprintf('\n - DONE - \n\n');
+end
  
  
  
