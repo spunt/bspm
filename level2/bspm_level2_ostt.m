@@ -32,7 +32,6 @@ def = { 'outdir',       [],     ...
 vals = setargs(def, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
-
 if ischar(cons), cons = cellstr(cons); end
 if iscell(mask), mask = char(mask); end
 if ~isempty(mask)
@@ -98,7 +97,7 @@ matlabbatch{1}.spm.stats.factorial_design.des.t1.scans      = cellstr(cons);
 matlabbatch{1}.spm.stats.factorial_design.masking.im        = implicit;
 matlabbatch{1}.spm.stats.factorial_design.masking.em{1}     = mask; 
 
-% | FACTORIAL DESIGN SPECIFICATION
+% | ESTIMATION
 matlabbatch{2}.spm.stats.fmri_est.spmmat{1} = fullfile(outdir,'SPM.mat');
 matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
 
@@ -126,3 +125,6 @@ if nargout==0
 end
 
 end
+
+
+

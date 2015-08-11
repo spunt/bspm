@@ -1,14 +1,9 @@
-function [] = bspm_level2_tstt_batch(analpat1, analpat2, labels, outaffix, mask, conidx)
+function matlabbatch = bspm_level2_tstt_batch(condirpat1, condirpat2, varargin)
 % BSPM_LEVEL2_TSTT_BATCH
 %
 %   USAGE: bspm_level2_tstt_batch(analpat1, analpat2, labels, outaffix, mask, conidx)
 %
 %   ARGUMENTS:
-%       analpat1: pattern for finding analysis directories for group 1
-%       analpat2: pattern for finding analysis directories for group 2
-%       outaffix: affix for directory in _groupstats_/<analysis_name> 
-%       (optional) mask: mask file to use (default = bspm_greymask)
-%       (optional) conidx: indices for contrasts to include
 %
 
 % ----------------------------------- Copyright (C) 2014 -----------------------------------
