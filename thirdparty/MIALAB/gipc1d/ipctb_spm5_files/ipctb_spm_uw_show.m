@@ -1,0 +1,189 @@
+function ipctb_spm_uw_show(mode,p1,p2,p3,p4,p5,p6)
+%
+% Manages graphical output for spm_FindFields
+%
+% FORMAT spm_graphwip(mode,p1,...)
+%
+% mode      - Verb specifying action.
+% p1-p6     - Depends on mode.
+%
+% FORMAT spm_graphwip('FinIter',SS,beta,fot,sot,ref,q)
+%
+%_______________________________________________________________________
+% Copyright (C) 2005 Wellcome Department of Imaging Neuroscience
+
+% Jesper Andersson
+% $Id: spm_uw_show.m 112 2005-05-04 18:20:52Z john $
+
+
+persistent iter;
+
+eff_string = {'x-trans','y-trans','z-trans','pitch','roll','yaw'};
+
+switch mode
+   case 'SmoothStart' % Report on start of smoothing.
+      ipctb_spm_progress_bar('Init',p1,...
+      'Creating temporary smooth files',...
+      'Scans completed');
+   case 'SmoothUpdate'
+      ipctb_spm_progress_bar('Set',p1);
+   case 'SmoothEnd'
+      ipctb_spm_progress_bar('Clear');
+   case 'MaskStart' % Report on start of making mask.
+      ipctb_spm_progress_bar('Init',p1,...
+      'Ascertaining data in all voxels and scans',...
+      'Scans completed');
+   case 'MaskUpdate'
+      ipctb_spm_progress_bar('Set',p1);
+   case 'MaskEnd'
+      ipctb_spm_progress_bar('Clear');
+   case 'NewIter'     % Report on start of new iteration.
+      iter = p1;
+   case 'StartRef'    % Report on start of evaluation of effects on reference scan.
+      ipctb_spm_progress_bar('Init',p1,...
+      sprintf('Computing effects on reference scans, iteration %d',iter),...
+      'Scans completed');
+   case 'NewRef'      % Report on new reference scan.
+      ipctb_spm_progress_bar('Set',p1);
+   case 'EndRef'
+      ipctb_spm_progress_bar('Clear');
+   case 'StartAtA'    % Report on start of evaluation of AtA.
+      ipctb_spm_progress_bar('Init',p1,sprintf('Computing AtA, iteration %d',iter)...
+      ,'Sub-matrices completed');
+   case 'NewAtA'      % Report on new scan for AtA.
+      ipctb_spm_progress_bar('Set',p1);
+   case 'EndAtA'
+      ipctb_spm_progress_bar('Clear');
+   case 'StartAty'    % Report on start of evaluation of Aty.
+      ipctb_spm_progress_bar('Init',p1,sprintf('Computing Aty, iteration %d',iter)...
+      ,'Scans completed');
+   case 'NewAty'      % Report on new scan for Aty.
+      ipctb_spm_progress_bar('Set',p1);
+   case 'EndAty'
+      ipctb_spm_progress_bar('Clear');
+   case 'StartInv'    % Report on start of inversion of AtA.
+      ipctb_spm_progress_bar('Init',p1,sprintf('Inverting AtA, iteration %d',iter),'');
+   case 'EndInv'
+      ipctb_spm_progress_bar('Clear');
+   case 'StartRefit'
+      ipctb_spm_progress_bar('Init',p1,'Refitting field on regular grid','');
+   case 'EndRefit'
+      ipctb_spm_progress_bar('Clear');
+   case 'FinIter'     % Report on outcome of iteration.
+              % p1 = Residual sum of squares.
+              % p2 = Current derivative fields
+              % p3 = fot
+              % p4 = sot
+              % p5 = Any scan
+              % p6 = Matrix of mean corrected movement parameters.
+      if nargin ~= 7
+         error('Wrong no. of arguments in call to ud_graphwip');
+      end
+      fg = ipctb_spm_figure('FindWin','Graphics');
+      if isempty(fg)
+         fg = ipctb_spm_figure('Create','Graphics');
+         if isempty(fg)
+            error('Cannot find or create graphics window');
+         end
+      end
+      ipctb_spm_figure('Clear','Graphics');
+      %
+      % Get mask for display of deformation maps.
+      %
+      mask = zeros(p5.dim(1:3));
+      ipctb_spm_smooth(reshape(p5.dat,p5.dim(1:3)),mask,5);
+      mask = mask > 0.3*mean(mean(mean(mask)));
+       
+      %
+      % Display deformation maps.
+      %
+      figure(fg);
+      fg_pos = get(fg,'Position');
+      fs = ipctb_spm('FontSizes');
+      pf = ipctb_spm_platform('fonts');
+
+      %
+      % Write general title.
+      %
+      uicontrol(fg,'Style','Text',...
+                'Position',[fg_pos(3)/10 0.95*fg_pos(4) 8*fg_pos(3)/10 30],...
+                'String','Estimation of EPI deformation fields',...
+	        'ForegroundColor','k','BackgroundColor','w',...
+                'FontSize',fs(20),'FontName',pf.times)
+
+      %
+      % Code modelled on spm_check_registration.m
+      %          
+      mn = size(p2,2);
+      n  = round(mn^0.4);
+      m  = ceil(mn/n);
+      w  = 1/n;
+      h  = .75/m;
+      ds = (w+h)*0.02;
+
+      ipctb_spm_orthviews('Reset');
+      global st;
+      P = p5; 
+      for ij=1:mn,
+         P.dat = p2(:,ij);
+         P.dat = reshape(P.dat,P.dim(1:3)) .* mask;
+         i  = 1-h*(floor((ij-1)/n)+1);
+         j  = w*rem(ij-1,n);
+         gh = ipctb_spm_orthviews('Image',P,[j+ds/2 i+ds/2 w-ds h-ds]);
+         if ij==1 
+            ipctb_spm_orthviews('Space');
+            ipctb_spm_orthviews('maxBB'); 
+         end;
+         if ij <= size(p3,2)  % If first order effect. 
+            string = sprintf('Derivative w.r.t. %s',eff_string{p3(ij)});
+         else
+            string = sprintf('Second order effect w.r.t. %s and %s',...
+                     eff_string{p4(ij-size(p3,2),1)},eff_string{p4(ij-size(p3,2),2)});
+         end
+         if mn > 6 
+            fsi = 12;
+         elseif mn > 4
+            fsi = 14;
+         else
+            fsi = 16;
+         end
+         uicontrol(fg,'Style','Text',...
+                'Position',[(st.vols{gh}.area(1)+(st.vols{gh}.area(3)+ds)/2)*fg_pos(3)...
+                            st.vols{gh}.area(2)*fg_pos(4)...
+                            ((st.vols{gh}.area(3)-ds)/2)*fg_pos(3)...
+                            (2*st.vols{gh}.area(4)/5)*fg_pos(4)],...
+                'String',string,...
+	        'ForegroundColor','k','BackgroundColor','w',...
+                'FontSize',fs(fsi),'FontName',pf.times)
+      end;
+
+      %
+      % Show plot of residual squared error
+      %
+      axes('Position',[.1 .025 .375 .17]);
+      indx = find(p1 ~= 0); 
+      plot(indx,p1(indx),'-k','LineWidth',2);
+      title('Residual error','FontSize',fs(14),'FontName',pf.times);
+
+      %
+      % Show plot of relevant movement parameters.
+      %
+      axes('Position',[.575 .025 .375 .17]);
+      plot(p6);
+      title('Movement parameters','FontSize',fs(14),'FontName',pf.times);
+      
+             
+   case 'FinTot'     % Report on outcome of undeformation.
+      ipctb_spm_progress_bar('Clear');
+   otherwise         % Ignore unknown actions.
+
+drawnow;
+
+end
+
+
+
+
+
+
+
