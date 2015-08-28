@@ -35,10 +35,14 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 if ischar(cons), cons = cellstr(cons); end
 if iscell(mask), mask = char(mask); end
 if ~isempty(mask)
-    [~,mtag] = fileparts(mask); 
+    [~,mtag] = fileparts(mask);
+    mtag = upper(mtag);
 else
-    mtag = 'noexplicitmask'; 
+    mtag = 'NOMASK'; 
 end
+
+% | NAN2ZERO (IF APPLICABLE)
+if nan2zero, bspm_batch_imcalc(cons, '', 'nan2zero'); end
 
 % | OUTPUT DIRECTORY
 if isempty(outdir)
@@ -52,10 +56,11 @@ if isempty(outdir)
     % | Analysis Name
     [p, level1name]  = fileparts(fileparts(cons{1})); 
     gadir       = fullfile(parentpath(cons), '_groupstats_', level1name);
+    if isempty(pctgroup), pctgrouptag = 100; else pctgrouptag = pctgroup; end
     if tag
-        gasubdir    = fullfile(gadir, sprintf('OSTT_%s_N=%d_%s_%s', tag, length(cons), mtag, bspm_timestamp(1)));
+        gasubdir    = fullfile(gadir, sprintf('OSTT_%s_N%d_PCTIN%d_%s_%s', tag, length(cons), pctgrouptag, mtag, bspm_timestamp(1)));
     else
-        gasubdir    = fullfile(gadir, sprintf('OSTT_N=%d_%s_%s', length(cons), mtag, bspm_timestamp(1)));
+        gasubdir    = fullfile(gadir, sprintf('OSTT_N%d_PCTIN%d_%s_%s', length(cons), pctgrouptag, mtag, bspm_timestamp(1)));
     end
     outdir      = fullfile(gasubdir, cname);
 
@@ -65,9 +70,6 @@ if isempty(outdir)
     
 end
 if ~isdir(outdir), mkdir(outdir); end
-
-% | NAN2ZERO (IF APPLICABLE)
-if nan2zero, bspm_batch_imcalc(cons, '', 'nan2zero'); end
 
 % | PCTGROUP (IF APPLICABLE)
 if ~isempty(pctgroup)
