@@ -50,15 +50,14 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 
 % Please note that, if a file in the middle of a series is missing, the series
 % will normally be skipped without converting, and a warning message in red text
-% will be shown in Command Windows, and the message will also be saved into a
-% text file under the data folder.
-% 
-% For MoCo series, motion parameters, RBMoCoTrans and RBMoCoRot, are also saved.
+% will be shown in Command Window. The message will also be saved into a text
+% file under the data folder.
 % 
 % A Matlab data file, dcmHeaders.mat, is always saved into the data folder. This
 % file contains dicom header from the first file for created series and some
 % information from last file in field LastFile. Some extra information may also
-% be saved into this file.
+% be saved into this file. For MoCo series, motion parameters (RBMoCoTrans and
+% RBMoCoRot) are also saved.
 % 
 % Slice timing information, if available, is stored in nii header, such as
 % slice_code and slice_duration. But the simple way may be to use the field
@@ -80,9 +79,8 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % may be useful if one wants to align the functional data to some physiological
 % recording, like pulse, respiration or ECG.
 % 
-% If there is DTI series, bval and bvec files will be generated for FSL etc. For
-% DTI series, B_value and DiffusionGradientDirection for all directions are
-% saved into the dcmHeaders.mat file.
+% If there is DTI series, bval and bvec files will be generated for FSL etc.
+% bval and bvec are also saved into the dcmHeaders.mat file.
 % 
 % Starting from 20150514, the converter stores some useful information in NIfTI
 % text extension (ecode=6). nii_tool can decode these information easily:
@@ -96,7 +94,7 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % or re-oriented, these information may not be correct anymore.
 % 
 % The output file names adopt SeriesDescription or ProtocolName of each series
-% used on scanner console. If both original and MoCo series are requested,
+% used on scanner console. If both original and MoCo series are converted,
 % '_MoCo' will be appended for MoCo series. For phase image, such as those from
 % field map, '_phase' will be appended to the name. If multiple subjects data
 % are mixed (strongly discouraged), subject name will be in file name. In case
@@ -295,7 +293,18 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 150609 No t_unit and SliceTiming for DTI.
 % 150613 mb_slicetiming: try to fix SOME broken multiband slice timing.
 % 150620 use 'bval' for nii.ext and dcmHeaders.mat, so keep original B_value.
+% 150910 bug fix for scl_slope/inter: missing double for max/min(nii.img(:)).
+% 150924 PAR: fix weird SliceNumber; fix mean-ADC removal if not last vol.
+% 150925 Bug fix for nSL=1 (vol-dim was at slice-dim);
+% 150926 multiFrameFields: add SliceNumber & simplify code; 
+%        save_dti_para: tidy format; try to avoid genvarname.
 % End of history. Don't edit this line!
+
+% TODO: need testing files to figure out following parameters:
+%    delay in TR (like sparse seq) for GE/Philips
+%    flag for MOCO series for GE/Philips
+%    GE Sag slice bvec sign
+%    Phase image flag for GE
 
 if nargout, varargout{1} = ''; end
 if nargin==3 && ischar(varargin{1}) % mis-use 3rd input for GUI and func handle
@@ -553,10 +562,10 @@ for i = 1:nRun
         continue;
     end
     
-    iSL = xform_mat(s); iSL = iSL(3);
-    a = zeros(1, nFile);
-    for j = 1:nFile, a(j) = h{i}{j}.ImagePositionPatient(iSL); end
-    nSL = sum(diff(sort(a)) > 1e-4) + 1; % allow minor diff
+    ipp = zeros(3, nFile);
+    for j = 1:nFile, ipp(:,j) = h{i}{j}.ImagePositionPatient; end
+    [~, iSL] = max(var(ipp, 1, 2)); ipp = ipp(iSL,:);
+    nSL = sum(diff(sort(ipp)) > 1e-4) + 1; % allow minor diff
     nVol = nFile / nSL;
     if mod(nVol, 1) > 0
         errorLog(['Missing file(s) detected for ' series '. Series skipped.']);
@@ -572,15 +581,15 @@ for i = 1:nRun
     h{i}{1}.(fld) = uint16(nSL); % best way for nSL?
 
     % re-order as Slice then Volume if Dim3IsVolume (likely Philips)
-    if abs(a(1)-a(2)) < 1e-4 % the same slice location
+    if abs(ipp(1)-ipp(2)) < 1e-4 % the same slice location
         ind = reshape(1:nFile, [nVol nSL])';
-        h{i} = h{i}(ind(:)); a = a(ind(:));
+        h{i} = h{i}(ind(:)); ipp = ipp(ind(:));
         h{i}{1}.Dim3IsVolume = true; % not needed, info only
     end
         
     % re-order slices within volume by slice locations
     if strncmpi(s.Manufacturer, 'GE', 2)
-        [~, ind] = sort(a(1:nSL)); % slice locations for first volume
+        [~, ind] = sort(ipp(1:nSL)); % slice locations for first volume
         % if iSL==1, ind = ind(nSL:-1:1); end % need to confirm for SAG slice
         if ~isequal(ind, 1:nSL)
             inc = repmat((0:nVol-1)*nSL, nSL, 1);
@@ -598,14 +607,14 @@ for i = 1:nRun
         end
     end
     
-    [~, ind] = sort(a(1:nSL));
+    [~, ind] = sort(ipp(1:nSL));
     if ~isequal(ind, 1:nSL) && ~isequal(ind, nSL:-1:1)
         errorLog(['Missing file(s) detected for ' series '. Series skipped.']);
         keep(i) = 0; continue; % skip
     end
     
     for j = 2:nVol
-        [~, ind1] = sort(a((1:nSL)+(j-1)*nSL));
+        [~, ind1] = sort(ipp((1:nSL)+(j-1)*nSL));
         if isequal(ind, ind1), continue; end
         errorLog(['Missing file(s) detected for ' series '. Series skipped.']);
         keep(i) = 0; break; % skip
@@ -661,6 +670,7 @@ for i = 1:nRun
     if MoCo==0 && isMoCo(i), a = [a '_MoCo']; end
     if multiSubj, a = [a '_' subjs{i}]; end
     if nStudy(i)>1, a = [a '_Study' studyIDs{i}]; end
+    if ~isstrprop(a(1), 'alpha'), a = ['x' a]; end
     a(~isstrprop(a, 'alphanum')) = '_'; % make str valid for field name
     while true % remove repeated underscore
         ind = strfind(a, '__');
@@ -673,7 +683,9 @@ for i = 1:nRun
     end
     rNames{i} = sprintf('%s_s%03.0f', a, sN);
 end
-rNames = genvarname(rNames); % add 'x' if started with a digit, and more
+if any(cellfun(@length, rNames)>namelengthmax)
+    rNames = genvarname(rNames); %#ok also guarantee unique names
+end 
 
 % deal with MoCo series
 if MoCo>0 && any(isMoCo)
@@ -731,18 +743,7 @@ for i = 1:nRun
         n = ndims(img);
         if n == 2 % for most dicom files
             img(:, :, 2:nFile) = 0; % pre-allocate
-            for j = 2:nFile
-                try
-                    img(:,:,j) = dicm_img(h{i}{j}, 0);
-                catch
-                    tmp = squeeze(dicm_img(h{i}{j}, 0)); 
-                    if size(tmp,3)==2 & isequal(tmp(:,:,1), tmp(:,:,2))
-                       img(:,:,j) = tmp(:,:,1); 
-                    else
-                        error('- | UNABLE TO READ %s | -', h{i}{j}.Filename); 
-                    end
-                end
-            end
+            for j = 2:nFile, img(:,:,j) = dicm_img(h{i}{j}, 0); end
         elseif n == 3 % SamplesPerPixel>1 is the only case I know for now
             img(:, :, :, 2:nFile) = 0; % pre-allocate
             for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
@@ -759,8 +760,8 @@ for i = 1:nRun
     elseif ndims(img)==4 && tryGetField(s, 'Dim3IsVolume', false) % BV/BRIK
         img = permute(img, [1 2 4 3]);
     elseif ndims(img) == 3 % may need to reshape to 4D
-        nSL = double(tryGetField(s, 'LocationsInAcquisition'));        
-        if nSL>1
+        nSL = double(tryGetField(s, 'LocationsInAcquisition'));
+        if ~isempty(nSL)
             dim = size(img);
             dim(3:4) = [nSL dim(3)/nSL]; % verified integer earlier
             if nFile==1 && tryGetField(s, 'Dim3IsVolume', false)
@@ -772,6 +773,10 @@ for i = 1:nRun
             end
         end
     end
+    
+    % fix weird slice ordering for PAR (seen) and multiframe
+    if isfield(s, 'SliceNumber'), img(:,:,s.SliceNumber,:) = img; end
+
     % This 'if' block takes care of SamplesPerPixel>1
     if tryGetField(s, 'SamplesPerPixel', 1) > 1
         img = permute(img, [1 2 4:8 3]); % put RGB into dim8 for nii_tool
@@ -894,7 +899,7 @@ end
 function tf = isDTI(s)
 tf = isType(s, '\DIFFUSION'); % Siemens, Philips
 if tf, return; end
-if strncmp(s.Manufacturer, 'GE', 2) % not labeled as /DIFFISION
+if strncmp(s.Manufacturer, 'GE', 2) % not labeled as \DIFFISION
     tf = tryGetField(s, 'DiffusionDirection', 0)>0;
 elseif strncmpi(s.Manufacturer, 'Philips', 7)
     tf = strcmp(tryGetField(s, 'MRSeriesDiffusion', 'N'), 'Y');
@@ -939,7 +944,7 @@ if (strcmp(tryGetField(s, 'MRAcquisitionType', ''), '3D') || s.isDTI) && ...
     pixdim = pixdim(perm);
     nii.hdr.dim(2:4) = dim;
     nii.img = permute(nii.img, [perm 4:8]);
-    if isfield(s, 'bvec'), s.bvec = s.bvec(:,perm); end
+    if isfield(s, 'bvec'), s.bvec = s.bvec(:, perm); end
 end
 iSL = find(fps_bits==16);
 iPhase = find(fps_bits==4); % axis index for phase_dim in re-oriented img
@@ -954,7 +959,7 @@ flp(1) = ~flp(1); % first axis negative: comment this to make all positive
 rotM = diag([1-flp*2 1]); % 1 or -1 on diagnal
 rotM(1:3, 4) = (dim-1) .* flp; % 0 or dim-1
 R = R / rotM; % xform matrix after flip
-for k = 1:3, if flp(k), nii.img = flipdim(nii.img, k); end; end
+for k = 1:3, if flp(k), nii.img = flipdim(nii.img, k); end; end %#ok
 if flp(iPhase), phPos = ~phPos; end
 if isfield(s, 'bvec'), s.bvec(:, flp) = -s.bvec(:, flp); end
 if isfield(s, 'SliceTiming') && flp(iSL) % slices flipped
@@ -1071,11 +1076,10 @@ end
 nii.hdr.descrip = descrip; % char[80], drop from end if exceed
 
 % data slope and intercept: apply to img if no rounding error 
-nii.hdr.scl_slope = 1; % default scl_inter is 0
 if any(isfield(s, {'RescaleSlope' 'RescaleIntercept'}))
     slope = tryGetField(s, 'RescaleSlope', 1); 
     inter = tryGetField(s, 'RescaleIntercept', 0); 
-    val = sort([max(nii.img(:)) min(nii.img(:))] * slope + inter);
+    val = sort(double([max(nii.img(:)) min(nii.img(:))]) * slope + inter);
     dClass = class(nii.img);
     if isa(nii.img, 'float') || (mod(slope,1)==0 && mod(inter,1)==0 ... 
             && val(1)>=intmin(dClass) && val(2)<=intmax(dClass))
@@ -1096,7 +1100,7 @@ nMos = ceil(sqrt(nSL)); % always nMos x nMos tiles
 [nr, nc, nv] = size(mos); % number of row, col and vol in mosaic
 
 nr = nr / nMos; nc = nc / nMos; % number of row and col in slice
-vol = zeros([nr nc nSL nv], class(mos));
+vol = zeros([nr nc nSL nv], class(mos)); %#ok
 for i = 1:nSL
     r =    mod(i-1, nMos) * nr + (1:nr); % 2nd slice is tile(2,1)
     c = floor((i-1)/nMos) * nc + (1:nc);
@@ -1108,8 +1112,8 @@ end
 %% subfunction: set slice timing related info
 function [s, hdr] = sliceTiming(s, hdr)
 TR = tryGetField(s, 'RepetitionTime'); % in ms
-if isempty(TR), TR = tryGetField(s, 'TemporalResolution', 0); end
-if TR == 0, return; end
+if isempty(TR), TR = tryGetField(s, 'TemporalResolution'); end
+if isempty(TR), return; end
 hdr.pixdim(5) = TR / 1000;
 if tryGetField(s, 'isDTI', 0), return; end
 hdr.xyzt_units = 8; % seconds
@@ -1179,22 +1183,17 @@ if isfield(s, 'bvec_original')
     bval = s.B_value;
     bvec = tryGetField(s, 'bvec_original');
 elseif isfield(s, 'PerFrameFunctionalGroupsSequence')
-    fld = 'PerFrameFunctionalGroupsSequence';
     if tryGetField(s, 'Dim3IsVolume', false), iDir = 1:nDir;
     else iDir = 1:nSL:nSL*nDir;
     end
-    dict = dicm_dict(s.Manufacturer, {fld 'B_value' 'MRDiffusionSequence' ...
-        'DiffusionGradientDirectionSequence' 'DiffusionGradientDirection'});
+    flds = {'DiffusionGradientDirectionSequence' 'DiffusionGradientDirection'};
+    dict = dicm_dict(s.Manufacturer, [MF_val('B_value') flds]);
     s2 = dicm_hdr(s.Filename, dict, iDir); % re-read needed frames
-    sq = s2.(fld);
     for j = 1:nDir
-        item = sprintf('Item_%g', iDir(j));
-        try
-            a = sq.(item).MRDiffusionSequence.Item_1;
-            bval(j) = a.B_value;
-            a = a.DiffusionGradientDirectionSequence.Item_1;
-            bvec(j,:) = a.DiffusionGradientDirection;
-        end
+        a = MF_val('B_value', s2, iDir(j));
+        if ~isempty(a), bval(j) = a; end
+        a = MF_val(flds{1}, s2, iDir(j));
+        if ~isempty(a), bvec(j,:) = a.Item_1.(flds{2}); end
     end
 else % multiple files: order already in slices then volumes
     dict = dicm_dict(s.Manufacturer, {'B_value' 'B_factor' 'SlopInt_6_9' ...
@@ -1238,15 +1237,18 @@ if strncmpi(s.Manufacturer, 'Philips', 7)
         for j = 1:nDir, bvec(j,:) = ang2vec(bvec(j,:)); end % deg to dir cos mat
         errorLog(['Please validate bvec (direction in deg): ' ProtocolName(s)]);
     end
-    fld = 'DiffusionDirectionality';
-    if bval(nDir)~=0 && all(abs(bvec(nDir,:))<1e-4)
-        if ~isfield(s, 'LastFile') || ~isfield(s.LastFile, fld) || ...
-                ~strncmpi(s.LastFile.(fld), 'ISO', 3)
-            % Remove last vol if it is computed ADC
-            bval(nDir) = [];
-            bvec(nDir,:) = [];
-            nii.img(:,:,:,nDir) = [];
-            nDir = nDir - 1;
+    
+    % Remove computed ADC: it may not be the last vol
+    ind = find(bval>1e-4 & sum(abs(bvec),2)<1e-4);
+    if ~isempty(ind)
+        try isISO = s.LastFile.DiffusionDirectionality;
+        catch, isISO = false;
+        end
+        if ~isISO
+            bval(ind) = [];
+            bvec(ind,:) = [];
+            nii.img(:,:,:,ind) = [];
+            nDir = nDir - numel(ind);
             nii.hdr.dim(5) = nDir;
         end
     end
@@ -1279,11 +1281,11 @@ function save_dti_para(s, fname)
 if ~isfield(s, 'bvec') || all(s.bvec(:)==0), return; end
 if isfield(s, 'bval')
     fid = fopen([fname '.bval'], 'w');
-    fprintf(fid, '%g ', s.bval); % one row
+    fprintf(fid, '%g\t', s.bval); % one row
     fclose(fid);
 end
 
-str = repmat('%.6g ', 1, size(s.bvec,1));
+str = repmat('%9.6f\t', 1, size(s.bvec,1));
 fid = fopen([fname '.bvec'], 'w');
 fprintf(fid, [str '\n'], s.bvec); % 3 rows by # direction cols
 fclose(fid);
@@ -1358,7 +1360,6 @@ foo = abs(R);
 [~, ixyz] = max(foo); % orientation info: perm of 1:3
 if ixyz(2) == ixyz(1), foo(ixyz(2),2) = 0; [~, ixyz(2)] = max(foo(:,2)); end
 if any(ixyz(3) == ixyz(1:2)), ixyz(3) = setdiff(1:3, ixyz(1:2)); end
-if nargout<2, return; end
 iSL = ixyz(3); % 1/2/3 for Sag/Cor/Tra slice
 cosSL = R(iSL, 3);
 
@@ -1786,188 +1787,145 @@ elseif strncmpi(s.Manufacturer, 'Philips', 7)
     if     any(d == 'LPH'), phPos = false;
     elseif any(d == 'RAF'), phPos = true;
     end
-    if R(ixy(iPhase), iPhase)<0, phPos = ~phPos; end % tricky
+    if R(ixy(iPhase), iPhase)<0, phPos = ~phPos; end % tricky!
 end
 
 %% subfunction: extract useful fields for multiframe dicom
 function s = multiFrameFields(s)
-if any(~isfield(s, {'SharedFunctionalGroupsSequence' ...
-        'PerFrameFunctionalGroupsSequence'}))
-    return; % do nothing
-end
-s1 = s.SharedFunctionalGroupsSequence.Item_1;
-s2 = s.PerFrameFunctionalGroupsSequence.Item_1;
+pffgs = 'PerFrameFunctionalGroupsSequence';
+if any(~isfield(s, {'SharedFunctionalGroupsSequence' pffgs})), return; end
 
-fld = 'EffectiveEchoTime'; n1 = 'MREchoSequence'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1; val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-end
-if ~isfield(s, 'EchoTime') && ~isempty(val), s.EchoTime = val; end
-if ~isfield(s, 'EchoTime') && isfield(s, 'EchoTimeDisplay')
-	s.EchoTime = s.EchoTimeDisplay;
+flds = {'EchoTime' 'PixelSpacing' 'SpacingBetweenSlices' 'SliceThickness' ...
+        'RepetitionTime' 'FlipAngle' 'RescaleIntercept' 'RescaleSlope' ...
+        'ImageOrientationPatient' 'ImagePositionPatient' ...
+        'InPlanePhaseEncodingDirection'};
+for i = 1:length(flds)
+    if isfield(s, flds{i}), continue; end
+    a = MF_val(flds{i}, s, 1);
+    if ~isempty(a), s.(flds{i}) = a; end
 end
 
-n1 = 'MRTimingAndRelatedParametersSequence';
-fld = 'RepetitionTime'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'PixelSpacing'; n1 = 'PixelMeasuresSequence'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'SpacingBetweenSlices';  val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'SliceThickness'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'RescaleIntercept'; n1 = 'PixelValueTransformationSequence'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'RescaleSlope'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'ImageOrientationPatient'; n1 = 'PlaneOrientationSequence'; val = [];
-if isfield(s1, n1)
-    a = s1.(n1).Item_1;  val = tryGetField(a, fld);
-elseif isfield(s2, n1)
-    a = s2.(n1).Item_1;  val = tryGetField(a, fld);
-end
-if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
-
-fld = 'ImagePositionPatient'; n1 = 'PlanePositionSequence';
-if isfield(s2, n1)
-    a = s2.(n1); val = tryGetField(a.Item_1, fld);
-    if ~isfield(s, fld) && ~isempty(val), s.(fld) = val; end
+if ~isfield(s, 'EchoTime')
+    a = MF_val('EffectiveEchoTime', s, 1);
+    if ~isempty(a), s.EchoTime = a;
+    elseif isfield(s, 'EchoTimeDisplay'), s.EchoTime = s.EchoTimeDisplay;
+    end
 end
 
-s2 = s.PerFrameFunctionalGroupsSequence;
-n1 = fieldnames(s2);
-if length(n1) < 2, return; end % in case of only 1 frame
-s2 = s2.(n1{end}); % last frame
-
-fld = 'DiffusionDirectionality'; n1 = 'MRDiffusionSequence';
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if ~isempty(val), s.LastFile.(fld) = val; end
+nFrame = tryGetField(s, 'NumberOfFrames');
+if isempty(nFrame)
+    a = fieldnames(s.(pffgs));
+    nFrame = sscanf(a{end}, 'Item_%g');
 end
 
 % check ImageOrientationPatient consistency for 1st and last frame only
-fld = 'ImageOrientationPatient'; n1 = 'PlaneOrientationSequence';
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if ~isempty(val)
-        try
-            if any(abs(val-s.ImageOrientationPatient) > 1e-4)
-                s = []; % silently ignore it
-                return; % inconsistent orientation, remove the field
-            end
-        end
-    end
+fld = 'ImageOrientationPatient';
+val = MF_val(fld, s, nFrame);
+if ~isempty(val) && isfield(s, fld) && any(abs(val-s.(fld))>1e-4)
+    s = []; % silently ignore it
+    return; % inconsistent orientation, remove the field
 end
 
-% GE data may need this to get LocationsInAcquisition
-fld = 'DimensionIndexValues'; n1 = 'FrameContentSequence';
-if isfield(s2, n1) && ~isfield(s, 'LocationsInAcquisition')
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if numel(val)>1, s.LocationsInAcquisition = val(2); end
+flds = {'DiffusionDirectionality' 'ImagePositionPatient' ...
+        'ComplexImageComponent' 'RescaleIntercept' 'RescaleSlope'};
+for i = 1:length(flds) % For last frame
+    a = MF_val(flds{i}, s, nFrame);
+    if ~isempty(a), s.LastFile.(flds{i}) = a; end
 end
 
-fld = 'ImagePositionPatient'; n1 = 'PlanePositionSequence';
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if ~isempty(val), s.LastFile.(fld) = val; end
+fld = 'ImagePositionPatient';
+val = MF_val(fld, s, 2); % 2nd frame
+if isempty(val), return; end
+if isfield(s, fld) && all(abs(s.(fld)-val)<1e-4)
+    s.Dim3IsVolume = true;
 end
 
-fld = 'ComplexImageComponent'; n1 = 'MRImageFrameTypeSequence';
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if ~isempty(val), s.LastFile.(fld) = val; end
-end
-
-fld = 'RescaleIntercept'; n1 = 'PixelValueTransformationSequence';
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if ~isempty(val), s.LastFile.(fld) = val; end
-end
-fld = 'RescaleSlope';
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if ~isempty(val), s.LastFile.(fld) = val; end
-end
-
-fld = 'ImagePositionPatient'; n1 = 'PlanePositionSequence';
-s2 = s.PerFrameFunctionalGroupsSequence.Item_2;
-if isfield(s2, n1)
-    a = s2.(n1).Item_1; val = tryGetField(a, fld);
-    if isfield(s, fld) && all(abs(s.(fld)-val)<1e-4)
-        s.Dim3IsVolume = true;
-    end
-    if isfield(s, 'LocationsInAcquisition'), return; end
-    
-    % Following code try to get LocationsInAcquisition
-    if isempty(val) || ~isfield(s, 'ImageOrientationPatient') || ...
-          ~isfield(s, 'LastFile') || ~isfield(s.LastFile, fld)
-        return; % give up: no needed info
-    end
-    
-    R = reshape(s.ImageOrientationPatient, 3, 2);
-    [cosSL, iSL] = max(abs(cross(R(:,1), R(:,2))));
-    dVL = s.LastFile.(fld) - s.(fld); dVL = dVL(iSL);
-
-    if ~tryGetField(s, 'Dim3IsVolume', false) % frames 1&2 are different slices
-        dSL = val(iSL) - s.(fld)(iSL);
-        s.LocationsInAcquisition = abs(round(dVL/dSL)) + 1;
-        return;
-    end
-    
-    thk = tryGetField(s, 'SpacingBetweenSlices');
-    if isempty(thk), thk = tryGetField(s, 'SliceThickness'); end
-    if ~isempty(thk)
-        s.LocationsInAcquisition = abs(round(dVL/cosSL/thk)) + 1;
-        return;
-    end
-    
-    % By ImagePositionPatient of all frames: slow
-    dict = dicm_dict('', {'PerFrameFunctionalGroupsSequence' n1 fld});
+if ~isfield(s, 'LocationsInAcquisition') % use all frames -- slow
+    dict = dicm_dict(s.Manufacturer, MF_val(fld));
     s2 = dicm_hdr(s.Filename, dict, 'all');
-    s2 = s2.PerFrameFunctionalGroupsSequence;
-    flds = fieldnames(s2);
-    n = length(flds);
-    a = nan(n, 1);
-    for i = 1:n, a(i) = s2.(flds{i}).(n1).Item_1.(fld)(iSL); end
-    s.LocationsInAcquisition = sum(diff(sort(a)) > 1e-4) + 1;
+    ipp = nan(3, nFrame);
+    for i = 1:nFrame, ipp(:,i) = MF_val(fld, s2, i); end
+    [~, iSL] = max(var(ipp,1,2));
+    s.LocationsInAcquisition = sum(diff(sort(ipp(iSL,:))) > 1e-4) + 1;
+end
+
+% Lastly check whether weird slice ordering: only seen in PAR though
+nSL = double(s.LocationsInAcquisition);
+if mod(nFrame,nSL)
+    errorLog(['nFrame/nSL not an integer (' ProtocolName(s) '). Skipped']);
+    s = [];
+    return;
+end
+i = MF_val('SliceNumberMR', s, 1); % Philips
+if ~isempty(i) 
+    i(2) = MF_val('SliceNumberMR', s, nFrame);
+    if isequal(i, [1 nSL]) || isequal(i, [nSL 1]), return; end
+end
+
+if tryGetField(s, 'Dim3IsVolume', false)
+    iFrame = 1:(nFrame/nSL):nFrame;
+else
+    iFrame = 1:nSL;
+end
+if exist('ipp', 'var') % save time if done for nSL
+    ipp = ipp(:,iFrame);
+else
+    dict = dicm_dict(s.Manufacturer, MF_val(fld));
+    s2 = dicm_hdr(s.Filename, dict, iFrame);
+    n = numel(iFrame);
+    ipp = nan(3, n);
+    for i = 1:n, ipp(:,i) = MF_val(fld, s2, iFrame(i)); end
+end
+[~, iSL] = max(var(ipp,1,2));
+[~, ind] = sort(ipp(iSL,:));
+if ~isequal(ind, 1:nSL) && ~isequal(ind, nSL:-1:1) % just avoid accident
+    s.SliceNumber = ind;
+    s.(fld) = MF_val(fld, s2, iFrame(ind==1));
+    s.LastFile.(fld) = MF_val(fld, s2, iFrame(ind==nSL));
+end
+
+%% subfunction: return value from Shared or PerFrame FunctionalGroupsSequence
+function val = MF_val(fld, s, iFrame)
+switch fld
+    case 'EffectiveEchoTime'
+        sq = 'MREchoSequence';
+    case {'DiffusionDirectionality' 'B_value' 'DiffusionGradientDirection' ...
+            'DiffusionGradientDirectionSequence'}
+        sq = 'MRDiffusionSequence';
+    case 'ComplexImageComponent'
+        sq = 'MRImageFrameTypeSequence';
+    case {'DimensionIndexValues' 'InStackPositionNumber' 'TemporalPositionIndex'}
+        sq = 'FrameContentSequence';
+    case {'RepetitionTime' 'FlipAngle'}
+        sq = 'MRTimingAndRelatedParametersSequence';
+    case 'ImagePositionPatient'
+        sq = 'PlanePositionSequence';
+    case 'ImageOrientationPatient'
+        sq = 'PlaneOrientationSequence';
+    case {'PixelSpacing' 'SpacingBetweenSlices' 'SliceThickness'}
+        sq = 'PixelMeasuresSequence';
+    case {'RescaleIntercept' 'RescaleSlope' 'RescaleType'}
+        sq = 'PixelValueTransformationSequence';
+    case {'InPlanePhaseEncodingDirection' 'MRAcquisitionFrequencyEncodingSteps' ...
+            'MRAcquisitionPhaseEncodingStepsInPlane'}
+        sq = 'MRFOVGeometrySequence';
+    case {'SliceNumberMR' 'EchoTime'} % Philips
+        sq = 'PrivatePerFrameSq';
+    otherwise
+        error('Sequence for %s not set.', fld);
+end
+pffgs = 'PerFrameFunctionalGroupsSequence';
+if nargin<2, val = {'SharedFunctionalGroupsSequence' pffgs sq fld}; return; end
+try 
+    s1 = s.SharedFunctionalGroupsSequence.Item_1;
+    val = s1.(sq).Item_1.(fld);
+catch
+    try
+        s1 = s.(pffgs).(sprintf('Item_%g', iFrame));
+        val = s1.(sq).Item_1.(fld);
+    catch
+        val = [];
+    end
 end
 
 %% subfunction: split nii into mag and phase for Philips single file

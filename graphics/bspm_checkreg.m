@@ -1,7 +1,7 @@
 function bspm_checkreg(images, addmniref, captions, xyz, title)
 % A visual check of image registration quality.
 %
-% USAGE: bspm_checkreg(images, captions, xyz, title)
+% USAGE: bspm_checkreg(images, addmniref, captions, xyz, title)
 %
 % FORMAT spm_check_registration
 % FORMAT spm_check_registration(images, captions)

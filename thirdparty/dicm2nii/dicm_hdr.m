@@ -23,8 +23,8 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % for Siemens, GE and Philips dicom, and runs faster, especially for partial
 % header and multi-frame dicom.
 % 
-% This can also read Philips PAR file and AFNI HEAD file, and return needed
-% fields for dicm2nii to convert into nifti.
+% This can also read Philips PAR file, AFNI HEAD file and some BrainVoyager
+% files, and return needed fields for dicm2nii to convert into nifti.
 % 
 % See also DICM_DICT, DICM2NII, DICM_IMG, RENAME_DICM, SORT_DICM
 
@@ -86,6 +86,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 150517 fix manufacturer check problem for Octave: no re-read.
 % 150522 PerFrameSQ ind: fix the case if numel(ind)~=nFrame.
 % 150526 read_sq: use ItemDelimitationItem instead of empty dat1 as SQ end.
+% 150924 philips_par: store SliceNumber if not acsending/decending order.
 
 persistent dict_full;
 s = []; info = '';
@@ -297,6 +298,7 @@ end
 if n<1, return; end % empty val
 
 % Look up item name in dictionary
+if n==13, n = 10; end % ugly bug fix for some old dicom file
 n = double(n)/2;
 ind = find(dict.tag == tag, 1);
 if ~isempty(ind)
@@ -351,6 +353,10 @@ while i<nEnd
     if isPerFrameSQ && ~ischar(iFrames)
         if j==0, i0 = i; j = 1; % always read 1st frame
         elseif j==1 % always read 2nd frame, and find ind for all frames
+            if ~exist('tag1', 'var') % in case 1st frame has no asked tag
+                iFrames = 'all'; rst = []; j = 0; i = i0-4; % re-do the SQ
+                continue;
+            end
             j = 2; iItem = 2;
             tag1 = char(typecast(tag1, 'uint8'));
             tag1 = tag1([3 4 1 2]);
@@ -515,7 +521,6 @@ if strncmpi(s.SoftwareVersion, 'V3', 2)
     s = []; return;
 end
 
-% s.IsPhilipsPAR = true;
 s.PatientName = par_key('Patient name', '%c');
 s.StudyDescription = par_key('Examination name', '%c');
 [pth, nam] = fileparts(fname);
@@ -534,7 +539,6 @@ s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
 s.NumberOfEchoes = par_key('Max. number of echoes');
 nSL = par_key('Max. number of slices/locations');
 s.LocationsInAcquisition = nSL;
-s.NumberOfTemporalPositions = par_key('Max. number of dynamics');
 foo = par_key('Patient position', '%c');
 if isempty(foo), foo = par_key('Patient Position', '%c'); end
 if ~isempty(foo)
@@ -558,9 +562,6 @@ s.Stack.Item_1.MRStackOffcentreAP = posMid(1);
 s.Stack.Item_1.MRStackOffcentreFH = posMid(2);
 s.Stack.Item_1.MRStackOffcentreRL = posMid(3);
 posMid = posMid([3 1 2]); % better precision than those in the table
-if par_key('MTC') % motion correction?
-    s.ImageType = [s.ImageType '\MOCO\'];
-end
 s.EPIFactor = par_key('EPI factor');
 % s.DynamicSeries = strkey(str, 'Dynamic scan', '%g'); % 0 or 1
 isDTI = par_key('Diffusion')>0;
@@ -617,10 +618,23 @@ para = sscanf(str, '%g'); % read all numbers
 nImg = floor(numel(para) / n); 
 para = reshape(para(1:n*nImg), n, nImg)'; % whole table now
 s.NumberOfFrames = nImg;
+nVol = nImg/nSL;
+s.NumberOfTemporalPositions = nVol;
 
 s.Dim3IsVolume = (diff(para(1:2, colIndex('slice number'))) == 0);
-if s.Dim3IsVolume, iVol = 1:(nImg/nSL);
-else iVol = 1:nSL:nImg;
+if s.Dim3IsVolume
+    iVol = 1:nVol;
+    iSL = 1:nVol:nImg;
+else
+    iVol = 1:nSL:nImg;
+    iSL = 1:nSL;
+end
+
+% PAR/REC file may not start with SliceNumber of 1, WHY?
+sl = para(iSL, colIndex('slice number'));
+dSL = diff(sl);
+if ~(all(dSL==1) || all(dSL==-1))
+    s.SliceNumber = sl; % slice order in REC file
 end
 
 imgType = para(iVol, colIndex('image_type_mr')); % 0 mag; 3, phase?
@@ -635,7 +649,7 @@ end
 
 % These columns should be the same for all images: 
 cols = {'image pixel size' 'recon resolution' 'image angulation' ...
-    'slice thickness' 'slice gap' 'slice orientation' 'pixel spacing'};
+        'slice thickness' 'slice gap' 'slice orientation' 'pixel spacing'};
 if ~strcmp(s.ComplexImageComponent, 'MIXED')
     cols = [cols {'rescale intercept' 'rescale slope'}];
 end
