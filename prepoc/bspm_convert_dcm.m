@@ -72,16 +72,15 @@ for sub = 1:nsubs
             
             outfn = strcat(pth, filesep, sprintf('%s_%03d_', anatprefix, dcminfo.sequenceinfo.order), lower(fn), fe);
             cellfun(@movefile, nii, outfn)
-        end 
+        end
+        
         if s~=1
             if all([strcmp(tmp.type, 'GR') strcmp(seqid{s,1}, seqid{s-1,1})])
                 nii         = files(fullfile(outputDIR, '*nii'));
                 movefile(char(nii), seqid{s-1,2});
                 rmdir(outputDIR, 's');
             end
-            
         end
-        
         
     end
     

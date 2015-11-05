@@ -63,20 +63,20 @@ tag = 0;
 if nvol > 1
     switch lower(operation)
     case {'colorcode'}
-        expression  = 'i1'; 
+        operation  = 'i1'; 
         for i = 2:length(hdr), operation = [operation sprintf('+(i%d*%d)', i, i)]; end
     case {'prod'}
-        expression  = 'i1'; 
+        operation  = 'i1'; 
         for i = 2:nvol, operation = [operation sprintf('.*i%d', i)]; end
     case {'sum', 'mean', 'median'}
-        expression = strcat('nan', operation, '(X)'); 
+        operation = strcat('nan', operation, '(X)'); 
     case {'min', 'max', 'std', 'var'}
-        expression = strcat('nan', operation, '(X)'); 
+        operation = strcat('nan', operation, '(X)'); 
     case {'diff'}
         if nvol > 2
             disp('ERROR: ''diff'' operation only works with 2 input images'); 
         else
-            expression = 'i1-i2'; 
+            operation = 'i1-i2'; 
         end
     end
     if regexpi(operation, '\(X\)')
