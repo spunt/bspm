@@ -29,7 +29,7 @@ dirs = genpath(srcDir);
 dirs = textscan(dirs, '%s', 'Delimiter', pathsep);
 dirs = dirs{1}; % cell str
 fnames = {};
-for i = 1:length(dirs)
+for i = 1:numel(dirs)
     curFolder = [dirs{i} filesep];
     foo = dir(curFolder); % all files and folders
     foo([foo.isdir]) = []; % remove folders
@@ -39,7 +39,7 @@ end
 
 dict = dicm_dict('', {'PatientName' 'PatientID' 'StudyID'});
 h = struct;
-n = length(fnames);
+n = numel(fnames);
 nDicm = 0;
 for i = 1:n
     s = dicm_hdr(fnames{i}, dict);
@@ -63,17 +63,17 @@ end
 sep = filesep;
 folders = {};
 subjs = fieldnames(h);
-for i = 1:length(subjs)
+for i = 1:numel(subjs)
     sub = h.(subjs{i});
     S = fieldnames(sub);
-    nS = length(S);
+    nS = numel(S);
     for j = 1:nS
         dstDir = [srcDir sep subjs{i}(2:end)];
         if nS>1, dstDir = [dstDir '_study' S{j}(2:end)]; end
         if ~exist(dstDir, 'dir'), mkdir(dstDir); end
         folders{end+1} = dstDir;
         
-        for k = 1:length(sub.(S{j}))
+        for k = 1:numel(sub.(S{j}))
             fname = sub.(S{j}){k};
             [~, nam, ext] = fileparts(fname);
             dstName = [dstDir sep nam ext];
@@ -86,6 +86,6 @@ if nargout
     varargout = {folders'};
 else
     fprintf(' %g of %g files sorted into %g subfolders:\n', ...
-        nDicm, n, length(folders));
+        nDicm, n, numel(folders));
     fprintf('  %s\n', folders{:});
 end

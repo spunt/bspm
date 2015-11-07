@@ -100,8 +100,7 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % are mixed (strongly discouraged), subject name will be in file name. In case
 % of name conflict, SeriesNumber, such as '_s005', will be appended to make file
 % names unique. It is suggested to use short and descriptive SeriesDescription
-% on the scanner console, and use names containing only letters, numbers and
-% underscores.
+% on the scanner console.
 % 
 % For SPM 3D files, the file names will have volume index in format of '_00001'
 % appended to above name.
@@ -298,12 +297,15 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 150925 Bug fix for nSL=1 (vol-dim was at slice-dim);
 % 150926 multiFrameFields: add SliceNumber & simplify code; 
 %        save_dti_para: tidy format; try to avoid genvarname.
+% 150927 Repalce misused length with numel in all files. 
+% 150928 checkImagePostion: skip most irregular spacing.
+% 150929 Take care of SL order for regular dicom: GE no longer special case.
+% 150930 Remove slice_dir guess; Use NiftiName for error info.
 % End of history. Don't edit this line!
 
 % TODO: need testing files to figure out following parameters:
-%    delay in TR (like sparse seq) for GE/Philips
 %    flag for MOCO series for GE/Philips
-%    GE Sag slice bvec sign
+%    GE non-axial slice bvec sign
 %    Phase image flag for GE
 
 if nargout, varargout{1} = ''; end
@@ -314,7 +316,7 @@ if nargin==3 && ischar(varargin{1}) % mis-use 3rd input for GUI and func handle
     elseif strcmp(varargin{1}, 'func_handle')
         if strcmp(dataFolder, 'all') % for command line test
             fcns = localfunctions; % only for Matlab since 2013b
-            for i = 1:length(fcns)
+            for i = 1:numel(fcns)
                 nam = func2str(fcns{i});
                 assignin('base', nam, eval(['@' nam]));
             end
@@ -368,7 +370,7 @@ if isnumeric(src)
     error('Invalid dicom source.');    
 elseif iscellstr(src) % multiple files
     dcmFolder = folderFromFile(src{1});
-    n = length(src);
+    n = numel(src);
     fnames = src;
     for i = 1:n
         foo = dir(src{i});
@@ -428,7 +430,7 @@ if ~exist('fnames', 'var')
     dirs = textscan(dirs, '%s', 'Delimiter', pathsep);
     dirs = dirs{1}; % cell str
     fnames = {};
-    for i = 1:length(dirs)
+    for i = 1:numel(dirs)
         curFolder = [dirs{i} filesep];
         foo = dir(curFolder); % all files and folders
         foo([foo.isdir]) = []; % remove folders
@@ -436,7 +438,7 @@ if ~exist('fnames', 'var')
         fnames = [fnames foo]; %#ok<*AGROW>
     end
 end
-nFile = length(fnames);
+nFile = numel(fnames);
 if nFile<1, error(' No files found in the data source.'); end
 
 %% Check each file, store partial header in cell array hh
@@ -479,7 +481,7 @@ for k = 1:nFile
 
     m = find(strcmp(s.SeriesInstanceUID, seriesUIDs));
     if isempty(m)
-        m = length(seriesUIDs)+1;
+        m = numel(seriesUIDs)+1;
         seriesUIDs{m} = s.SeriesInstanceUID;
     end
     
@@ -487,7 +489,7 @@ for k = 1:nFile
     i = tryGetField(s, 'EchoNumber', 1); if i<1, i = 1; end
     j = tryGetField(s, 'InstanceNumber');
     if isempty(j) || j<1
-        try j = length(h{m}{i}) + 1;
+        try j = numel(h{m}{i}) + 1;
         catch, j = 1; 
         end
     end
@@ -496,7 +498,7 @@ end
 clear hh errStr;
 
 %% Check headers: remove file-missing and dim-inconsistent series
-nRun = length(h);
+nRun = numel(h);
 if nRun<1
     errorLog(sprintf('No valid files found:\n%s.', errInfo)); 
     return;
@@ -528,9 +530,9 @@ for i = 1:nRun
     h{i}{1} = s; % update record in case of full hdr or multiframe
     
     % check consistency in 'fldsCk'
-    nFile = length(h{i});
+    nFile = numel(h{i});
     if nFile<2, continue; end
-    nFlds = length(fldsCk);
+    nFlds = numel(fldsCk);
     if isfield(s, 'SpacingBetweenSlices'), nFlds = nFlds - 1; end % check 1 of 2
     for k = 1:nFlds
         val1  = tryGetField(s, fldsCk{k});
@@ -558,66 +560,46 @@ for i = 1:nRun
         continue; % no other check for mosaic
     end
         
-    if ~keep(i) || any(~isfield(s, {'ImagePositionPatient' 'ImageOrientationPatient'}))
-        continue;
-    end
+    if ~keep(i) || ~isfield(s, 'ImagePositionPatient'), continue; end
     
-    ipp = zeros(3, nFile);
-    for j = 1:nFile, ipp(:,j) = h{i}{j}.ImagePositionPatient; end
-    [~, iSL] = max(var(ipp, 1, 2)); ipp = ipp(iSL,:);
-    nSL = sum(diff(sort(ipp)) > 1e-4) + 1; % allow minor diff
-    nVol = nFile / nSL;
-    if mod(nVol, 1) > 0
-        errorLog(['Missing file(s) detected for ' series '. Series skipped.']);
+    ipp = zeros(nFile, 3);
+    for j = 1:nFile, ipp(j,:) = h{i}{j}.ImagePositionPatient; end
+    [err, nSL, sliceN, isTZ] = checkImagePostion(ipp);
+    if ~isempty(err)
+        errorLog([err ' for ' series '. Series skipped.']);
         keep(i) = 0; continue; % skip
     end
     
-    fld = 'LocationsInAcquisition';
-    if isfield(s, fld) && s.(fld)~=nSL % warning but override it
-        errorLog(sprintf(['%s: the number of slices (%g) in dicom header ' ...
-            'seems wrong. nSL = %g is used. Please check the result.'], ...
-            series, s.(fld), nSL));
-    end
-    h{i}{1}.(fld) = uint16(nSL); % best way for nSL?
+    h{i}{1}.LocationsInAcquisition = uint16(nSL); % best way for nSL?
 
-    % re-order as Slice then Volume if Dim3IsVolume (likely Philips)
-    if abs(ipp(1)-ipp(2)) < 1e-4 % the same slice location
+    nVol = nFile / nSL;
+    if isTZ % Dim3IsVolume: Philips
         ind = reshape(1:nFile, [nVol nSL])';
-        h{i} = h{i}(ind(:)); ipp = ipp(ind(:));
+        h{i} = h{i}(ind(:));
         h{i}{1}.Dim3IsVolume = true; % not needed, info only
     end
-        
-    % re-order slices within volume by slice locations
-    if strncmpi(s.Manufacturer, 'GE', 2)
-        [~, ind] = sort(ipp(1:nSL)); % slice locations for first volume
-        % if iSL==1, ind = ind(nSL:-1:1); end % need to confirm for SAG slice
-        if ~isequal(ind, 1:nSL)
-            inc = repmat((0:nVol-1)*nSL, nSL, 1);
-            ind = repmat(ind, 1, nVol) + inc(:)';
-            h{i} = h{i}(ind); % sorted by slice locations
-            if ind(1)>1 % first file changed: update info for h{i}{1}
-                h{i}{1} = dicm_hdr(h{i}{1}.Filename); % read full hdr
-                s = h{i}{ind==1}; % original first file
-                h{i}{1}.isDTI = s.isDTI;
-                h{i}{1}.LocationsInAcquisition = s.LocationsInAcquisition;
-                h{i}{1}.AcquisitionDateTime = [ ... % useless based on GE data
-                    tryGetField(s, 'AcquisitionDate', '') ...
-                    tryGetField(s, 'AcquisitionTime', '')];
+       
+    % re-order slices within vol. No SliceNumber since files are organized
+    if any(diff(sliceN, 2) > 0) % neither 1:nSL nor nSL:-1:1
+        if sliceN(end) == 1, sliceN = sliceN(nSL:-1:1); end % not important
+        inc = repmat((0:nVol-1)*nSL, nSL, 1);
+        ind = repmat(sliceN(:), nVol, 1) + inc(:);
+        h{i} = h{i}(ind); % sorted by slice locations
+        if sliceN(1)>1 % first file changed: update info for h{i}{1}
+            h{i}{1} = dicm_hdr(h{i}{1}.Filename); % read full hdr
+            s = h{i}{sliceN==1}; % original first file
+            fldsCp = {'AcquisitionDateTime' 'isDTI' 'Dim3IsVolume' ...
+                'LocationsInAcquisition'};
+            for j = 1:numel(fldsCp)
+                if isfield(s, fldsCp{j})
+                    h{i}{1}.(fldsCp{j}) = s.(fldsCp{j}); 
+                end
+            end
+            if ~isfield(s, fldsCp{1})
+                h{i}{1}.(fldsCp{1}) = [tryGetField(s, 'AcquisitionDate', '') ...
+                                       tryGetField(s, 'AcquisitionTime', '')];
             end
         end
-    end
-    
-    [~, ind] = sort(ipp(1:nSL));
-    if ~isequal(ind, 1:nSL) && ~isequal(ind, nSL:-1:1)
-        errorLog(['Missing file(s) detected for ' series '. Series skipped.']);
-        keep(i) = 0; continue; % skip
-    end
-    
-    for j = 2:nVol
-        [~, ind1] = sort(ipp((1:nSL)+(j-1)*nSL));
-        if isequal(ind, ind1), continue; end
-        errorLog(['Missing file(s) detected for ' series '. Series skipped.']);
-        keep(i) = 0; break; % skip
     end
 end
 h = h(keep); sNs = sNs(keep); studyIDs = studyIDs(keep); 
@@ -629,7 +611,7 @@ subjs = subjs(keep); vendor = vendor(keep);
 subj = unique(subjs); 
 h = h(ind); sNs = sNs(ind); studyIDs = studyIDs(ind); % by subjs now
 nStudy = ones(1, nRun); % one for each series
-for i = 1:length(subj)
+for i = 1:numel(subj)
     iSub = find(strcmp(subj{i}, subjs));
     study = studyIDs(iSub);
     [study, iStudy] = sort(study); % by study for each subject
@@ -637,8 +619,8 @@ for i = 1:length(subj)
     a = sNs(iSub); sNs(iSub) = a(iStudy);
     studyIDs(iSub) = study; % done for h/sNs/studyIDs by studyIDs for a subj
     uID = unique(study);
-    nStudy(iSub) = length(uID);
-    for k = 1:length(uID) % now sort h/sNs by sNs for each studyID
+    nStudy(iSub) = numel(uID);
+    for k = 1:numel(uID) % now sort h/sNs by sNs for each studyID
         iStudy = strcmp(uID{k}, study);
         ind = iSub(iStudy); 
         [sNs(ind), iSN] = sort(sNs(ind));
@@ -652,14 +634,14 @@ end
 %  for MoCo series, append '_MoCo' to the name if both series are created.
 %  for multiple subjs, it is SeriesDescription_subj_s007
 %  for multiple Study, it is SeriesDescription_subj_Study1_s007
-nRun = length(h); % update it, since we have removed some
+nRun = numel(h); % update it, since we have removed some
 if nRun<1
     errorLog('No valid series found');
     return;
 end
 rNames = cell(1, nRun);
 isMoCo = false(1, nRun);
-multiSubj = length(subj)>1; 
+multiSubj = numel(subj)>1; 
 for i = 1:nRun
     s = h{i}{1};
     a = strtrim(ProtocolName(s));
@@ -670,7 +652,7 @@ for i = 1:nRun
     if MoCo==0 && isMoCo(i), a = [a '_MoCo']; end
     if multiSubj, a = [a '_' subjs{i}]; end
     if nStudy(i)>1, a = [a '_Study' studyIDs{i}]; end
-    if ~isstrprop(a(1), 'alpha'), a = ['x' a]; end
+    if ~isstrprop(a(1), 'alpha'), a = ['x' a]; end % genvarname behavior
     a(~isstrprop(a, 'alphanum')) = '_'; % make str valid for field name
     while true % remove repeated underscore
         ind = strfind(a, '__');
@@ -683,7 +665,7 @@ for i = 1:nRun
     end
     rNames{i} = sprintf('%s_s%03.0f', a, sN);
 end
-if any(cellfun(@length, rNames)>namelengthmax)
+if any(cellfun(@numel, rNames)>namelengthmax)
     rNames = genvarname(rNames); %#ok also guarantee unique names
 end 
 
@@ -702,7 +684,7 @@ if MoCo>0 && any(isMoCo)
     end
     h = h(keep); rNames = rNames(keep);
     vendor = vendor(keep); subj = unique(subjs(keep));
-    nRun = length(h);
+    nRun = numel(h);
 end
 
 vendor = strtok(unique(vendor));
@@ -724,7 +706,7 @@ for i = 1:nRun
         fnames{iRuns(i)}(end+(-4:0)) = [];
     end
 end
-fmtStr = sprintf(' %%-%gs %%gx%%gx%%gx%%g\n', max(cellfun(@length, fnames))+6);
+fmtStr = sprintf(' %%-%gs %%gx%%gx%%gx%%g\n', max(cellfun(@numel, fnames))+6);
 
 %% Now ready to convert nii series by series
 subjStr = sprintf('''%s'', ', subj{:}); subjStr(end+(-1:0)) = [];
@@ -732,30 +714,25 @@ vendor = sprintf('%s, ', vendor{:}); vendor(end+(-1:0)) = [];
 fprintf('Converting %g series (%s) into %g-D %s: subject %s\n', ...
             nRun, vendor, 4-rst3D, ext, subjStr);
 for i = 1:nRun
-    nFile = length(h{i});
+    nFile = numel(h{i});
+    h{i}{1}.NiftiName = fnames{i}; % for convenience of error info
     s = h{i}{1};
-    img = dicm_img(s, 0); % initialize with proper data type and img size
-
-    if nFile > 1
-        if ~isfield(s, 'LastFile')
-            h{i}{1}.LastFile = h{i}{nFile}; % store partial last header into 1st
-        end
-        n = ndims(img);
-        if n == 2 % for most dicom files
-            img(:, :, 2:nFile) = 0; % pre-allocate
-            for j = 2:nFile, img(:,:,j) = dicm_img(h{i}{j}, 0); end
-        elseif n == 3 % SamplesPerPixel>1 is the only case I know for now
-            img(:, :, :, 2:nFile) = 0; % pre-allocate
-            for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
-        else % err out, likely won't work for other series
-            error('dicm2nii can''t deal with multiple %g-dim dicom image', n);
-        end
-    elseif size(img,3) == 1 % single gray file (multi-frame dicm, par or brik)
-        img = permute(img, [1 2 4 3]); % put frames into dim3
+    if nFile>1 && ~isfield(s, 'LastFile')
+        h{i}{1}.LastFile = h{i}{nFile}; % store partial last header into 1st
     end
     
+    img = dicm_img(s, 0); % initialize data type and img size. No transpose
+    if ndims(img)>4 % err out, likely won't work for other series
+        error('Image with 5 or more dim not supported: %s', s.NiftiName);
+    end
+    img(:, :, :, 2:nFile) = 0; % pre-allocate
+    for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
+    if size(img,3)<2, img = permute(img, [1 2 4 3]); end % put frames into dim3
+    
     nSL = csa_header(s, 'NumberOfImagesInMosaic', 1);
-    if nSL>1 % SIEMENS mosaic
+    if tryGetField(s, 'SamplesPerPixel', 1) > 1 % color image
+        img = permute(img, [1 2 4:8 3]); % put RGB into dim8 for nii_tool
+    elseif nSL>1 % SIEMENS mosaic
         img = mos2vol(img, nSL); % mosaic to volume
     elseif ndims(img)==4 && tryGetField(s, 'Dim3IsVolume', false) % BV/BRIK
         img = permute(img, [1 2 4 3]);
@@ -772,22 +749,17 @@ for i = 1:nRun
                 img = reshape(img, dim);
             end
         end
+        % fix weird slice ordering for PAR (seen) and multiframe
+        if isfield(s, 'SliceNumber'), img(:,:,s.SliceNumber,:) = img; end
     end
-    
-    % fix weird slice ordering for PAR (seen) and multiframe
-    if isfield(s, 'SliceNumber'), img(:,:,s.SliceNumber,:) = img; end
 
-    % This 'if' block takes care of SamplesPerPixel>1
-    if tryGetField(s, 'SamplesPerPixel', 1) > 1
-        img = permute(img, [1 2 4:8 3]); % put RGB into dim8 for nii_tool
-    end
     dim = size(img);
-    if numel(dim)<3, dim(3) = 1; end
+    if numel(dim)<3, dim(3) = 1; end % single slice
     fld = 'NumberOfTemporalPositions';
     if ~isfield(s, fld) && numel(dim)>3 && dim(4)>1, h{i}{1}.(fld) = dim(4); end
 
     if any(~isfield(s, {'ImageOrientationPatient' 'ImagePositionPatient'}))
-        h{i}{1} = csa2pos(s, dim(3));
+        h{i}{1} = csa2pos(h{i}{1}, dim(3));
     end
     
     % Store GE slice timing. No slice order info for Philips at all!
@@ -856,7 +828,7 @@ h = cell2struct(h, fnames, 2); % convert into struct
 fname = [dataFolder 'dcmHeaders.mat'];
 if exist(fname, 'file') % if file exists, we update fields only
     S = load(fname);
-    for i = 1:length(fnames), S.h.(fnames{i}) = h.(fnames{i}); end
+    for i = 1:numel(fnames), S.h.(fnames{i}) = h.(fnames{i}); end
     h = S.h; %#ok
 end
 save(fname, 'h', '-v7'); % -v7 better compatibility
@@ -890,7 +862,7 @@ if ischar(keywords) % single keyword
     tf = ~isempty(strfind(typ, keywords));
     return;
 end
-for i = 1:length(keywords)
+for i = 1:numel(keywords)
     tf = ~isempty(strfind(typ, keywords{i}));
     if tf, return; end
 end
@@ -1119,12 +1091,12 @@ if tryGetField(s, 'isDTI', 0), return; end
 hdr.xyzt_units = 8; % seconds
 if hdr.dim(5)<3, return; end % skip structual, fieldmap etc
 
-t = csa_header(s, 'MosaicRefAcqTimes'); % in ms
 delay = asc_header(s, 'lDelayTimeInTR')/1000; % in ms now
 if isempty(delay), delay = 0; end
 TA = TR - delay;
+t = csa_header(s, 'MosaicRefAcqTimes'); % in ms
 if ~isempty(t) && isfield(s, 'LastFile') && max(t)-min(t)>TA % MB wrong vol 1
-    try t = mb_slicetiming(s); end
+    try t = mb_slicetiming(s, TA); end
 end
 if isempty(t), t = tryGetField(s, 'RefAcqTimes'); end % GE or Siemens non-mosaic
 
@@ -1198,12 +1170,12 @@ elseif isfield(s, 'PerFrameFunctionalGroupsSequence')
 else % multiple files: order already in slices then volumes
     dict = dicm_dict(s.Manufacturer, {'B_value' 'B_factor' 'SlopInt_6_9' ...
        'DiffusionDirectionX' 'DiffusionDirectionY' 'DiffusionDirectionZ'});
-    iDir = (0:nDir-1) * length(h)/nDir + 1; % could be mosaic 
+    iDir = (0:nDir-1) * numel(h)/nDir + 1; % could be mosaic 
     for j = 1:nDir % no these values for 1st file of each excitation
         s2 = h{iDir(j)};
         val = tryGetField(s2, 'B_value');
         if val == 0, continue; end
-        vec = tryGetField(s2, 'DiffusionGradientDirection');
+        vec = tryGetField(s2, 'DiffusionGradientDirection'); % Siemens/Philips
         imgRef = isempty(vec); % likely GE if true. B_value=0 won't reach here
         if isempty(val) || isempty(vec) % likely GE
             s2 = dicm_hdr(s2.Filename, dict);
@@ -1226,7 +1198,7 @@ else % multiple files: order already in slices then volumes
 end
 
 if all(isnan(bval)) && all(isnan(bvec(:)))
-    errorLog(['Failed to get DTI parameters: ' ProtocolName(s)]);
+    errorLog(['Failed to get DTI parameters: ' s.NiftiName]);
     return; 
 end
 bval(isnan(bval)) = 0;
@@ -1235,7 +1207,7 @@ bvec(isnan(bvec)) = 0;
 if strncmpi(s.Manufacturer, 'Philips', 7)
     if max(sum(bvec.^2, 2)) > 2 % guess in degree
         for j = 1:nDir, bvec(j,:) = ang2vec(bvec(j,:)); end % deg to dir cos mat
-        errorLog(['Please validate bvec (direction in deg): ' ProtocolName(s)]);
+        errorLog(['Please validate bvec (direction in deg): ' s.NiftiName]);
     end
     
     % Remove computed ADC: it may not be the last vol
@@ -1258,17 +1230,21 @@ h{1}.bval = bval; % store all into header of 1st file
 h{1}.bvec_original = bvec; % original from dicom
 
 % http://wiki.na-mic.org/Wiki/index.php/NAMIC_Wiki:DTI:DICOM_for_DWI_and_DTI
+[ixyz, R] = xform_mat(s, nii.hdr.dim(2:4)); % R takes care of slice dir
 if exist('imgRef', 'var') && imgRef % GE bvec already in image reference
     % Following sign change is based on FSL result. non-axial slice not tested
-    % GE slices have been sorted by ImagePositionPatient
     if strcmp(tryGetField(s, 'InPlanePhaseEncodingDirection'), 'ROW')
         bvec = bvec(:, [2 1 3]);
         bvec(:, 2:3) = -bvec(:, 2:3);
     else
         bvec(:, 1:2) = -bvec(:, 1:2);
     end
+    for i=1:3, if R(ixyz(i),i)<0, bvec(:,i) = -bvec(:,i); end; end
+    if ixyz(3)<3
+        errorLog(sprintf(['%s: bvec sign for non-axial slices not tested.\n' ...
+         ' Please check the result and report problem to author.'], s.NiftiName));
+    end
 else % Siemens/Philips
-    [~, R] = xform_mat(s, nii.hdr.dim(2:4)); % R takes care of slice dir
     R = R(1:3, 1:3);
     R = bsxfun(@rdivide, R, sqrt(sum(R.^2))); % normalize
     bvec = bvec * R; % dicom plane to image plane
@@ -1391,7 +1367,7 @@ elseif isfield(s, 'LastFile') && isfield(s.LastFile, 'ImagePositionPatient')
 end
 
 % Rest of the code is almost unreachable
-if isfield(s, 'CSASeriesHeaderInfo') % Siemens
+if isfield(s, 'CSASeriesHeaderInfo') % Siemens both mosaic and regular
     ori = {'Sag' 'Cor' 'Tra'}; ori = ori{iSL};
     sNormal = asc_header(s, ['sSliceArray.asSlice[0].sNormal.d' ori]);
     % csa_header(s, 'ProtocolSliceNumber') won't work for Mprage 
@@ -1400,24 +1376,14 @@ if isfield(s, 'CSASeriesHeaderInfo') % Siemens
     return;
 end
 
-% GE: sorted by ImagePosition, so slice dir is determined
-if strncmpi(tryGetField(s, 'Manufacturer', ''),  'GE', 2)
-    % if iSL==1, cosSL = -cosSL; end % turn on this if SAG sorted descending
-    if cosSL<0, R(:,3) = -R(:,3); end
-    return;
+pos = []; % SliceLocation for last or center slice we try to retrieve
+if isfield(s, 'LastScanLoc') && isfield(s, 'FirstScanLocation') % GE
+    pos = mean([s.LastScanLoc s.FirstScanLocation]); % mid-slice center
+    if iSL<3, pos = -pos; end % RAS convention!
+    pos = [R(iSL, 1:2) pos] * [-(dim(1:2)-1)/2 1]'; % mid-slice location
 end
 
-pos = []; % SliceLocation for last or center slice we try to retrieve
-% if isempty(pos) && isfield(s, 'LastScanLoc') && isfield(s, 'FirstScanLocation')
-%     pos = [s.LastScanLoc s.FirstScanLocation];
-%     if iSL<3, pos = -pos; end % RAS convention!
-%     % if iSL==1, pos = -pos; end
-%     pos = max(pos);
-%     pos = [R(iSL, 1:2) pos] * [-(dim(1:2)-1)/2 1]'; % 1st or last SliceLocation
-% end
-
-% May be useful for Philips dicom: use volume centre info
-if isempty(pos) && isfield(s, 'Stack')
+if isempty(pos) && isfield(s, 'Stack') % Philips
     ori = {'RL' 'AP' 'FH'}; ori = ori{iSL};
     pos = tryGetField(s.Stack.Item_1, ['MRStackOffcentre' ori]);
     if ~isempty(pos)
@@ -1425,16 +1391,11 @@ if isempty(pos) && isfield(s, 'Stack')
     end
 end
 
-if ~isempty(pos) % have SliceLocation for last/center slice
-    flp = sign(pos-R(iSL,4)) ~= sign(cosSL); % same direction?
-else % we do some guess work and warn user
-    errorLog(['Please check whether slices are flipped: ' ProtocolName(s)]);
-    pos1 = R(iSL, 3:4) * [dim(3)-1 1]'; % last SliceLocation based on current R
-    pos2 = R(iSL, 3:4) * [1-dim(3) 1]'; % opposite slice direction
-    % if pos1 is larger than the other dir, and is way outside head
-    flp = all(abs(pos1) > [abs(pos2) 150]); % arbituary 150 mm
+if isempty(pos) % keep right-handed, and warn user
+    errorLog(['Please check whether slices are flipped: ' s.NiftiName]);
+elseif sign(pos-R(iSL,4)) ~= sign(cosSL) % same direction?
+    R(:,3) = -R(:,3);
 end
-if flp, R(:,3) = -R(:,3); end % change to opposite direction
 
 %% Subfunction: get a parameter in CSA series ASC header: MrPhoenixProtocol
 function val = asc_header(s, key)
@@ -1483,10 +1444,7 @@ end
 
 %% Subfuction: for GUI subfunctions
 function dicm2nii_gui(cmd, hs)
-if nargin<2
-    fh = figure('dicm' * 256.^(0:3)'); % arbitury integer
-    hs = guidata(fh); 
-end
+if nargin<2, hs = guidata('dicm' * 256.^(0:3)'); end
 drawnow;
 switch cmd
     case 'do_convert'
@@ -1635,7 +1593,10 @@ function create_gui
 fh = figure('dicm' * 256.^(0:3)'); % arbitury integer
 if strcmp('dicm2nii_fig', get(fh, 'Tag')), return; end
 
-fnameH = [getenv('HOME') '/dicm2nii_gui_para.mat'];
+if ispc, home = [getenv('HOMEDRIVE') getenv('HOMEPATH')];
+else home = getenv('HOME');
+end
+fnameH = fullfile(home, 'dicm2nii_gui_para.mat');
 fname = fnameH;
 if ~exist(fname, 'file')
     fname = [fileparts(which(mfilename)) '/dicm2nii_gui_para.mat'];
@@ -1650,10 +1611,12 @@ if ~exist(fname, 'file')
 end
 
 scrSz = get(0, 'ScreenSize');
-set(fh, 'Toolbar', 'none', 'Menubar', 'none', 'Resize', 'off', ...
+clr = [1 1 1]*206/256;
+clrButton = [1 1 1]*216/256;
+
+set(fh, 'Toolbar', 'none', 'Menubar', 'none', 'Resize', 'off', 'Color', clr, ...
     'Tag', 'dicm2nii_fig', 'Position', [200 scrSz(4)-500 420 256], ...
     'Name', 'DICOM to NIfTI Converter', 'NumberTitle', 'off');
-clr = get(fh, 'color');
 
 str = 'Choose what kind of data source you are using';
 uicontrol('Style', 'text', 'Position', [10 206 90 30], ...
@@ -1678,7 +1641,7 @@ uicontrol('Style', 'edit', 'Position', [88 176 296 24],'FontSize', 9, ...
     'TooltipString', str, ...
     'Callback', 'dicm2nii([],''set_src'',''gui_callback'');');
 uicontrol('Style', 'pushbutton', 'Position', [384 177 24 22], ...
-    'FontSize', 9, 'String', '...', ...
+    'FontSize', 9, 'String', '...', 'Background', clrButton, ...
     'TooltipString', 'Browse dicom source', ...
     'Callback', 'dicm2nii([],''srcDialog'',''gui_callback'');');
 
@@ -1691,7 +1654,7 @@ uicontrol('Style', 'edit', 'Position', [88 136 296 24], 'FontSize', 9, ...
     'Tag', 'dst', 'TooltipString', str, ...
     'Callback', 'dicm2nii([],''set_dst'',''gui_callback'');');
 uicontrol('Style', 'pushbutton', 'Position', [384 137 24 22], ...
-    'FontSize', 9, 'String', '...', ...
+    'FontSize', 9, 'String', '...', 'Background', clrButton, ...
     'TooltipString', 'Browse result folder', ...
     'Callback', 'dicm2nii([],''dstDialog'',''gui_callback'');');
 
@@ -1724,15 +1687,14 @@ uicontrol('Style', 'popup', 'Background', 'white', 'Tag', 'mocoOpt', ...
      'String', [' Convert both original and MoCo series|' ...
                 ' Convert only original series if both exist|' ...
                 ' Convert only MoCo series if both exist']);
-
 uicontrol('Style', 'pushbutton', 'Position', [104 10 200 30], ...
     'FontSize', 9, 'String', 'Start conversion', 'Tag', 'convert', ...
-    'UserData', fname, ...
+    'UserData', fname, 'Background', clrButton, ...
     'TooltipString', 'Dicom source and Result folder needed before start', ...
     'Callback', 'dicm2nii([],''do_convert'',''gui_callback'');');
 
 uicontrol('Style', 'popup', 'Tag', 'about', 'String', 'About|License', ...
-    'Position', [354 4 56 30], 'Callback', 'dicm2nii([],''about'',''gui_callback'');');
+    'Position', [352 4 58 30], 'Callback', 'dicm2nii([],''about'',''gui_callback'');');
 
 hs = guihandles(fh); % get handles
 guidata(fh, hs); % store handles
@@ -1741,7 +1703,7 @@ set(fh, 'HandleVisibility', 'callback'); % protect from command line
 if ~exist(fname, 'file'), return; end
 para = load(fname); para = para.para;
 fn = fieldnames(para);
-for i = 1:length(fn)
+for i = 1:numel(fn)
     tag = fn{i};
     if ~isfield(hs, tag)
         continue;  % avoid error
@@ -1761,7 +1723,7 @@ fld = 'InPlanePhaseEncodingDirection';
 if isfield(s, fld)
     if     strncmpi(s.(fld), 'COL', 3), iPhase = 2; % based on dicm_img(s,0)
     elseif strncmpi(s.(fld), 'ROW', 3), iPhase = 1;
-    else errorLog(['Unknown ' fld ' for ' ProtocolName(s) ': ' s.(fld)]);
+    else errorLog(['Unknown ' fld ' for ' s.NiftiName ': ' s.(fld)]);
     end
 end
 
@@ -1799,7 +1761,7 @@ flds = {'EchoTime' 'PixelSpacing' 'SpacingBetweenSlices' 'SliceThickness' ...
         'RepetitionTime' 'FlipAngle' 'RescaleIntercept' 'RescaleSlope' ...
         'ImageOrientationPatient' 'ImagePositionPatient' ...
         'InPlanePhaseEncodingDirection'};
-for i = 1:length(flds)
+for i = 1:numel(flds)
     if isfield(s, flds{i}), continue; end
     a = MF_val(flds{i}, s, 1);
     if ~isempty(a), s.(flds{i}) = a; end
@@ -1828,7 +1790,7 @@ end
 
 flds = {'DiffusionDirectionality' 'ImagePositionPatient' ...
         'ComplexImageComponent' 'RescaleIntercept' 'RescaleSlope'};
-for i = 1:length(flds) % For last frame
+for i = 1:numel(flds) % For last frame
     a = MF_val(flds{i}, s, nFrame);
     if ~isempty(a), s.LastFile.(flds{i}) = a; end
 end
@@ -1843,23 +1805,21 @@ end
 if ~isfield(s, 'LocationsInAcquisition') % use all frames -- slow
     dict = dicm_dict(s.Manufacturer, MF_val(fld));
     s2 = dicm_hdr(s.Filename, dict, 'all');
-    ipp = nan(3, nFrame);
-    for i = 1:nFrame, ipp(:,i) = MF_val(fld, s2, i); end
-    [~, iSL] = max(var(ipp,1,2));
-    s.LocationsInAcquisition = sum(diff(sort(ipp(iSL,:))) > 1e-4) + 1;
+    ipp = nan(nFrame, 3);
+    for i = 1:nFrame, ipp(i,:) = MF_val(fld, s2, i); end
+    [err, s.LocationsInAcquisition, sliceN] = checkImagePostion(ipp);
+    if ~isempty(err)
+        errorLog([err ' for "' s.Filename '". Series skipped.']);
+        s = []; return; % skip
+    end
 end
 
 % Lastly check whether weird slice ordering: only seen in PAR though
 nSL = double(s.LocationsInAcquisition);
-if mod(nFrame,nSL)
-    errorLog(['nFrame/nSL not an integer (' ProtocolName(s) '). Skipped']);
-    s = [];
-    return;
-end
 i = MF_val('SliceNumberMR', s, 1); % Philips
 if ~isempty(i) 
     i(2) = MF_val('SliceNumberMR', s, nFrame);
-    if isequal(i, [1 nSL]) || isequal(i, [nSL 1]), return; end
+    if isequal(i, [1 nSL]) || isequal(i, [nSL 1]), return; end % not 100% safe
 end
 
 if tryGetField(s, 'Dim3IsVolume', false)
@@ -1867,21 +1827,19 @@ if tryGetField(s, 'Dim3IsVolume', false)
 else
     iFrame = 1:nSL;
 end
-if exist('ipp', 'var') % save time if done for nSL
-    ipp = ipp(:,iFrame);
-else
+if ~exist('sliceN', 'var') % save time if done by checkImagePostion
     dict = dicm_dict(s.Manufacturer, MF_val(fld));
     s2 = dicm_hdr(s.Filename, dict, iFrame);
     n = numel(iFrame);
-    ipp = nan(3, n);
-    for i = 1:n, ipp(:,i) = MF_val(fld, s2, iFrame(i)); end
+    ipp = nan(n, 3);
+    for i = 1:n, ipp(i,:) = MF_val(fld, s2, iFrame(i)); end
+    [~, iSL] = max(var(ipp));
+    [~, sliceN] = sort(ipp(:,iSL));
 end
-[~, iSL] = max(var(ipp,1,2));
-[~, ind] = sort(ipp(iSL,:));
-if ~isequal(ind, 1:nSL) && ~isequal(ind, nSL:-1:1) % just avoid accident
-    s.SliceNumber = ind;
-    s.(fld) = MF_val(fld, s2, iFrame(ind==1));
-    s.LastFile.(fld) = MF_val(fld, s2, iFrame(ind==nSL));
+if any(diff(sliceN, 2)>0) % just avoid accident
+    s.SliceNumber = sliceN; % will be used to re-order img
+    s.(fld) = MF_val(fld, s2, iFrame(sliceN==1));
+    s.LastFile.(fld) = MF_val(fld, s2, iFrame(sliceN==nSL));
 end
 
 %% subfunction: return value from Shared or PerFrame FunctionalGroupsSequence
@@ -1909,8 +1867,8 @@ switch fld
     case {'InPlanePhaseEncodingDirection' 'MRAcquisitionFrequencyEncodingSteps' ...
             'MRAcquisitionPhaseEncodingStepsInPlane'}
         sq = 'MRFOVGeometrySequence';
-    case {'SliceNumberMR' 'EchoTime'} % Philips
-        sq = 'PrivatePerFrameSq';
+    case {'SliceNumberMR' 'EchoTime'}
+        sq = 'PrivatePerFrameSq'; % Philips
     otherwise
         error('Sequence for %s not set.', fld);
 end
@@ -2011,7 +1969,7 @@ str = str(max(1, ind-500):ind+2); % go back several lines
 ind = strfind(str, [ret '% ']); % new line with % and space
 for i = 1:numel(ind)-1
     ln = str(ind(i)+3 : ind(i+1)-1);
-    if length(ln)>5 && all(isstrprop(ln(1:6), 'digit'))
+    if numel(ln)>5 && all(isstrprop(ln(1:6), 'digit'))
         dStr = ln(1:6);
     end 
 end
@@ -2080,8 +2038,8 @@ if ~isfield(s, 'ImagePositionPatient')
     
     R = reshape(s.ImageOrientationPatient, 3, 2);
     R = R * diag(s.PixelSpacing);
-    dim = double([s.Columns s.Rows]);
-    if all(pos(:,2) == 0) % Mprage, dThickness and sPosition are for volume
+    dim = double([s.Columns s.Rows]');
+    if all(pos(:,2) == 0) % Mprage: dThickness and sPosition are for volume
         sNormal = zeros(3,1);
         for i = 1:3
             a = asc_header(s, ['sSliceArray.asSlice[0].sNormal.d' ori{i}]);
@@ -2089,10 +2047,10 @@ if ~isfield(s, 'ImagePositionPatient')
         end
         v3 = asc_header(s, 'sSliceArray.asSlice[0].dThickness');
         R = [R sNormal*v3/nSL];
-        x = [-dim'/2*[1 1]; (1-nSL)/2*[1 -1]];
+        x = [-dim/2*[1 1]; (1-nSL)/2*[1 -1]];
         pos = R * x + pos(:,1) * [1 1];
     else % likely mosaic
-        pos = pos - R * dim'/2 * [1 1];
+        pos = pos - R * dim/2 * [1 1];
     end
     if revNum, pos = pos(:, [2 1]); end
     if isMos, pos(:,2) = pos(:,1); end % set LastFile same as first for mosaic
@@ -2156,13 +2114,13 @@ flds = { % fields to put into nifti ext
   'AcquisitionDateTime' 'bval' 'bvec' 'ReadoutSeconds' 'SliceTiming' ...
   'UnwarpDirection' 'EffectiveEPIEchoSpacing' 'EchoTime' 'deltaTE' ...
   'PatientName' 'PatientSex' 'PatientAge' 'PatientSize' 'PatientWeight' ...
-  'SliceThickness' 'FlipAngle' 'RBMoCoTrans' 'RBMoCoRot' ...
+  'PatientPosition' 'SliceThickness' 'FlipAngle' 'RBMoCoTrans' 'RBMoCoRot' ...
   'Manufacturer' 'SoftwareVersion' 'MRAcquisitionType' 'InstitutionName' ...
   'ScanningSequence' 'SequenceVariant' 'ScanOptions' 'SequenceName'};
 
 ext.ecode = 6; % text ext
 ext.edata = '';
-for i = 1:length(flds)
+for i = 1:numel(flds)
     val = tryGetField(s, flds{i});
     if isempty(val)
         continue;
@@ -2173,10 +2131,12 @@ for i = 1:length(flds)
     elseif isvector(val) % row or column
         str = sprintf('%.8g ', val);
         str = sprintf('[%s]', str(1:end-1)); % drop last space
-    else % matrix, like DTI bvec
+    elseif isnumeric(val) % matrix, like DTI bvec
         fmt = repmat('%.8g ', 1, size(val, 2));
         str = sprintf([fmt char(10)], val');
         str = sprintf('[%s]', str(1:end-2)); % drop last space and char(10)
+    else % in case of struct etc, skip
+        continue;
     end
     ext.edata = [ext.edata flds{i} ' = ' str ';' char([0 10])];
 end
@@ -2190,13 +2150,13 @@ end
 % delete(fname);
 % 
 % % first 4 bytes (int32) encode real data length, endian-dependent
-% if exist('ext', 'var'), n = length(ext)+1; else n = 1; end
+% if exist('ext', 'var'), n = numel(ext)+1; else n = 1; end
 % ext(n).edata = [typecast(int32(numel(b)), 'uint8')'; b];
 % ext(n).ecode = 40; % Matlab
  
 % % Dicom ext: ecode = 2
 % if isfield(s, 'SOPInstanceUID') % make sure it is dicom
-%     if exist('ext', 'var'), n = length(ext)+1; else n = 1; end
+%     if exist('ext', 'var'), n = numel(ext)+1; else n = 1; end
 %     ext(n).ecode = 2; % dicom
 %     fid = fopen(s.Filename);
 %     ext(n).edata = fread(fid, s.PixelData.Start, '*uint8');
@@ -2210,28 +2170,21 @@ end
 % nSL=20; mb=2; nShot=nSL/mb; % inc=3
 % In PDF: 0,10 - 3,13 - 6,16 - 9,19 - 1,11 - 4,14 - 7,17 - 2,12 - 5,15 - 8,18
 % result: 0,10 - 3,13 - 6,16 - 9,19 - 2,12 - 5,15 - 8,18 - 1,11 - 4,14 - 7,17
-function t = mb_slicetiming(s)
-t = s.MosaicRefAcqTimes;
-delay = asc_header(s, 'lDelayTimeInTR')/1000; % in ms now
-if isempty(delay), delay = 0; end
-TA = s.RepetitionTime - delay; % effective TR
-
-if max(t)-min(t)>TA && isfield(s, 'LastFile') % try last volume first
-    dict = dicm_dict(s.Manufacturer, 'MosaicRefAcqTimes');
-    s2 = dicm_hdr(s.LastFile.Filename, dict);
-    t = s2.MosaicRefAcqTimes; % use the last file
-end
+function t = mb_slicetiming(s, TA)
+dict = dicm_dict(s.Manufacturer, 'MosaicRefAcqTimes');
+s2 = dicm_hdr(s.LastFile.Filename, dict);
+t = s2.MosaicRefAcqTimes; % try last volume first
 
 % No SL acc factor. Not even multiband flag. This is UGLY
 nSL = double(s.LocationsInAcquisition);
-mb = ceil((max(t) - min(t)) / TA); % based on the wrong timing pattern
-nShot = nSL / mb;
-if mb==1 || mod(nShot,1)>0, return; end % good t, not MB, or wrong acc factor
+mb = ceil((max(t) - min(t)) ./ TA); % based on the wrong timing pattern
+if isempty(mb) || mb==1 || mod(nSL,mb)>0, return; end % not MB or wrong mb guess
 
+nShot = nSL / mb;
 ucMode = asc_header(s, 'sSliceArray.ucMode'); % 1/2/4: Asc/Desc/Inter
 if isempty(ucMode), return; end
 t = linspace(0, TA, nShot+1)'; t(end) = [];
-t = repmat(t, mb, 1); % ascending
+t = repmat(t, mb, 1); % ascending, ucMode==1
 if ucMode == 2 % descending
     t = t(nSL:-1:1);
 elseif ucMode == 4 % interleaved
@@ -2240,7 +2193,7 @@ elseif ucMode == 4 % interleaved
     else
         inc = nShot / 2 - 1;
         if mod(inc,2) == 0, inc = inc - 1; end
-        errorLog([ProtocolName(s) ': multiband interleaved order, even' ...
+        errorLog([s.NiftiName ': multiband interleaved order, even' ...
             ' number of shots.\nThe SliceTiming information may be wrong.']);
     end
     
@@ -2269,3 +2222,39 @@ elseif ucMode == 4 % interleaved
     t = t * TA;
 end
 if csa_header(s, 'ProtocolSliceNumber')>0, t = t(nSL:-1:1); end % rev-num
+
+%% subfunction: check ImagePostionPatient from multiple slices/volumes
+function [err, nSL, sliceN, isTZ] = checkImagePostion(ipp)
+v = var(ipp); % ipp rows for slices
+[~, iSL] = max(v);
+ipp1 = ipp(:, v>0.01); % remove constant columns which give corr 0 or nan
+ipp = ipp(:,iSL); % ipp at SL dimension
+del = mean(diff(sort(ipp))) * 0.02; % allow 2% error: have seen error of 0.1/7
+nSL = sum(diff(sort(ipp)) > del) + 1;
+sliceN = []; err = '';
+nVol = numel(ipp) / nSL;
+if mod(nVol,1), err = 'Missing file(s) detected'; return; end
+if nSL<2, return; end
+
+isTZ = all(abs(diff(ipp(1:nVol))) < del);
+if isTZ % Philips XYTZ
+    a = ipp(1:nVol:end);
+    b = reshape(ipp, nVol, nSL);
+else
+    a = ipp(1:nSL);
+    b = reshape(ipp, nSL, nVol)';
+end
+[~, sliceN] = sort(a); % no descend since wrong for PAR/singleDicom
+if any(abs(diff(a,2))>del), err = 'Inconsistent slice spacing'; return; end
+if nVol>1
+    b = diff(b);
+    if any(abs(b(:))>del), err = 'Irregular slice order'; return; end
+end
+
+if size(ipp1,2)<2, return; end
+c = cov(ipp1);
+d = sqrt(diag(c));
+c = c ./ (d*d'); % corr(ipp1') should be 1 or -1 after removing constant
+c = c(triu(true(size(c)), 1)); % value above diagonal
+c = abs(abs(c) - 1);
+if ~isempty(c) && any(c>0.02), err = 'Irregular ImagePosition detected'; end

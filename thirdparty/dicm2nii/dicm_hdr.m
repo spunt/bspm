@@ -87,6 +87,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 150522 PerFrameSQ ind: fix the case if numel(ind)~=nFrame.
 % 150526 read_sq: use ItemDelimitationItem instead of empty dat1 as SQ end.
 % 150924 philips_par: store SliceNumber if not acsending/decending order.
+% 151001 check Manufacturer in advance for 'search' method.
 
 persistent dict_full;
 s = []; info = '';
@@ -175,17 +176,27 @@ if toSearch % search each tag if only a few fields
     tg = char([2 0 16 0 'UI']); % TransferSyntaxUID
     i = (strfind(b8, tg)+1) / 2; % i for uint16
     if ~isempty(i) % empty for truncated 
-        [dat, name] = read_item(i(1));
-        s.(name) = dat;
-        expl = ~strcmp(dat, '1.2.840.10008.1.2');
+        dat = read_item(i(1));
+        if ischar(dat), expl = ~strcmp(dat, '1.2.840.10008.1.2'); end
+    end
+    if ~isempty(dict.vendor)
+        tg = char([8 0 112 0]); % Manufacturer
+        if expl, tg = [tg 'LO']; end
+        i = (strfind(b8, tg)+1) / 2;
+        if ~isempty(i) % empty for truncated 
+            dat = read_item(i(1));
+            if ischar(dat) && ~strncmpi(dat, dict.vendor, 2)
+                updateManufacturer(dat); 
+            end
+        end
     end
     for k = 1:numel(dict.tag)
         tg = char(typecast(dict.tag(k), 'uint8'));
         tg = tg([3 4 1 2]);
         i = (strfind(b8, tg)+1) / 2;
         if isempty(i), continue;
-        elseif numel(i)>1 % +1 tags found. use non-search method
-            if expl, tg = [tg uint8(dict.vr{k})]; end %#ok add vr
+        elseif numel(i)>1 % +1 tags found
+            if expl, tg = [tg dict.vr{k}]; end %#ok add vr
             i = (strfind(b8, tg)+1) / 2;
             if isempty(i), continue;
             elseif numel(i)>1 % +1 tags found. use non-search method
@@ -197,9 +208,6 @@ if toSearch % search each tag if only a few fields
         [dat, name, info] = read_item(i);
         if isnumeric(name) || isempty(dat), continue; end
         s.(name) = dat;
-        if strcmp(name, 'Manufacturer') && ~strncmpi(dat, dict.vendor, 2)
-            updateManufacturer(dat);
-        end
     end
 end
 
@@ -226,10 +234,11 @@ while ~toSearch
     if strncmp(info, 'Given up', 8), break; end
     if isnumeric(name) || isempty(dat), continue; end
     s.(name) = dat;
-    if strcmp(name, 'Manufacturer') && ~strncmpi(dat, dict.vendor, 2)
-        updateManufacturer(dat);
-    end
-    if strcmp(name, 'TransferSyntaxUID')
+    if strcmp(name, 'Manufacturer') 
+        if ~isempty(dict.vendor) && ~strncmpi(dat, dict.vendor, 2)
+            updateManufacturer(dat);
+        end
+    elseif strcmp(name, 'TransferSyntaxUID')
         expl = ~strcmp(dat, '1.2.840.10008.1.2'); % may be wrong for some
     end
 end
@@ -332,10 +341,21 @@ elseif strcmp(vr, 'SQ')
     isPerFrameSQ = strcmp(name, 'PerFrameFunctionalGroupsSequence');
     [dat, info, i] = read_sq(i, min(i+n,len), isPerFrameSQ);
 else % numeric data, or UN
-    fmt = vr2format(vr);
+    switch vr 
+        case 'OB', fmt = 'uint8';
+        case 'UN', fmt = 'uint8';
+        case 'AT', fmt = 'uint16';
+        case 'OW', fmt = 'uint16';
+        case 'US', fmt = 'uint16';
+        case 'SS', fmt = 'int16'; 
+        case 'UL', fmt = 'uint32';
+        case 'SL', fmt = 'int32';
+        case 'FL', fmt = 'single'; 
+        case 'FD', fmt = 'double';
+        otherwise, fmt = '';
+    end
     if isempty(fmt)
         info = sprintf('Given up: Invalid VR (%d %d) for %s', vr, name);
-        fprintf(2, ' %s\n', info);
     else
         dat = typecast(b(i+(0:n-1)), fmt)'; i=i+n;
     end
@@ -410,23 +430,6 @@ end
 
 end % main func
 
-% subfunction: return format str for typecast according to VR
-function fmt = vr2format(vr)
-switch vr 
-    case 'OB', fmt = 'uint8';
-    case 'UN', fmt = 'uint8';
-    case 'AT', fmt = 'uint16';
-    case 'OW', fmt = 'uint16';
-    case 'US', fmt = 'uint16';
-    case 'SS', fmt = 'int16'; 
-    case 'UL', fmt = 'uint32';
-    case 'SL', fmt = 'int32';
-    case 'FL', fmt = 'single'; 
-    case 'FD', fmt = 'double';
-    otherwise, fmt = '';
-end
-end
-
 % subfunction: decode Siemens CSA image and series header
 function csa = read_csa(csa)
 b = csa';
@@ -458,7 +461,7 @@ try %#ok in case of error, we return the original uint8
                 dat{end+1, 1} = deblank(foo); %#ok
             end
         end
-        if iscellstr(dat) && length(dat)<2, dat = dat{1}; end
+        if iscellstr(dat) && numel(dat)<2, dat = dat{1}; end
         if ~isempty(dat), rst.(name) = dat; end
     end
     csa = rst;
@@ -514,7 +517,7 @@ key = 'image export tool';
 i = strfind(lower(str), key) + numel(key);
 if isempty(i), err = 'Not PAR file'; s = []; return; end
 C = textscan(str(i:end), '%s', 1);
-s.SoftwareVersion = C{1}{1};
+s.SoftwareVersion = [C{1}{1} '\PAR'];
 if strncmpi(s.SoftwareVersion, 'V3', 2)
     err = 'V3 PAR file is not supported';
     fprintf(2, ' %s.\n', err);
@@ -969,7 +972,7 @@ catch me
 end
 
 if ~isempty(bv.Trf)
-    for i = 1:length(bv.Trf)
+    for i = 1:numel(bv.Trf)
         if ~isequal(diag(bv.Trf(i).TransformationValues), [1 1 1 1]')
             err = 'Data has been transformed: skipped.';
             return;
@@ -1008,6 +1011,7 @@ if isempty(folder) || ~strcmp(folder, pth)
 end
 if ~isempty(subj), s.PatientName = subj; end
 
+s.SoftwareVersion = sprintf('%g/BV_FileVersion', bv.FileVersion);
 s.Columns = bv.NCols;
 s.Rows = bv.NRows;
 s.SliceThickness = bv.SliceThickness;
@@ -1076,7 +1080,7 @@ elseif strcmpi(fType, 'fmr') || strcmpi(fType, 'dmr')
     if strcmpi(fType, 'fmr')
         bv.LoadSTC;
         s.PixelData = permute(bv.Slice(1).STCData , [1 2 4 3]);
-        for i = 2:length(bv.Slice)
+        for i = 2:numel(bv.Slice)
             s.PixelData(:,:,i,:) = permute(bv.Slice(i).STCData , [1 2 4 3]);
         end
     else % dmr

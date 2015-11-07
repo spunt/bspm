@@ -279,7 +279,9 @@ C = {
     '0020' '0012' 'IS' 'AcquisitionNumber'
     '0020' '0013' 'IS' 'InstanceNumber'
     '0020' '0020' 'CS' 'PatientOrientation'
+    '0020' '0030' 'DS' 'ImagePosition'
     '0020' '0032' 'DS' 'ImagePositionPatient'
+    '0020' '0035' 'DS' 'ImageOrientation'
     '0020' '0037' 'DS' 'ImageOrientationPatient'
     '0020' '0052' 'UI' 'FrameOfReferenceUID'
     '0020' '0100' 'IS' 'TemporalPositionIdentifier'
@@ -460,8 +462,6 @@ if strncmpi(vendor, 'SIEMENS', 7)
     '0051' '1017' 'SH' 'SliceThicknessText'
     '0051' '1019' 'LO' 'ScanOptionsText'
     }];
-
-
 elseif strncmpi(vendor, 'GE', 2) 
     C = [C; {
     '0009' '1001' 'LO' 'FullFidelity'
@@ -1010,7 +1010,7 @@ dict.name = C(:,4);
 if nargin>1 && ~isempty(flds) % use only provided fields
     flds = cellstr(flds);
     ind = false(size(dict.tag,1), 1);
-    for i = 1:length(flds)
+    for i = 1:numel(flds)
         ind = ind | strcmp(flds{i}, dict.name); % include duplicate
     end
     dict.fields = flds; % remember the requested fields

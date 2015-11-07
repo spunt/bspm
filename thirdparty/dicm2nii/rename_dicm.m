@@ -7,23 +7,24 @@ function rename_dicm(files, fmt)
 % The second input is the format for the result file names. Support format
 % include:
 % 
-% 1: Protocol_#####.dcm, such as run1_00001.dcm. If there is MoCo series,
-%    or users did not change run names, there will be name conflict.
+% 1: run1_00001.dcm (SeriesDescription_instance). It is the shortest name, but
+%    if there is MoCo series, or users did not change run names, there will be
+%    name conflict.
 %   
-% 2: Subj-Ser#-Acq#-Inst#.dcm, such as 2334ZL-0004-0001-00001.dcm. This is
-%    the BrainVoyager format. It won't have any name confict, but it is
-%    long and less descriptive. Note that BrainVoyager itself has problem
-%    to distinguish the two series of images for Siemens fieldmap, while
-%    this code can avoid this problem.
+% 2: Smith^John-0004-0001-00001.dcm (PatientName-Series-Acquisition-Instance).
+%    This is the BrainVoyager format. It has no name confict, but it is long and
+%    less descriptive. Note that BrainVoyager itself has problem to distinguish
+%    the two series of images for Siemens fieldmap, while this code can avoid
+%    this problem.
 % 
-% 3: Protocol_Se#_Inst#, such as run1_004_00001.dcm. This gives short names,
-%    while it is descriptive and there is no name conflict most of time.
+% 3: run1_004_00001.dcm (SeriesDescription_Series_Instance). This gives short
+%    names, while it is descriptive and there is no name conflict most of time.
 % 
-% 4: Subj_Protocol_In#, such as 2334ZL_run1_00001.dcm. This is useful if
-%    files for different subjects are in the same folder.
+% 4: 2334ZL_run1_00001.dcm (PatientName_SeriesDescription_instance). This may be
+%    useful if files for different subjects are in the same folder.
 % 
-% 5: Protocol_Ser#-Acq#-Inst#, such as run1_003_001_00001.dcm. This ensures 
-%    no name conflict, and is the default.
+% 5: run1_003_001_00001.dcm (SeriesDescription_Series__acquisition_instance). 
+%    This ensures no name conflict, and is the default.
 % 
 % Whenever there is name confict, you will see red warning and the latter
 % files won't be renamed.
@@ -42,59 +43,56 @@ function rename_dicm(files, fmt)
 % 1309?? Use 5-digit InstanceNumber, so works better for GE/Philips
 % 1402?? Add Manufacturer to flds (bug caused by dicm_hdr update)
 % 140506 Use SeriesDescription to replace ProtocolName non-Siemens
+% 151001 Avoid cd so it works if m file is at pwd but path not set
 
-curFolder = pwd;
-clnObj = onCleanup(@() cd(curFolder));
 if nargin<1 || isempty(files)
     folder = uigetdir(pwd, 'Select a folder containing DICOM files');
     if folder==0, return; end
-    cd(folder);
-    files = dir;
+    files = dir(folder);
     files([files.isdir]) = [];
     files = {files.name};
     
     str = sprintf(['Choose Output format: \n\n' ...
-                   '1: run1_00001.dcm\n' ...
-                   '2: BrainVoyager format\n' ...
-                   '3: run1_001_00001.dcm\n' ...
-                   '4: subj_run1_00001.dcm\n' ...
-                   '5: run1_001_001_00001.dcm\n']);
+                   '1: run1_00001.dcm (SeriesDescription_instance)\n' ...
+                   '2: BrainVoyager format (subj-series-acquisiton-instance)\n' ...
+                   '3: run1_001_00001.dcm (SeriesDescription_series_instance)\n' ...
+                   '4: subj_run1_00001.dcm (subj_SeriesDescription_instance)\n' ...
+                   '5: run1_001_001_00001.dcm (SeriesDescription_series_acquisition_instance)\n']);
     fmt = inputdlg(str, 'Rename Dicom', 1, {'5'});
     if isempty(fmt), return; end
     fmt = str2double(fmt{1});
 else
     if exist(files, 'dir') % input is folder
-        cd(files);
-        files = dir;
+        folder = files;
+        files = dir(folder);
         files([files.isdir]) = [];
         files = {files.name};
     else % files
         if ~iscell(files), files = {files}; end
         folder = fileparts(files{1});
-        if ~isempty(folder), cd(folder); end
+        if ~isempty(folder), folder = pwd; end
     end
     if nargin<2 || isempty(fmt), fmt = 5; end
 end
-
-if ispc, ren = 'rename';
-else ren = 'mv';
-end % matlab movefile is too slow
 
 flds = {'InstanceNumber' 'AcquisitionNumber' 'SeriesNumber' 'EchoNumber' 'ProtocolName' ...
         'SeriesDescription' 'PatientName' 'PatientID' 'Manufacturer'};
 dict = dicm_dict('', flds);
 
-nFile = length(files);
+nFile = numel(files);
 if nFile<1, return; end
+if ~strcmp(folder(end), filesep), folder(end+1) = filesep; end
 err = '';
 str = sprintf('%g/%g', 1, nFile);
+iswin = ispc;
+more off;
 fprintf(' Renaming DICOM files: %s', str);
 
 for i = 1:nFile
-    fprintf(repmat('\b', [1 length(str)]));
+    fprintf(repmat('\b', [1 numel(str)]));
     str = sprintf('%g/%g', i, nFile);
     fprintf('%s', str);
-    s = dicm_hdr(files{i}, dict);
+    s = dicm_hdr([folder files{i}], dict);
     try % skip if no these fields
         sN = s.SeriesNumber;
         aN = s.AcquisitionNumber;
@@ -149,7 +147,12 @@ for i = 1:nFile
     end
     
     if strcmpi(files{i}, name), continue; end % done already
-    [er, foo] = system([ren ' "' files{i} '" ' name]);
+    
+    if iswin, cmd = ['rename "' folder files{i} '" ' name];
+    else cmd = ['mv "' folder files{i} '" "' folder name '"'];
+    end % matlab movefile is too slow
+    
+    [er, foo] = system(cmd);
     if er, err = [err files{i} ': ' foo]; end %#ok
 end
 fprintf('\n');
