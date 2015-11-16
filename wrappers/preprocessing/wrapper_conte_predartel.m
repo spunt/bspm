@@ -8,7 +8,7 @@ opt.coreg_epi2t1    = 1; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to 
 runit.segment       = 0;
 omitpat             = '';
 saveit              = 1;
-append2jobname      = 'CONTE_PREDARTEL_2015_04_30';
+append2jobname      = 'CONTE_PREDARTEL';
 
 % | paths for relevant folders
 path.study  = '/Users/bobspunt/Documents/fmri/conte';
