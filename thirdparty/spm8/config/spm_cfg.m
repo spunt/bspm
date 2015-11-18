@@ -32,35 +32,35 @@ stats.values  = { spm_cfg_fmri_spec spm_cfg_fmri_design spm_cfg_fmri_data spm_cf
 % ---------------------------------------------------------------------
 % meeg preprocessing
 % ---------------------------------------------------------------------
-meegprep        = cfg_choice;
-meegprep.tag    = 'preproc';
-meegprep.name   = 'M/EEG Preprocessing';
-meegprep.help   = {'M/EEG preprocessing.'};
-meegprep.values = {spm_cfg_eeg_montage spm_cfg_eeg_filter spm_cfg_eeg_bc spm_cfg_eeg_artefact spm_cfg_eeg_downsample spm_cfg_eeg_merge spm_cfg_eeg_fuse}; 
+% meegprep        = cfg_choice;
+% meegprep.tag    = 'preproc';
+% meegprep.name   = 'M/EEG Preprocessing';
+% meegprep.help   = {'M/EEG preprocessing.'};
+% meegprep.values = {spm_cfg_eeg_montage spm_cfg_eeg_filter spm_cfg_eeg_bc spm_cfg_eeg_artefact spm_cfg_eeg_downsample spm_cfg_eeg_merge spm_cfg_eeg_fuse};
 % ---------------------------------------------------------------------
 % meeg time-frequency
 % ---------------------------------------------------------------------
-meegtf        = cfg_choice;
-meegtf.tag    = 'tf';
-meegtf.name   = 'M/EEG Time-frequency';
-meegtf.help   = {'M/EEG time-frequency.'};
-meegtf.values = {spm_cfg_eeg_tf spm_cfg_eeg_tf_rescale}; 
+% meegtf        = cfg_choice;
+% meegtf.tag    = 'tf';
+% meegtf.name   = 'M/EEG Time-frequency';
+% meegtf.help   = {'M/EEG time-frequency.'};
+% meegtf.values = {spm_cfg_eeg_tf spm_cfg_eeg_tf_rescale};
 % ---------------------------------------------------------------------
 % meeg source reconstruction
 % ---------------------------------------------------------------------
-source        = cfg_choice;
-source.tag    = 'source';
-source.name   = 'M/EEG Source reconstruction';
-source.help   = {'M/EEG source reconstruction.'};
-source.values = {spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract}; 
+% source        = cfg_choice;
+% source.tag    = 'source';
+% source.name   = 'M/EEG Source reconstruction';
+% source.help   = {'M/EEG source reconstruction.'};
+% source.values = {spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract};
 % ---------------------------------------------------------------------
 % meeg Meeg
 % ---------------------------------------------------------------------
-meeg         = cfg_choice;
-meeg.tag     = 'meeg';
-meeg.name    = 'M/EEG';
-meeg.help    = {'M/EEG functions.'};
-meeg.values  = { spm_cfg_eeg_convert spm_cfg_eeg_epochs meegprep spm_cfg_eeg_average spm_cfg_eeg_review spm_cfg_eeg_contrast spm_cfg_eeg_grandmean spm_cfg_eeg_convert2images meegtf source};
+% meeg         = cfg_choice;
+% meeg.tag     = 'meeg';
+% meeg.name    = 'M/EEG';
+% meeg.help    = {'M/EEG functions.'};
+% meeg.values  = { spm_cfg_eeg_convert spm_cfg_eeg_epochs meegprep spm_cfg_eeg_average spm_cfg_eeg_review spm_cfg_eeg_contrast spm_cfg_eeg_grandmean spm_cfg_eeg_convert2images meegtf source};
 % ---------------------------------------------------------------------
 % util Util
 % ---------------------------------------------------------------------
@@ -119,7 +119,7 @@ else
             fi = {di{~cellfun('isempty',f2)}};
             ftc = {ftc{:} fi{:}};
             dtc(end+1:end+length(fi)) = deal({d2});
-        end;        
+        end;
     end
     if ~isempty(ft)||~isempty(ftc)
         % The toolbox developer MUST add path to his/her toolbox in his/her 'prog'
@@ -200,4 +200,4 @@ spmjobs.help    = {
                 'This panel provides information about the meaning of the current item.'
                 '/*\begin{figure} \begin{center} \includegraphics[width=70mm]{images/batch_ui1} \includegraphics[width=70mm]{images/batch_ui2} \includegraphics[width=70mm]{images/ui3} \includegraphics[width=70mm]{images/ui4}\end{center} \caption{The SPM5 user interface. \emph{Top left:} The usual user-interface.  \emph{Top right:} The Defaults user-interface. \emph{Bottom left:} The file selector (click the (?) button for more information about filtering filenames, or selecting individual volumes within a 4D file). \emph{Bottom right:} more online help can be obtained via the main help button.} \end{figure} */'
 }';
-spmjobs.values  = { temporal spatial stats meeg util tools};
+spmjobs.values  = { temporal spatial stats util tools};
