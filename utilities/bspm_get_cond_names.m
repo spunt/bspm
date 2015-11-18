@@ -1,4 +1,6 @@
-function [condnames runidx] = bspm_get_cond_names(spmmat)
+function [condnames, runidx] = bspm_get_cond_names(spmmat)
+% USAGE: [condnames, runidx] = bspm_get_cond_names(spmmat)
+%
 % --------------------- Copyright (C) 2014 ---------------------
 %	Author: Bob Spunt
 %	Affilitation: Caltech
