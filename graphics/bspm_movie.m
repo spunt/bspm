@@ -1,7 +1,12 @@
-function bspm_movie(in, dim, slice)
+function bspm_movie(in, dim, rate, slice)
 % BSPM_MOVIE
 %
-% USAGE: bspm_movie(in, dim, slice)
+% USAGE: bspm_movie(in, dim, rate, slice)
+%
+%   in: vol
+%   dim: 1=sagittal, 2=coronal, 3=axial
+%   rate: # of images per second
+%   slice: slice to display
 %
 
 % ------ Copyright (C) 2014 ------
@@ -10,13 +15,14 @@ function bspm_movie(in, dim, slice)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
+if nargin < 3, rate = 10; end
+if nargin < 2, dim = 1; end
 if nargin < 1, error('USAGE: bspm_movie(in, dim, [slice])'); end
 if iscell(in), in = char(in); end
 h       = spm_vol(in);
 nvol    = length(h);
 dimvol  = h(1).dim;
-if nargin < 2, dim = 1; end
-if nargin < 3, slice = round(dimvol(dim)/2); end
+if nargin < 4, slice = round(dimvol(dim)/2); end
 fprintf('\n | - Reading data for %d image volumes', nvol);
 d       = spm_read_vols(h);
 if dim==1
@@ -39,7 +45,7 @@ while playagain==1
     for i=1:nvol
         set(t, 'String', sprintf(['Volume ' f ' of ' f], i, nvol)); 
         set(h1,'CData',autobrightvol(d(:,:,i)));
-        pause(1/15);
+        pause(1/rate);
     end;
     playagain = input('Play it again? [1=Yes, 2=No] ');
     close gcf
