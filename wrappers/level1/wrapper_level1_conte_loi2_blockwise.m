@@ -1,4 +1,4 @@
-function allinput = wrapper_level1_conte_loi2(covidx, varargin)
+function allinput = wrapper_level1_conte_loi2_blockwise(covidx, varargin)
 % matlabbatch = wrapper_level1_conte(covidx, varargin)
 %
 % To show default settings, run without any arguments.
@@ -119,6 +119,13 @@ for s = 1:length(subdir)
         % | =====================================================================
         b = get_behavior(behav{r}, model, yesnokeys);
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
+        
+        % | Sort by condlabel so betas refer to same block for all subjects
+        % | =====================================================================
+        data = [b.condlabels num2cell(b.blockwise)];
+        data = sortrows(data, -1);
+        b.condlabels = data(:,1);
+        b.blockwise = cell2mat(data(:,2:end));
 
         % | Columns for b.blockwise
         % | =====================================================================
@@ -133,8 +140,8 @@ for s = 1:length(subdir)
         % | =====================================================================
         for c = 1:length(b.condlabels)
             runs(r).conditions(c).name      = b.condlabels{c};
-            runs(r).conditions(c).onsets    = b.blockwise(b.blockwise(:,1)==c, 3);
-            runs(r).conditions(c).durations = b.blockwise(b.blockwise(:,1)==c, 4);
+            runs(r).conditions(c).onsets    = b.blockwise(c, 3);
+            runs(r).conditions(c).durations = b.blockwise(c, 4);
         end
 
         % | Floating Parametric Modulators
@@ -244,6 +251,7 @@ qidx = blockwise(:, end);
 questions = regexprep(d.result.preblockcues(qidx), 'Is the person ', '');
 questions = regexprep(questions, ' ', '_');
 questions = regexprep(questions, '?', '');
+questions = regexprep(questions, '-', '_'); 
 
 % | blockwise accuracy and durations
 % | ========================================================================
@@ -273,7 +281,8 @@ condlabels = {'Why-Face' 'Why-Hand' 'How-Face' 'How-Hand'};
 qcond = condlabels(blockwise(:,2))';
 rt = round(blockwise(:,4)*1000);
 err = blockwise(:,5);
-b.condlabels = strcat(upper(qcond), '-', num2str(rt), 'ms', '-', num2str(err), 'error', '-', upper(questions));
+b.condlabels = strcat(upper(qcond), '-', upper(questions), '-', num2str(rt), 'ms', '-', num2str(err), 'error');
+b.condlabels = regexprep(b.condlabels, ' ', '');
 b.blockwise = blockwise;
 b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Total_Errors' 'Foil_Errors'};
 end
