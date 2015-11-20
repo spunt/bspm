@@ -1,29 +1,25 @@
-function allinput = wrapper_level1_conte_loi2(covidx, varargin)
-% matlabbatch = wrapper_level1_conte(covidx, varargin)
+function allinput = wrapper_level1_conte_loi1(varargin)
+% matlabbatch = wrapper_level1_loi1(varargin)
 %
 % To show default settings, run without any arguments.
 %
-%     COVIDX
-%       01 - Duration
-%       02 - Errors (Total)
-%       03 - Errors (Foils)
 %
 
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Documents/fmri/conte',            ...
+            'studydir',         '/Users/bobspunt/Documents/fmri/conte', ...
+            'covidx',           [],             ...
+            'epifname',         [],             ...
             'HPF',              100,            ...
             'armethod',         2,              ...
-            'epifname',         [],             ...
             'nuisancepat',      'bad*txt',      ...
-            'epipat',           'wbua*nii',      ...
+            'epipat',           'wbua*nii',     ...
             'subid',            'CC*',          ...
-            'runid',            'EP*LOI_2*',     ...
-            'behavid',          'loi2*mat',     ...
-            'basename',         'LOI2',         ...
+            'runid',            'EP*LOI_1*',    ...
+            'behavid',          'loi1*mat',     ...
+            'basename',         'LOI1',         ...
             'brainmask',        '',             ...
-            'model',            '2X2',          ...
             'fcontrast',        1,              ...
             'nskip',            4,              ...
             'runtest',          0,              ...
@@ -32,7 +28,7 @@ defaults = {
             'yesnokeys',        [1 2]           ...
              };
 vals = setargs(defaults, varargin);
-if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
+if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
@@ -64,8 +60,8 @@ if ~isempty(covidx)
 else
     pmstr = 'None';
 end
-analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...
-                        pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
+analysisname  = sprintf('%s_BLOCKWISE_%s_%ds_%s', basename, ...
+                        armethodlabels{armethod + 1}, HPF, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
 % | IMAGING PARAMETERS
@@ -115,10 +111,15 @@ for s = 1:length(subdir)
     % | ========================================================================
     for r = 1:length(rundir)
 
-        % | Data for Current Run
-        % | =====================================================================
-        b = get_behavior(behav{r}, model, yesnokeys);
+        b = get_behavior(behav{r});
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
+        
+        % | Sort by condlabel so betas refer to same block for all subjects
+        % | =====================================================================
+        data = [b.condlabels num2cell(b.blockwise)];
+        data = sortrows(data, -1);
+        b.condlabels = data(:,1);
+        b.blockwise = cell2mat(data(:,2:end));
 
         % | Columns for b.blockwise
         % | =====================================================================
@@ -133,8 +134,8 @@ for s = 1:length(subdir)
         % | =====================================================================
         for c = 1:length(b.condlabels)
             runs(r).conditions(c).name      = b.condlabels{c};
-            runs(r).conditions(c).onsets    = b.blockwise(b.blockwise(:,2)==c, 3);
-            runs(r).conditions(c).durations = b.blockwise(b.blockwise(:,2)==c, 4);
+            runs(r).conditions(c).onsets    = b.blockwise(c, 3);
+            runs(r).conditions(c).durations = b.blockwise(c, 4);
         end
 
         % | Floating Parametric Modulators
@@ -175,18 +176,18 @@ for s = 1:length(subdir)
     % | Contrasts
     % | ========================================================================
     ncond   = length(b.condlabels);
-    w1      = eye(ncond);
-    if ncond==2
-        w2 = [1 -1];
-    else
-        w2 = [.5 .5 -.5 -.5; .5 -5 .5 -.5; 1 0 -1 0; 0 1 0 -1; 1 -1 0 0; 0 0 1 -1];
-    end
-    weights = [w1; w2];
+    cond    = b.blockwise(:,2)';
+    w1      = (ismember(cond, [1]) - ismember(cond, [3]));
+    w2      = (ismember(cond, [2]) - ismember(cond, [3]));
+    w3      = (ismember(cond, [1]) - ismember(cond, [2]));
+    weights = [w1; w2; w3];
+    ncon    = size(weights,1);
+    conname = {'Face_-_Scram' 'Hand_-_Scram' 'Face_-_Hand'};
     ncon    = size(weights,1);
     for c = 1:ncon
         contrasts(c).type       = 'T';
         contrasts(c).weights    = weights(c,:);
-        contrasts(c).name       = bspm_conweights2names(weights(c,:), b.condlabels);
+        contrasts(c).name       = conname{c};
     end
     if fcontrast
         contrasts(ncon+1).type      = 'F';
@@ -200,35 +201,31 @@ for s = 1:length(subdir)
 
     % | Cleanup Workspace
     % | ========================================================================
-    clear general_info runs contrasts b modelpm modelpmnames
+    clear general_info runs contrasts b modelpm modelpmnames images
 
 end
 end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, opt, yesnokeys)
+function b = get_behavior(in)
 % GET_BEHAVIOR
 %
-%   USAGE: b = get_behavior(in, opt)
+%   USAGE: b = get_behavior(in)
 %
 %       in      behavioral data filename (.mat)
-%       opt     '2x2'  - full design
-%               '1x2'  - why vs. how
 %
 %       Columns for b.blockwise
 %          1 - Block
 %          2 - Cond
 %          3 - Onset
 %          4 - Duration
-%          5 - Total_Errors
-%          6 - Foil_Errors
+%          5 - Average Stimulus Valence
+%          6 - Average Stimulus Luminance
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
 % =========================================================================
-if nargin < 1, error('USAGE: b = get_behavior(in, opt, yesnokeys)'); end
-if nargin < 2, opt = '2x2'; end
-if nargin < 3, yesnokeys = [1 2]; end
+if nargin < 1, error('USAGE: b = get_behavior(in)'); end
 if iscell(in), in = char(in); end
 
 % | read data
@@ -242,45 +239,50 @@ else
     data        = d.trialSeeker;
     blockwise   = d.blockSeeker;
 end
+blockwise(:,3:4) = 0;
+% QDATA KEY
+% 1 - photo condition (1=FACE, 2=HAND)
+% 2 - answer 
+% 3 - stimulus VALENCE (from MTurk normative data) [NaN for ps]
+% 4 - stimulus LUMINANCE (from bob_rgb2lum) [NaN for ps]
+% Each color channel is weighted differently according to the
+% CIE Color Space. CIE Luminance is computed assuming a modern
+% monitor. For further detials, ee Charles Pontyon's Colour FAQ at:
+% http://www.poynton.com/notes/colour_and_gamma/ColorFAQ.html 
+qdata = d.result.qdata; 
+qdata(size(qdata,1):160,:) = NaN; 
+qidx = data(:,5);
+qdata = [d.result.qim(qidx,:) num2cell(qdata(qidx,:))];
+repidx = find(~any(diff(char(qdata(:,2))), 2)) + 1; 
+qdata(repidx, :) = [];
+questions = qdata(1:8:end,1);
+questions = regexprep(questions, 'Is the person ', '');
+questions = regexprep(questions, ' ', '_');
+questions = regexprep(questions, '?', '');
+questions = regexprep(questions, '-', '_');
+blockwise(:,5) = nanmean(reshape(cell2mat(qdata(:,5)), 8, 12));
+blockwise(:,6) = nanmean(reshape(cell2mat(qdata(:,6)), 8, 12));
 
-% | blockwise accuracy and durations
+% | blockwise onsets and durations
 % | ========================================================================
-ntrials         = length(data(data(:,1)==1,1));
-data(data(:,8)==yesnokeys(1), 8) = 1;
-data(data(:,8)==yesnokeys(2), 8) = 2;
-data(:,10)      = data(:,4)~=data(:,8); % errors
-data(data(:,8)==0, 7:8) = NaN; % NR to NaN
-blockwise(:,3)  = data(data(:,2)==1, 6);
-blockwise(:,4)  = data(data(:,2)==ntrials, 9) - data(data(:,2)==1, 6);
-
-% | compute block-wise error counts
-% | ========================================================================
-for i = 1:size(blockwise, 1)
-    blockwise(i,5) = sum(data(data(:,1)==i,10));  % all errors
-    blockwise(i,6) = sum(data(data(:,1)==i & data(:,4)==2, 10)); % foil errors
-end
-
-% | re-code data
-% | ========================================================================
-con     = blockwise(:,2);
-condata = data(:,3);
-switch lower(opt)
-    case {'2x2'}
-        b.condlabels = {'Why_Face' 'Why_Hand' 'How_Face' 'How_Hand'};
-    case {'1x2'}
-        b.condlabels = {'Why' 'How'};
-        blockwise(con==2, 2)                    = 1;
-        data(condata==2, 3)                     = 1;
-        blockwise(ismember(con,[3 4]), 2)       = 2;
-        data(ismember(condata,[3 4]), 3)        = 2;
-end
-for i = 1:length(unique(data(:,3)))
-    cdata = data(data(:,3)==i, [7 10]);
-    b.accuracy(i)  = 100*(sum(cdata(:,2)==0)/size(cdata,1));
-    b.rt(i)        = nanmean(cdata(:,1));
+nblocks     = size(blockwise, 1);
+for i = 1:nblocks
+   cblock = data(data(:,1)==i,:);
+   blockwise(i, 3) = cblock(1, 6);
+   blockwise(i, 4) = cblock(end, 9) - cblock(1, 6);
 end
 b.blockwise = blockwise;
-b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Total_Errors' 'Foil_Errors'};
+b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Valence' 'Luminance'};
+b.num_hits = sum(data(:,3)==4 & data(:,7)>0);
+b.num_misses = sum(data(:,3)~=4 & data(:,7)>0);
+
+% | Blockwise Labels
+% | ========================================================================
+condlabels = {'Face' 'Hand' 'Scram'};
+qcond = condlabels(blockwise(:,2))';
+b.condlabels = strcat(upper(qcond), '-', upper(questions));
+b.condlabels = regexprep(b.condlabels, ' ', '');
+
 end
 function mfile_showhelp(varargin)
 % MFILE_SHOWHELP
