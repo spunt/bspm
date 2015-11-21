@@ -30,7 +30,7 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % - Set/query default NIfTI version and/or rgb_dim. To check the setting, run
 % nii_tool('default') without other input. The input for 'default' command can
-% either be a struct with fields of 'version' and/or 'rgb_dim', or
+% be either a struct with fields of 'version' and/or 'rgb_dim', or
 % parameter/value pairs. See nii_tool('RGBstyle') for meaning of rgb_dim.
 % 
 % Note that the setting will be saved for future use. If one wants to change the
@@ -87,7 +87,8 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % hdr = nii_tool('hdr', filename);
 % 
-% - Return hdr struct of the provided NIfTI file.
+% - Return hdr struct of the provided NIfTI file. This is useful to check NIfTI
+% hdr, and it is much faster than 'load', especially for .gz file. 
 % 
 % 
 % img = nii_tool('img', filename_or_hdr);
@@ -237,7 +238,8 @@ function varargout = nii_tool(cmd, varargin)
 % 150514 read_ext: decode txt edata by dicm2nii.m
 % 150517 fhandle: provide a way to use gunzipOS etc from outside
 % 150617 auto detect rgb_dim 1&3 for 'load' etc using ChrisR method
-% 151025 Change subfunc img2datatype as 'update' for outside access.
+% 151025 Change subfunc img2datatype as 'update' for outside access
+% 151109 Include dd.win (exe) from WinAVR-20100110 for partial gz decompression
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -428,7 +430,7 @@ elseif strcmpi(cmd, 'hdr')
     end
     
     fname = nii_name(varargin{1}, '.hdr'); % get .hdr if it is .img
-    [fid, clnObj, niiVer] = fopen_nii(fname); %#ok<ASGLU>
+    [fid, clnObj, niiVer] = fopen_nii(fname, [], 544); %#ok<ASGLU>
     varargout{1} = read_hdr(fid, niiVer, C, fname);
    
 elseif any(strcmpi(cmd, {'ext' 'img' 'load'})) 
@@ -768,8 +770,7 @@ if ispc
 else
     [err, str] = system([cmd '"' fname '" &']);
 end
-% [err, str] = system([cmd '"' fname '"']);
-if err, errorLog(['Error during compression: ' str]); end
+if err, fprintf(2, 'Error during compression: %s\n', str); end
 
 % Deal with pigz/gzip on path or in nii_tool folder, and matlab gzip/gunzip
 function cmd = check_gzip
@@ -781,7 +782,7 @@ if ~err, cmd = 'pigz -n'; return; end
 m_dir = fileparts(which(mfilename));
 if ismac % pigz for mac is not included in the package
     fprintf(2, [' Please install pigz for fast compression: ' ...
-        'http://rudix.org/packages/pigz.html\n']);
+        'http://macappstore.org/pigz/\n']);
 elseif ispc % rename back pigz for Windows. Renamed to trick Matlab Central
     try %#ok<TRYNC>
         fname = [m_dir '\pigz.win'];
@@ -811,18 +812,43 @@ end
     
 cmd = true; % use slower matlab gzip/gunzip
 
+function dd = check_dd
+[err, ~] = system('dd --version 2>&1');
+if ~err, dd = 'dd'; return; end % dd with linix/mac, and maybe windows
+
+if ispc % rename it as exe
+    m_dir = fileparts(which(mfilename));
+    fname = [m_dir '\dd.win'];
+    if exist(fname, 'file') % first time after download
+        try movefile(fname, [m_dir '\dd.exe'], 'f'); catch, end
+    end
+    dd = fullfile(m_dir, 'dd');
+    [err, ~] = system([dd ' --version 2>&1']);
+    if ~err, dd = ['"' dd '"']; return; end
+end
+dd = '';
+
 %% Try to use in order of pigz, system gunzip, then matlab gunzip
-function outName = gunzipOS(fname)
-persistent cmd; % command to run gupzip
+function outName = gunzipOS(fname, bytes)
+persistent cmd dd pth; % command to run gupzip, dd tool, and temp_path
 if isempty(cmd)
     cmd = check_gzip;
     if ischar(cmd)
-    	cmd = [cmd ' -f -d ']; % overwrite if exist
+    	cmd = [cmd 'fd']; % overwrite if exist
     elseif islogical(cmd) && ~cmd
         error('None of system pigz, gunzip or Matlab gunzip is available');
     end
+    dd = check_dd;
+    if ~isempty(dd), dd = [' | ' dd ' count=']; end
+    
+    if ispc % matlab tempdir could be slow to due to cd in and out
+        pth = getenv('TEMP');
+        if isempty(pth), pth = pwd; end
+    else
+        pth = getenv('TMP');
+        if isempty(pth), pth = '/tmp'; end
+    end
 end
-pth = tempdir; % unzip into temp dir
 
 if islogical(cmd)
     if cmd, outName = gunzip(fname, pth); end
@@ -831,8 +857,20 @@ end
 
 [pth1, outName, ext] = fileparts(fname);
 outName = fullfile(pth, outName);
-if ~strcmp([pth1 filesep], pth), copyfile(fname, [outName ext], 'f'); end
-[err, str] = system([cmd '"' outName ext '"']); % overwrite if exist
+done = false;
+if ~isempty(dd) && nargin>1 && ~isempty(bytes) % unzip only part of data
+    try
+        n = num2str(ceil(bytes/512)); % 512: default ibs
+        [err, str] = system([cmd 'c ' fname dd n ' of="' outName '"']);
+        done = true;
+    catch
+    end
+end
+
+if ~done
+    if ~strcmp(pth1, pth), copyfile(fname, [outName ext], 'f'); end
+    [err, str] = system([cmd ' "' outName ext '"']); % overwrite if exist
+end
 if err, fprintf(2, 'Error during decompression:\n%s\n', str); end
 
 %% subfunction: read hdr
@@ -977,8 +1015,8 @@ fname(n+(-3:0)) = ext; % if not return or error, change it
  
 %% fopen NIfTI file, check endian, niiVer and nii/hdr by 'magic' for header file
 % clnObj takes care of fclose(fid) and delete(fopen(fid)) if isGz 
-function [fid, clnObj, niiVer, isNii] = fopen_nii(fname, endian)
-if nargin<2, endian = 'ieee-le'; end % only provided for .img fopen
+function [fid, clnObj, niiVer, isNii] = fopen_nii(fname, endian, bytes)
+if nargin<2 || isempty(endian), endian = 'ieee-le'; end % only useful for .img
 [fid, err] = fopen(fname, 'r', endian);
 if fid<1, error([err ': ' fname]); end
 
@@ -986,8 +1024,9 @@ n = fread(fid, 4, '*uint8')'; % sizeof_hdr or signature
 isGz = isequal(n(1:2), [31 139]); % gz, tgz, tar file
 fnameIn = fname; % for error msg
 if isGz
+    if nargin<3 || isempty(bytes), bytes = []; end
     fclose(fid); % close .gz file
-    fname = gunzipOS(fname); % guzipped file, return unzipped fname
+    fname = gunzipOS(fname, bytes); % guzipped file, return unzipped fname
     fid = fopen(fname, 'r', endian);
     n = fread(fid, 4, '*uint8')';
 end
