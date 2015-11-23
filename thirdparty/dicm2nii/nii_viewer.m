@@ -112,7 +112,7 @@ function nii_viewer(fname, overlayName)
 % longer time to copy or save, and result in large file. If needed, one can
 % change to white background for picture output. With white background, the
 % threshold for the background image needs to be carefully selected to avoid
-% black/white strips. White background is intended only for picture output.
+% erosion into brain. White background is intended only for picture output.
 % 
 % The selected NIfTI can also be saved into different format from File -> Save
 % NIfTI as. For example, a file can be saved as a different resolution. With a
@@ -133,6 +133,8 @@ function nii_viewer(fname, overlayName)
 % 151114 Avoid see-thu for white background.
 % 151119 Make smooth faster by using only 3 slices; Allow flip L/R.
 % 151120 Implement key navigation and zoom in/out.
+% 151121 Implement erode for white background; Add 'Show NIfTI essentials'. 
+% 151122 Bug fix for background img with sform=0.
 % End of history. Don't edit this line!
 
 if nargin>1 && ischar(overlayName) && strcmp(overlayName, 'gui_callback')
@@ -280,6 +282,7 @@ uimenu(h_view, 'Label', 'Right on left side', 'Callback',  cb('flipLR'));
 uimenu(h_view, 'Label', 'Show colorbar', 'Callback',  cb('colorbar'));
 uimenu(h_view, 'Label', 'Show crosshair', 'Separator', 'on', ...
     'Checked', 'on', 'Callback',  cb('cross'));
+uimenu(h_view, 'Label', 'Center crosshair', 'Callback',  cb('center'));
 uimenu(h_view, 'Label', 'Crosshair color', 'Callback',  cb('color'));
 h = uimenu(h_view, 'Label', 'Crosshair gap');
 for i = [1 2 3 4 5 6 8 10 20 40]
@@ -293,6 +296,7 @@ for i = [0.75 1 2 4 8]
 end
 
 h = uimenu(fh, 'Label', '&Window');
+uimenu(h, 'Label', 'Show NIfTI essentials', 'Callback', cb('essential'));
 uimenu(h, 'Label', 'Show NIfTI hdr', 'Callback', cb('hdr'));
 uimenu(h, 'Label', 'Show NIfTI ext', 'Callback', cb('ext'));
 uimenu(h, 'Label', 'DICOM to NIfTI converter', 'Callback', 'dicm2nii', 'Separator', 'on');
@@ -323,7 +327,8 @@ for i = 1:3
     hs.cross(i) = quiver(x, y, u, v, 'ShowArrowHead', 'off', 'AutoScale', 'off');
 end
 
-labls='ASLSLP';
+labls='ASLSLP'; 
+if hs.form_code<1, labls = '      '; end
 pos = [0.95 0.5; 0.47 0.96;  0 0.5; 0.47 0.96; 0 0.5; 0.47 0.05]; 
 for i = 1:numel(labls)
     hs.ras(i) = text(pos(i,1), pos(i,2), labls(i), 'Units', 'normalized', ...
@@ -340,7 +345,7 @@ set(hs.colorbar, 'Visible', 'off', 'UIContextMenu', '', 'EdgeColor', [1 1 1]);
 
 % image makes YDir reversed. Turn off ax and ticks
 set(hs.ax, 'YDir', 'normal', 'Visible', 'off');
-set([hs.ras hs.cross], 'Color', 'b', 'UIContextMenu', ''); %, 'PickableParts', 'none');
+set([hs.ras hs.cross], 'Color', 'b', 'UIContextMenu', '');
 
 %% control panel
 pos = get(fh, 'Position'); pos = [1 pos(4)-64 pos(3) 64];
@@ -374,8 +379,10 @@ hs.show = uicontrol(ph, 'Style', 'checkbox', 'Position', [90 8 22 20], 'Value', 
     'Callback', cb('show'), 'BackGroundColor', clr, ...
     'TooltipString', 'Turn on/off selected image');
 
-hs.lb = java_spinner([108 8 52 22], [rg(1) -inf inf 10], ph, cb('lb'), '#.##', 'min value (threshold)');
-hs.ub = java_spinner([160 8 52 22], [rg(2) -inf inf 10], ph, cb('ub'), '#.##', 'max value (clipped)');
+hs.lb = java_spinner([108 8 52 22], [rg(1) -inf inf 10], ph, cb('lb'), ...
+    '#.##', 'min value (threshold)');
+hs.ub = java_spinner([160 8 52 22], [rg(2) -inf inf 10], ph, cb('ub'), ...
+    '#.##', 'max value (clipped)');
 hs.lut = uicontrol(ph, 'Style', 'popup', 'Position', [214 8 74 22], ...
     'String', {'grayscale' 'red' 'green' 'blue' 'violet' 'yellow' 'cyan' ...
     'red-yellow' 'blue-green' 'two-sided' 'lines'}, ...
@@ -389,7 +396,8 @@ hs.smooth = uicontrol(ph, 'Style', 'checkbox', 'value', p.smooth, ...
     'FontSize', 8, 'Position', [332 8 60 22], 'String', 'smooth', ...
     'BackGroundColor', clr, 'Callback', cb('smooth'), ...
     'TooltipString', 'Smooth image in 3D');
-hs.interp = uicontrol(ph, 'Style', 'popup', 'String', {'nearest' 'linear' 'cubic' 'spline'}, ...
+hs.interp = uicontrol(ph, 'Style', 'popup', ...
+    'String', {'nearest' 'linear' 'cubic' 'spline'}, ...
     'Position', [392 8 68 22], 'value', p.interp, 'BackGroundColor', 'w', ...
     'Callback', cb('interp'), 'Enable', 'off', ... 
     'TooltipString', 'Interpolation method for overlay');
@@ -662,20 +670,33 @@ switch cmd
         guidata(fh, hs);
         nii_viewer_cb('files');
         set(hs.overlay, 'Enable', 'off'); % some menu items off
-    case {'hdr' 'ext'}
+    case {'hdr' 'ext' 'essential'}
         j = get(hs.files, 'Value');
         if strcmp(cmd, 'hdr')
             hdr = hs.q(j).nii.hdr;
-        else
-            try 
-                hdr = hs.q(j).nii.ext.edata_decoded;
-            catch
-                errordlg('No known extension for the selected NIfTI'); 
-                return; 
+        elseif strcmp(cmd, 'ext')
+            if ~isfield(hs.q(j).nii, 'ext')
+                errordlg('No extension for the selected NIfTI'); 
+                return;
             end
+            hdr = {};
+            for i = 1:numel(hs.q(j).nii.ext)
+                if ~isfield(hs.q(j).nii.ext(i), 'edata_decoded'), continue; end
+                hdr{end+1} = hs.q(j).nii.ext(i).edata_decoded; %#ok
+            end
+            if isempty(hdr)
+                errordlg('No known extension for the selected NIfTI'); 
+                return;
+            elseif numel(hdr) == 1, hdr = hdr{1};
+            end
+        elseif strcmp(cmd, 'essential')
+            hdr = nii_essential(hs.q(j).nii);
         end
         nam = get(hs.files, 'String');
-        nam = [nam{j} '_' cmd];
+        nam = nam{j};
+        if ~isstrprop(nam(1), 'alpha'), nam = ['x' nam]; end % like genvarname
+        nam(~isstrprop(nam, 'alphanum')) = '_'; % make it valid for var name
+        nam = [nam '_' cmd];
         assignin('base', nam, hdr);
         evalin('base', ['open ' nam]);
     case 'close'
@@ -693,13 +714,14 @@ switch cmd
         
         str = get(hs.files, 'String');
         str(j) = [];
-        n = size(str ,1);
+        n = numel(str);
         j = min(n, j);
         set(hs.files, 'Value', j, 'String', str);
         guidata(fh, hs);
         nii_viewer_cb('files');
-        on_off = 'on'; if n==1, on_off = 'off'; end
-        set(hs.overlay, 'Enable', on_off);
+        if n==1, set(hs.overlay, 'Enable', 'off');
+        else set(hs.overlay, 'Enable', 'on');
+        end
     case 'cross' % show/hide crosshairs and RAS labels
         if strcmp(get(h, 'Checked'), 'on')
             set(h, 'Checked', 'off');
@@ -966,8 +988,10 @@ switch cmd
             a = inputdlg(str,'Input mask threshold', 1, {num2str(rg(1),'%.3g')});
             if isempty(a), return; end
             thre = str2double(a{1});
+            fname = [fname ' (threshold = ' a{1} ')']; % info only
         end
         hs.q(i).nii.mask = abs(im)>thre;
+        hs.q(i).nii.mask_info = fname;        
         guidata(fh, hs);
         nii_viewer_cb('update');
     case 'pref'
@@ -975,12 +999,12 @@ switch cmd
     case 'background'
         if strcmp(get(h, 'Checked'), 'on');
             set(h, 'Checked', 'off');
-            set(hs.im_panel, 'BackgroundColor', 'k');
-            set(hs.colorbar, 'EdgeColor', 'w');
+            set(hs.im_panel, 'BackgroundColor', [0 0 0]);
+            set(hs.colorbar, 'EdgeColor', [1 1 1]);
         else
             set(h, 'Checked', 'on');
-            set(hs.im_panel, 'BackgroundColor', 'w');
-            set(hs.colorbar, 'EdgeColor', 'k');
+            set(hs.im_panel, 'BackgroundColor', [1 1 1]);
+            set(hs.colorbar, 'EdgeColor', [0 0 0]);
         end
         nii_viewer_cb('update');
     case 'flipLR'
@@ -994,30 +1018,31 @@ switch cmd
             set(hs.ras([3 5]), 'String', 'R');
         end
     case 'keyHelp'
-        str = sprintf(['Left or Right: Move crosshair left or right\n\n' ...
-                       'Up or Down: Move crosshair superior or inferior\n\n' ...
-                       '[ or ]: Move crosshair posterior or anterior\n\n' ...
-                       '< or >: Decrease or increase volume number\n\n' ...
-                       'Ctrl + or -: Zoom in or out by 10%%\n']);
+        str = sprintf([ ...
+           'Left or Right arrow key: Move crosshair left or right.\n\n' ...
+           'Up or Down arrow key: Move crosshair superior or inferior.\n\n' ...
+           '[ or ] key: Move crosshair posterior or anterior.\n\n' ...
+           '< or > key: Decrease or increase volume number.\n\n' ...
+           'Ctrl + or - key: Zoom in or out by 10%%.\n']);
         helpdlg(str, 'Key Shortcut');
+    case 'center'
+        c = mean(get(hs.ax(2), 'XLim'));
+        hs.spinner(1).setValue(round(c));
+        c = mean(get(hs.ax(1), 'XLim'));
+        hs.spinner(2).setValue(round(c));
+        c = mean(get(hs.ax(1), 'YLim'));
+        hs.spinner(3).setValue(round(c));
     otherwise
         error('Unknown Callback: %s', cmd);
 end
 
 %% zoom in/out with a factor
 function set_zoom(m, hs)
-if m == 1 % restore, regardless of crosshair loc
-    axis(hs.ax(1), [0 hs.dim(2) 0 hs.dim(3)]+0.5);
-    axis(hs.ax(2), [0 hs.dim(1) 0 hs.dim(3)]+0.5);
-    axis(hs.ax(3), [0 hs.dim(1) 0 hs.dim(2)]+0.5);
-    return;
+c = hs.dim(:) / 2;
+if m <= 1, I = c; % full view regardless of crosshair location
+else I = cell2mat(get(hs.spinner, 'Value'));
 end
-
-lim = zeros(3,2);
-for ix = 1:3
-    c = hs.spinner(ix).getValue;
-    lim(ix,:) = c + 0.5 + [-1 1]/2*hs.dim(ix)/m;
-end
+lim = [I I] + c/m*[-1 1] + 0.5;
 axis(hs.ax(1), [lim(2,:) lim(3,:)]);
 axis(hs.ax(2), [lim(1,:) lim(3,:)]);
 axis(hs.ax(3), [lim(1,:) lim(2,:)]);
@@ -1097,6 +1122,7 @@ for i = 1:n
     elseif ~strcmpi(get(hs.q(i).hsI(1), 'Type'), 'image')
         delete(hs.q(i).hsI); % delete quiver
         for j = 1:3, hs.q(i).hsI(j) = copyobj(hs.q(1).hsI(j), hs.ax(j)); end
+        set(hs.q(i).hsI, 'Visible', 'on'); % in case background is off
         guidata(fh, hs);
         crossFront(hs);
         if i<n, for j=1:3; uistack(hs.q(i).hsI(j), 'down', n-i); end; end
@@ -1204,22 +1230,8 @@ for i = 1:n
     set(hs.q(i).hsI(ix), 'CData', im);
     
     alfa = mean(im,3);
-    % This simple 2D extraction avoids seeing white background
     if i==1 && isequal(get(hs.im_panel,'BackgroundColor'), [1 1 1])
-        m = mean(alfa(alfa(:)>0));
-        alfa = smooth23(alfa/m, 'box', 5)> m/2;
-        a = alfa;
-        for j = 1:size(alfa,1) % left-right boundary
-            i1 = find(alfa(j,:), 1);
-            i2 = find(alfa(j,:), 1, 'last'); 
-            alfa(j, i1:i2) = 1;
-        end
-        for j = 1:size(a,2) % top-bottom boundary
-            i1 = find(a(:,j), 1);
-            i2 = find(a(:,j), 1, 'last'); 
-            a(i1:i2, j) = 1;
-        end
-        alfa = alfa .* a;
+        alfa = erode(alfa); % ~30ms for regular mprage
     end
     alfa = p(i).alpha * alfa>0;
     set(hs.q(i).hsI(ix), 'AlphaData', alfa);
@@ -1282,6 +1294,7 @@ hs.q(i).interp = any(abs(hs.q(1).R(:) - hs.q(i).R(:))>1e-3);
 
 % duplicate image obj for overlay
 for j = 1:3, hs.q(i).hsI(j) = copyobj(hs.q(1).hsI(j), hs.ax(j)); end
+set(hs.q(i).hsI, 'Visible', 'on'); % in case background is off
 crossFront(hs);
 
 % set default for overlay
@@ -1373,7 +1386,10 @@ rg = get_range(img);
 
 %% Return xform mat
 function [R, frm] = nii_xform_mat(hdr, ask_code)
-if nargin<2 || isempty(ask_code), ask_code = hdr.sform_code; end
+if nargin<2 || isempty(ask_code)
+    ask_code = hdr.sform_code;
+    if ask_code<1, ask_code = hdr.qform_code; end
+end
 if hdr.sform_code == ask_code
     frm = hdr.sform_code;
     R = [hdr.srow_x; hdr.srow_y; hdr.srow_z; 0 0 0 1];
@@ -1663,4 +1679,135 @@ for i = 1:numel(hs.q)
     str = sprintf(['%s ' fmtstr], str, val);
 end
 set(hs.xyz, 'String', str);
+
+%% erode from outside, avoid seeing white background inside brain
+function r = erode(b, i, j, r)
+persistent m n;
+if nargin>1 % recursive call
+    if b(i,j), return; end % stop one call
+    r(i,j) = 0; % only place to set it false
+    if i>1 && r(i-1,j), r = erode(b, i-1, j, r); end % neighboring 4 voxels
+    if i<m && r(i+1,j), r = erode(b, i+1, j, r); end
+    if j>1 && r(i,j-1), r = erode(b, i, j-1, r); end
+    if j<n && r(i,j+1), r = erode(b, i, j+1, r); end
+else % first call: check input, binarize, start recursive calls
+    if ~ismatrix(b), error('bet2 can deal with 2D data only.'); end
+    mn = mean(b(b(:)>0));
+    b = smooth23(b, 'box', 5)> mn/8; % smooth, binarize
+    
+    [m, n] = size(b);
+    r = true(m,n);
+    i = find(b(:,1)==0, 1); % two start point each side seems enough
+    if ~isempty(i), r = erode(b, i, 1, r); end
+    i = find(b(:,n)==0 & r(:,n), 1);
+    if ~isempty(i), r = erode(b, i, n, r); end
+    j = find(b(1,:)==0 & r(1,:), 1);
+    if ~isempty(j), r = erode(b, 1, j, r); end
+    j = find(b(m,:)==0 & r(m,:), 1);
+    if ~isempty(j), r = erode(b, m, j, r); end
+
+    i = find(b(:,1)==0 & r(:,1), 1, 'last');
+    if ~isempty(i), r = erode(b, i, 1, r); end
+    i = find(b(:,n)==0 & r(:,n), 1, 'last');    
+    if ~isempty(i), r = erode(b, i, n, r); end
+    j = find(b(1,:)==0 & r(1,:), 1, 'last');
+    if ~isempty(j), r = erode(b, 1, j, r); end
+    j = find(b(m,:)==0 & r(m,:), 1, 'last');
+    if ~isempty(j), r = erode(b, m, j, r); end
+end
+
+%% nii essentials
+function s = nii_essential(nii)
+hdr = nii.hdr;
+s.FileName = hdr.file_name;
+if isfield(nii, 'mask_info')
+    s.Mask = nii.mask_info;
+end
+switch hdr.intent_code
+    case 2, s.intent = 'Correlation'; s.DoF = hdr.intent_p1;
+    case 3, s.intent = 'T-test'; s.DoF = hdr.intent_p1;
+    case 4, s.intent = 'F-test'; s.DoF = [hdr.intent_p1 hdr.intent_p2];
+    case 5, s.intent = 'Z-score';
+    case 6, s.intent = 'Chi squared'; s.DoF = hdr.intent_p1;
+    otherwise,
+end
+switch hdr.datatype
+    case 0,
+    case 32, s.DataType = 'single complex';
+    case 128, s.DataType = 'uint8 RGB';
+    case 511, s.DataType = 'single RGB';
+    case 768, s.DataType = 'uint32';
+    case 1280, s.DataType = 'uint64';
+    case 1792, s.DataType = 'double complex';
+    case 2304, s.DataType = 'uint8 RGBA';
+    otherwise
+        typ = log2(hdr.datatype) + 1;
+        if mod(typ,1)==0
+            str = {'logical' 'uint8' 'int16' 'int32' 'single' '' 'double'  ...
+                   '' 'int8' 'uint16' 'int64'};
+            s.DataType = str{typ};
+        else s.DataType = 'unknown';
+        end
+end
+s.Dimension = hdr.dim(2:hdr.dim(1)+1);
+s.VoxelSize = hdr.pixdim(2:4);
+switch bitand(hdr.xyzt_units, 7)
+    case 0,
+    case 1, s.VoxelUnit = 'meters';
+    case 2, s.VoxelUnit = 'milimeters';
+    case 3, s.VoxelUnit = 'micrometers';
+end 
+switch bitand(hdr.xyzt_units, 56)
+    case 0,
+    case 8,  s.TemporalUnit = 'seconds';
+    case 16, s.TemporalUnit = 'miliseconds';
+    case 24, s.TemporalUnit = 'microseconds';
+    case 32, s.TemporalUnit = 'Hertz';
+    case 40, s.TemporalUnit = 'ppm';
+    case 48, s.TemporalUnit = 'radians per second';
+end 
+if isfield(s, 'TemporalUnit') && strfind(s.TemporalUnit, 'seconds')
+    s.TR = hdr.pixdim(5);
+end
+if hdr.dim_info>0
+     for i = 1:3
+         s.ReadFreqSliceDim(i) = bitget(hdr.dim_info, (1:2)+(i-1)*2) * [1 2]'; 
+     end 
+end
+
+switch hdr.slice_code
+    case 0,
+    case 1, s.SliceOrder = 'Sequential Increasing';
+    case 2,	s.SliceOrder = 'Sequential Decreasing';
+    case 3,	s.SliceOrder = 'Alternating Increasing 1';
+    case 4,	s.SliceOrder = 'Alternating Decreasing 1';
+    case 5,	s.SliceOrder = 'Alternating Increasing 2';
+    case 6,	s.SliceOrder = 'Alternating Decreasing 2';
+    otherwise, s.SliceOrder = 'Multiband?';
+end
+s.Notes = hdr.descrip;
+switch hdr.qform_code
+    case 0,
+    case 1, s.qform = 'Scanner Anat';
+    case 2, s.qform = 'Alighed Anat';
+    case 3, s.qform = 'Talairach';
+    case 4, s.qform = 'mni_152';
+    otherwise, s.qform = 'Unknown';
+end
+if hdr.qform_code>0
+    s.quatern_bcd = [hdr.quatern_b hdr.quatern_c hdr.quatern_d];
+    s.qoffset_xyz = [hdr.qoffset_x hdr.qoffset_y hdr.qoffset_z];
+end
+switch hdr.sform_code
+    case 0,
+    case 1, s.sform = 'Scanner Anat';
+    case 2, s.sform = 'Alighed Anat';
+    case 3, s.sform = 'Talairach';
+    case 4, s.sform = 'mni_152';
+    otherwise, s.sform = 'Unknown';
+end
+if hdr.sform_code>0
+    s.srow_xyz = [hdr.srow_x; hdr.srow_y; hdr.srow_z];
+end
+
 %%
