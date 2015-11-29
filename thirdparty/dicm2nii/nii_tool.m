@@ -239,7 +239,7 @@ function varargout = nii_tool(cmd, varargin)
 % 150517 fhandle: provide a way to use gunzipOS etc from outside
 % 150617 auto detect rgb_dim 1&3 for 'load' etc using ChrisR method
 % 151025 Change subfunc img2datatype as 'update' for outside access
-% 151109 Include dd.win (exe) from WinAVR-20100110 for partial gz decompression
+% 151109 Include dd.win (exe) from WinAVR-20100110 for partial gz unzip
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end

@@ -78,11 +78,10 @@ if iscell(target) % transformation and template file names
     end
     
     % I thought it is something like R = R0 \ R * R1; but it is way off. It
-    % seems the location info in src nii is not irrevelant, but direction must
-    % be used: Left-handed storage and Right-handed storage give exactly the
-    % same alignment R with the same target nii (left-handed). Alignment R may
-    % not be diag-major, and can be negative for major axes (e.g. cor/sag
-    % slices).
+    % seems the location info in src nii is irrevelant, but direction must be
+    % used: Left-handed storage and Right-handed storage give exactly the same
+    % alignment R with the same target nii (left-handed). Alignment R may not be
+    % diag-major, and can be negative for major axes (e.g. cor/sag slices).
     
     % Following works for tested FSL .mat files: Any better way?
     R = R0 / diag([hdr.pixdim(2:4) 1]) * R * diag([nii.hdr.pixdim(2:4) 1]);
@@ -136,7 +135,6 @@ I = [X(:) Y(:) Z(:)]'-1; I(4,:) = 1; % template ijk
 I = R \ (R0 * I) + 1; % ijk+1 (fraction) in source
 clear X Y Z;
 I = reshape(I(1:3,:)', [dim 3]);
-I = round(I * 100) / 100; % avoid rounding error by above transformation
 
 d47 = nii.hdr.dim(5:8);
 d47(d47<1 | d47>32767) = 1;
@@ -153,7 +151,7 @@ for i8=1:d8; for i7=1:d47(4); for i6=1:d47(3); for i5=1:d47(2); for i4=1:d47(1) 
         I(:,:,:,2), I(:,:,:,1), I(:,:,:,3), intrp, missVal);
 end; end; end; end; end
 
-% copy xform info to rst nii from template
+% copy xform info from template to rst nii
 nii.hdr.pixdim(1:4) = hdr.pixdim(1:4);
 flds = {'qform_code' 'sform_code' 'srow_x' 'srow_y' 'srow_z' ...
     'quatern_b' 'quatern_c' 'quatern_d' 'qoffset_x' 'qoffset_y' 'qoffset_z'};

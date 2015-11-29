@@ -94,6 +94,8 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 %  global dicm2nii_SAVE_JSON; dicm2nii_SAVE_JSON = 1;
 % It will stay on (saving json files) until a new session with
 %  global dicm2nii_SAVE_JSON; dicm2nii_SAVE_JSON = 0;
+% For more information about the purpose of json file, check
+%  http://bids.neuroimaging.io/ 
 % 
 % Please note that some information, such as the slice order information, phase
 % encoding direction and DTI bvec are in image reference, rather than NIfTI
@@ -1975,9 +1977,10 @@ fprintf(fid, '%s\n', errInfo);
 fclose(fid);
 
 %% Get the last date string in history
-function dStr = reviseDate
-dStr = '150609?';
-fid = fopen(which(mfilename));
+function dStr = reviseDate(mfile)
+if nargin<1, mfile = mfilename; end
+dStr = '151117?';
+fid = fopen(which(mfile));
 if fid<1, return; end
 str = fread(fid, '*char')';
 fclose(fid);
@@ -1991,7 +1994,7 @@ for i = 1:numel(ind)-1
     ln = str(ind(i)+3 : ind(i+1)-1);
     if numel(ln)>5 && all(isstrprop(ln(1:6), 'digit'))
         dStr = ln(1:6);
-    end 
+    end
 end
 
 %% Get position info from Siemens CSA header
