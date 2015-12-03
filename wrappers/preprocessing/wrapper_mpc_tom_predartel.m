@@ -3,6 +3,7 @@ home; clear all
 % | options
 runit.omitvols      = 1;
 runit.slicetime     = 1;
+runit.coreg         = 0; 
 opt.slice_times     = 1; % 1 do slice-timing using actual times, 0 will do using order
 opt.coreg_epi2t1    = 0; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
 runit.segment       = 0;
@@ -129,15 +130,17 @@ for s = 1:length(subdirs)
     count = count + 1;
     matlabbatch(count) = bspm_realign_and_unwarp(epi_all, phase_map);
 
-    % | Co-register
-    t1 = files([subdir filesep 'raw' filesep pattern.t1dir filesep pattern.anatimg]);
-    count = count + 1;
-    if opt.coreg_epi2t1
-        % | EPIs to T1
-        matlabbatch(count) = bspm_coregister(t1, mean_epi, uaepi);
-    else
-        % | T1 to Mean EPI
-        matlabbatch(count) = bspm_coregister(mean_epi, t1);
+    if runit.coreg
+        % | Co-register
+        t1 = files([subdir filesep 'raw' filesep pattern.t1dir filesep pattern.anatimg]);
+        count = count + 1;
+        if opt.coreg_epi2t1
+            % | EPIs to T1
+            matlabbatch(count) = bspm_coregister(t1, mean_epi, uaepi);
+        else
+            % | T1 to Mean EPI
+            matlabbatch(count) = bspm_coregister(mean_epi, t1);
+        end
     end
 
     % | Segment T1
