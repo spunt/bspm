@@ -28,9 +28,10 @@ if ischar(images)
 end
 
 % fix end of image filename cell array
-for i = 1:length(images)
-    images(i) = cellstr([images{i} ',1']);
-end
+% for i = 1:length(images)
+%     images(i) = cellstr([images{i} ',1']);
+% end
+images = bspm_expand4D(images);
 
 % build job
 % -------------------------------------------------

@@ -48,6 +48,7 @@ if nargin<3, disp('USAGE: bspm_imcalc(in, outname, operation)'); return, end
 
 % | check variable formats
 if ischar(in), in = cellstr(in); end
+if iscell(outname), outname = char(outname); end
 if iscell(operation), operation = char(operation); end
 [p, n, e] = fileparts(outname); 
 if isempty(p), p = pwd; end
