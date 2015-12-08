@@ -18,7 +18,11 @@ if nargin<2, disp('USAGE: matlabbatch = bspm_smooth(in, fwhm, implicitmaskTAG)')
 if nargin<3, implicitmaskTAG = 0; end
 if length(fwhm)==1, fwhm = [fwhm fwhm fwhm]; end
 if ischar(in), in = cellstr(in); end
-in = strcat(in, ',1');
+if length(in)==1
+    in = bspm_expand4D(in);
+else
+    in = strcat(in, ',1');
+end
 
 % | Build job variable
 % | =======================================================================
