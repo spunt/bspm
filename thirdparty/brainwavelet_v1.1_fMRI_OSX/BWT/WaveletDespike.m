@@ -90,7 +90,7 @@ end
 
 DefaultOpts=struct('wavelet','d4','threshold',10,'boundary','reflection',...
     'chsearch','moderate','nscale','liberal','compress',1,'SP',1,...
-    'LimitRAM',0,'verbose',1);
+    'LimitRAM',6,'verbose',1);
 Opts=parseInOpts(DefaultOpts,varargin);
 
 %% check inputs
@@ -204,11 +204,11 @@ end
     
 %% Write files
 
-WriteOutNii(clean,strcat(Opref,'_wds.nii.gz'),Info);
-WriteOutNii(noise,strcat(Opref,'_noise.nii.gz'),Info);
+WriteOutNii(clean,strcat('wds_', Opref, '.nii.gz'),Info);
+WriteOutNii(noise,strcat('noise_', Opref, '.nii.gz'),Info);
 
 if exist('SP','var')
-    dlmwrite(sprintf('%s_SP.txt',Opref),SP,' ');
+    dlmwrite(sprintf('spikepercent_%s.txt',Opref),SP,' ');
 end
 
 footer(t);
