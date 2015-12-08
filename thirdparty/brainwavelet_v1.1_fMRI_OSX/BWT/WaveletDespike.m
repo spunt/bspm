@@ -90,7 +90,7 @@ end
 
 DefaultOpts=struct('wavelet','d4','threshold',10,'boundary','reflection',...
     'chsearch','moderate','nscale','liberal','compress',1,'SP',1,...
-    'LimitRAM',0,'verbose',1);
+    'LimitRAM',8,'verbose',1);
 Opts=parseInOpts(DefaultOpts,varargin);
 
 %% check inputs
