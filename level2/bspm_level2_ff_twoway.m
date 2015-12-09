@@ -81,10 +81,11 @@ if isempty(outdir)
     % | Analysis Name
     [p, level1name] = fileparts(fileparts(cons{1})); 
     gadir           = fullfile(parentpath(cons), '_groupstats_', level1name);
+    if isempty(pctgroup), pctgrouptag = 100; else pctgrouptag = pctgroup; end
     if tag
-        gasubdir    = fullfile(gadir, sprintf('FF_%s_%s_vs_%s_N%d_%s_%s', tag, factors.name, nsub, mtag, bspm_timestamp(1)));
+        gasubdir    = fullfile(gadir, sprintf('FF_%s_%s_vs_%s_N%d_PCTIN%d_%s_%s', tag, factors.name, nsub, pctgrouptag, mtag, bspm_timestamp(1)));
     else
-        gasubdir    = fullfile(gadir, sprintf('FF_%s_vs_%s_N%d_%s_%s', factors.name, nsub, mtag, bspm_timestamp(1)));
+        gasubdir    = fullfile(gadir, sprintf('FF_%s_vs_%s_N%d_PCTIN%d_%s_%s', factors.name, nsub, pctgrouptag, mtag, bspm_timestamp(1)));
     end
     outdir          = fullfile(gasubdir);
 

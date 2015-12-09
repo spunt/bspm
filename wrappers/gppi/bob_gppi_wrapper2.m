@@ -22,7 +22,7 @@ clear all; home;
 %---------------------------------------------------------------------%
 
 % -----------Paths-----------
-gPPIpath = '/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/useful_functions/gPPItoolbox'; % path for gPPI toolbox
+gPPIpath = fullfile(getenv('HOME'), 'Github', 'bspm', 'thirdparty', 'gPPI_Toolbox'); % path for gPPI toolbox
 studypath =  '/Users/bobspunt/Documents/fmri/lois'; % path for study directory
 maskpath = [studypath filesep '_rois_'];
 level1path = 'analysis/lois_rwls'; % path of level analysis (relative to subject folder)
@@ -121,3 +121,7 @@ for i=dosubs
 end
 
 
+ 
+ 
+ 
+ 

@@ -9,7 +9,7 @@ runit.segment       = 1;
 
 % | paths for relevant folders
 path.study  = '/Users/bobspunt/Documents/fmri/peers';
-path.study = '/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/ASD/data';
+path.study = '/Users/bobspunt/Drive/Writing/Empirical/ASD/data';
 if regexp(pwd,'/home/spunt'), path.study = regexprep(path.study, '/Users/bobspunt/Documents/fmri', '/home/spunt/data'); end
 path.qa     = fullfile(path.study, '_notes_', 'qa');
 if ~exist(path.qa, 'dir'), mkdir(path.qa); end
@@ -143,3 +143,11 @@ save(jobname, 'matlabbatch');
 
 
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

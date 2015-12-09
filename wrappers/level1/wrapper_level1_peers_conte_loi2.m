@@ -12,7 +12,7 @@ function allinput = wrapper_level1_peers_conte_loi2(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Desktop/Dropbox/Bob/Research/caltech/PEERS/data',      ...
+            'studydir',         '/Users/bobspunt/Drive/Research/caltech/PEERS/data',      ...
             'HPF',              100,            ...
             'armethod',         1,              ...
             'epifname',         [],             ...
@@ -289,3 +289,7 @@ if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; e
 eval(sprintf('help %s', ST(2).file));
 end
 
+ 
+ 
+ 
+ 

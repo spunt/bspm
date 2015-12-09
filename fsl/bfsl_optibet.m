@@ -19,7 +19,7 @@ function bfsl_optibet(images)
 %
 %
 % in .bash_profile:
-% SHELLDIR=/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/shell
+% SHELLDIR=/Users/bobspunt/Github/osx-sync/shell
 % PATH=${PATH}:${SHELLDIR}
 % export SHELLDIR PATH
 %
@@ -42,3 +42,7 @@ for i = 1:nim
     eval(command);
 end
 fprintf('\n | - Done\n');  
+ 
+ 
+ 
+ 

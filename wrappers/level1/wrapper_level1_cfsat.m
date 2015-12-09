@@ -16,7 +16,7 @@ function matlabbatch = wrapper_level1_cfsat(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         fullfile(dropboxPath,'Bob','Professional','Writing','Empirical','ASD','data'), ...
+            'studydir',         fullfile(getenv('HOME'),'Bob','Writing','Empirical','ASD','data'), ...
             'HPF',              128,                    ...
             'armethod',         2,                      ... 
             'nuisancepat',      'bad*txt',              ...
@@ -317,3 +317,11 @@ if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; e
 eval(sprintf('help %s', ST(2).file));  
 end
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

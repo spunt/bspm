@@ -24,7 +24,7 @@ if nargin < 2, TR = []; end
 if nargin < 3, outdir = fileparts(infile); end
 
 % | - Configure Path
-gitdir      = '/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/_functions_/git'; 
+gitdir      = fullfile(getenv('HOME'), 'Github')
 aromadir    = fullfile(gitdir, 'thirdparty', 'ICA-AROMA');  
 icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
 if ~exist(icaaroma, 'file')
@@ -38,3 +38,7 @@ else
     cmd = sprintf('python2.7 %s -i %s -o %s -mc %s -tr %d', icaaroma, infile, outdir, rpfile, TR);
 end
 if nargout==0, system(cmd); end
+ 
+ 
+ 
+ 

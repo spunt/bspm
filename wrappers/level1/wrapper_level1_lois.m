@@ -13,7 +13,7 @@ function matlabbatch = wrapper_level1_lois(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/ASD/data',            ...
+            'studydir',         '/Users/bobspunt/Drive/Writing/Empirical/ASD/data',            ...
             'HPF',              128,                    ...
             'armethod',         2,                      ... 
             'nuisancepat',      'aroma_bad*txt',        ...
@@ -269,3 +269,11 @@ if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; e
 eval(sprintf('help %s', ST(2).file));  
 end
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

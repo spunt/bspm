@@ -1,7 +1,7 @@
 
-under = {'/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/AVT/data/brain/meanT1_N=54.nii'};
-over = {'/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/AVT/data/brain/nuisance_regressions/rt/spmT_0001.img'};
-over2 = {'/Users/bobspunt/Desktop/Dropbox/Bob/Professional/Writing/Empirical/AVT/data/brain/nuisance_regressions/rt/spmT_0002.img'};
+under = {'/Users/bobspunt/Drive/Writing/Empirical/AVT/data/brain/meanT1_N=54.nii'};
+over = {'/Users/bobspunt/Drive/Writing/Empirical/AVT/data/brain/nuisance_regressions/rt/spmT_0001.img'};
+over2 = {'/Users/bobspunt/Drive/Writing/Empirical/AVT/data/brain/nuisance_regressions/rt/spmT_0002.img'};
 slices = -6;
 thresh = [.005 100];
 view = 'sagittal';
@@ -75,6 +75,14 @@ end
 
 
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
  
  

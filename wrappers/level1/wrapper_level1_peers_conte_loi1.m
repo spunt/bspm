@@ -32,7 +32,7 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 
 % | PATHS
 % | ===========================================================================
-studydir = '/Users/bobspunt/Desktop/Dropbox/Bob/research/caltech/PEERS/data';
+studydir = '/Users/bobspunt/Drive/research/caltech/PEERS/data';
 if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/peers'; end
 [subdir, subnam] = files([studydir filesep subid]);
 
@@ -247,3 +247,7 @@ if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; e
 eval(sprintf('help %s', ST(2).file));  
 end
 
+ 
+ 
+ 
+ 

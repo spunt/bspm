@@ -8,7 +8,7 @@ def = { 'doparfor',                0,          ...
 vals = setargs(def, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
-if quitdropboxbefore, macapp('Dropbox', 'close'); end
+if quitdropboxbefore, macapp('Google Drive', 'close'); end
 % | Initialize SPM config 
 bspm_init;
 njob = length(job);
@@ -50,9 +50,13 @@ else
     save(outfile, 'joblog'); 
     printmsg(sprintf('Error Data Saved To: %s', outfile), 'msgtitle', sprintf('%d Failed Jobs', numerrs), 'msgtop', '=', 'msgbottom', '='); 
 end
-if opendropboxafter, macapp('Dropbox', 'open'); end
+if opendropboxafter, macapp('Google Drive', 'open'); end
 end
 
+ 
+ 
+ 
+ 
  
  
  

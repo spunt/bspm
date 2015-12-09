@@ -18,7 +18,7 @@ if nargin<1, display('USAGE: bspm_checkcountmap(countmap)'); return; end
 if iscell(countmap), countmap = char(countmap); end
 
 % masks
-maskdir = '/Users/bobspunt/Desktop/Dropbox/Bob/Matlab/masks';
+maskdir = fullfile(getenv('HOME'), 'Github', 'bspm', 'imagedata', 'masks');
 maskidx{1} = get_mask_idx(countmap);
 maskidx{2} = get_mask_idx([maskdir filesep 'mask_amygdala_LR_edit.nii']);
 maskidx{3} = get_mask_idx([maskdir filesep 'mask_vPFC.nii']);
@@ -55,6 +55,10 @@ hdr = spm_vol(maskfile);
 img = spm_read_vols(hdr);
 img = img(:);
 idx = find(img);
+ 
+ 
+ 
+ 
  
  
  
