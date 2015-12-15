@@ -144,7 +144,7 @@ WrtFlt = isfield(job.WriteFiltImg, 'name'); %spm_input('Write filtered statistic
 if WrtFlt
 	%WrtFltFn = 'SnPMt_filtered';
 	%WrtFltFn=spm_input('Filename ?','+1','s',WrtFltFn);
-    %    WrtFltFn = [WrtFltFn, '.img'];
+    %    WrtFltFn = [WrtFltFn, '.nii'];
     WrtFltFn = job.WriteFiltImg.name;
 end
 

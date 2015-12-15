@@ -31,7 +31,7 @@ SnPMdefs.nMax4DefVol = 16; % Default to volumetric if less than this many scans
 
 % Variance smoothing?
 %------------------------------------------------------------------------
-SnPMdefs.vFWHM = [0 0 0 ]; 
+SnPMdefs.vFWHM = [0 0 0]; 
 
 % Default number of permutations
 %------------------------------------------------------------------------

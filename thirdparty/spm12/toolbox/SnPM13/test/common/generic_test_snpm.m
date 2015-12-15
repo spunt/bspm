@@ -104,9 +104,9 @@ classdef generic_test_snpm < matlab.unittest.TestCase
             
             % Maps obtained with the batch execution
             if strcmp(testCase.stattype, 't')
-                statMapRegexp = '^snpmT\+\.img';
+                statMapRegexp = '^snpmT\+\.nii';
             else
-                statMapRegexp = '^snpmF\.img';
+                statMapRegexp = '^snpmF\.nii';
             end
                 
             batch_tmap = spm_select('FPList', testCase.batchResDir, statMapRegexp);

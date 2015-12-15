@@ -25,7 +25,8 @@ if nargin < 1, error('USAGE: bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag
 
 %% MAPS
 if ischar(maps), maps = cellstr(maps); end
-all = bspm_read_vol(char(maps), 'reshape', 'implicitmask', 'mask', mask);
+% all = bspm_read_vol(char(maps), 'reshape', 'implicitmask', 'mask', mask);
+all = bspm_read_vol(char(maps), 'reshape');
 % nmaps = length(maps);
 % nvox = sum(mask(:) > 0);
 % all = zeros(nvox, nmaps);
@@ -41,17 +42,18 @@ all(nanmean(isnan(all),2)>0,:) = [];
 %% MDS
 rho = corr(all, 'rows', 'pairwise');
 D = 1 - rho;
+
 [Y,eigvals] = cmdscale(D);
 if eigenplot
     figure('color','white');
     plot(1:length(eigvals),eigvals,'bo-');
-    if feature('HGUsingMATLABClasses')
-        cl = specgraphhelper('createConstantLineUsingMATLABClasses','LineStyle',...
-            ':','Color',[.7 .7 .7],'Parent',gca);
-        cl.Value = 0;
-    else
-        graph2d.constantline(0,'LineStyle',':','Color',[.7 .7 .7]);
-    end
+%     if feature('HGUsingMATLABClasses')
+%         cl = specgraphhelper('createConstantLineUsingMATLABClasses','LineStyle',...
+%             ':','Color',[.7 .7 .7],'Parent',gca);
+%         cl.Value = 0;
+%     else
+%         graph2d.constantline(0,'LineStyle',':','Color',[.7 .7 .7]);
+%     end
     axis([1,length(eigvals),min(eigvals),max(eigvals)*1.1]);
     xlabel('Eigenvalue number');
     ylabel('Eigenvalue');

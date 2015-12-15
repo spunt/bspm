@@ -452,7 +452,7 @@ else
   if WrtFlt
     WrtFltFn = 'SnPMt_filtered';
     WrtFltFn=spm_input('Filename ?','+1','s',WrtFltFn);
-    WrtFltFn = [WrtFltFn, '.img'];
+    WrtFltFn = [WrtFltFn, '.nii'];
   end
 end
 

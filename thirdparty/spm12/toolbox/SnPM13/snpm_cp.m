@@ -55,7 +55,7 @@ function snpm_cp(CWD)
 % for complete listing.
 %
 % snpm_cp writes out the following image files (for each image, there are
-% two files: .img and .hdr files)  
+% two files: .nii and .hdr files)  
 %  
 % beta_**** (from 0001 to p): p images of p parameter estimates at each
 % voxel for the correct permutation. These p parameters include all
@@ -86,7 +86,7 @@ function snpm_cp(CWD)
 % P-values, positive or negative). 
 %
 % The following is an example of matlab codes for reading in an image file. 
-% P='.../.../beta_0001.img';
+% P='.../.../beta_0001.nii';
 % V=spm_vol(P);
 % Y=spm_read_vols(V);
 % Y(~isfinite(Y))=[]; %delete NaN values from vector Y.
@@ -365,13 +365,13 @@ Vt=V(1);
 %-Initialize image structures.
 %
 for ii=1:p
-  fname= sprintf('beta_%04d.img',ii);
+  fname= sprintf('beta_%04d.nii',ii);
   descrip=sprintf('beta_%04d hats',ii);
   Vbeta(ii)=snpm_clone_vol(Vt,fname,descrip);
 end  
 Vbeta = spm_create_vol(Vbeta);
 
-VResMS=snpm_clone_vol(Vt,'ResMS.img','Residual sum-of-squares');
+VResMS=snpm_clone_vol(Vt,'ResMS.nii','Residual sum-of-squares');
 VResMS=spm_create_vol(VResMS);
 if bVarSm==0
   str = sprintf('%c_{%d} statistic',STAT,df);
@@ -384,33 +384,33 @@ else
   end
 end
 if STAT=='T'
-  VT_pos=snpm_clone_vol(Vt,'snpmT+.img',[str,' (+ve)']);
+  VT_pos=snpm_clone_vol(Vt,'snpmT+.nii',[str,' (+ve)']);
   VT_pos=spm_create_vol(VT_pos);
-  VT_neg=snpm_clone_vol(Vt,'snpmT-.img',[str,' (-ve)']);
+  VT_neg=snpm_clone_vol(Vt,'snpmT-.nii',[str,' (-ve)']);
   VT_neg=spm_create_vol(VT_neg);
 elseif STAT=='F'
-  VF=snpm_clone_vol(Vt,'snpmF.img',str);
+  VF=snpm_clone_vol(Vt,'snpmF.nii',str);
   VF=spm_create_vol(VF);
 end
 
-VlP_pos=snpm_clone_vol(Vt, 'lP+.img', '-log10(uncor. non-para. P, +ve)');
+VlP_pos=snpm_clone_vol(Vt, 'lP+.nii', '-log10(uncor. non-para. P, +ve)');
 VlP_pos=spm_create_vol(VlP_pos);
-VlP_FWE_pos=snpm_clone_vol(Vt, 'lP_FWE+.img','-log10(FWE-corr. P, +ve)');
+VlP_FWE_pos=snpm_clone_vol(Vt, 'lP_FWE+.nii','-log10(FWE-corr. P, +ve)');
 VlP_FWE_pos=spm_create_vol(VlP_FWE_pos);
-VlP_FDR_pos=snpm_clone_vol(Vt, 'lP_FDR+.img','-log10(FDR-corr. P, +ve)');
+VlP_FDR_pos=snpm_clone_vol(Vt, 'lP_FDR+.nii','-log10(FDR-corr. P, +ve)');
 VlP_FDR_pos=spm_create_vol(VlP_FDR_pos);
 
 if STAT=='T'
-  VlP_neg=snpm_clone_vol(Vt, 'lP-.img', '-log10(uncor. non-para. P, -ve)');
+  VlP_neg=snpm_clone_vol(Vt, 'lP-.nii', '-log10(uncor. non-para. P, -ve)');
   VlP_neg=spm_create_vol(VlP_neg);
-  VlP_FWE_neg=snpm_clone_vol(Vt, 'lP_FWE-.img','-log10(FWE-corr. P, -ve)');
+  VlP_FWE_neg=snpm_clone_vol(Vt, 'lP_FWE-.nii','-log10(FWE-corr. P, -ve)');
   VlP_FWE_neg=spm_create_vol(VlP_FWE_neg);
-  VlP_FDR_neg=snpm_clone_vol(Vt, 'lP_FDR-.img','-log10(FDR-corr. P, -ve)');
+  VlP_FDR_neg=snpm_clone_vol(Vt, 'lP_FDR-.nii','-log10(FDR-corr. P, -ve)');
   VlP_FDR_neg=spm_create_vol(VlP_FDR_neg);
 end
 
 if bVarAlph
-  VlwP=snpm_clone_vol(Vt, 'lwP.img','-log10(weighted p-value)');
+  VlwP=snpm_clone_vol(Vt, 'lwP.nii','-log10(weighted p-value)');
   VlwP=spm_create_vol(VlwP);
 end  
 

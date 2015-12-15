@@ -33,11 +33,11 @@ function snpm_test_ground_truth()
 
       % test 1: onesample_1
       matlabbatch{1}.spm.tools.snpm.des.OneSampT.P = {
-          fullfile(testDataDir, 'su_control01', 'cn_sess1', 'con_0001.img,1')
-          fullfile(testDataDir, 'su_control02', 'cn_sess1', 'con_0001.img,1')
-          fullfile(testDataDir, 'su_control03', 'cn_sess1', 'con_0001.img,1')
-          fullfile(testDataDir, 'su_control04', 'cn_sess1', 'con_0001.img,1')
-          fullfile(testDataDir, 'su_control05', 'cn_sess1', 'con_0001.img,1')
+          fullfile(testDataDir, 'su_control01', 'cn_sess1', 'con_0001.nii,1')
+          fullfile(testDataDir, 'su_control02', 'cn_sess1', 'con_0001.nii,1')
+          fullfile(testDataDir, 'su_control03', 'cn_sess1', 'con_0001.nii,1')
+          fullfile(testDataDir, 'su_control04', 'cn_sess1', 'con_0001.nii,1')
+          fullfile(testDataDir, 'su_control05', 'cn_sess1', 'con_0001.nii,1')
       };
       matlabbatch{1}.spm.tools.snpm.des.OneSampT.dir = {fullfile(resultDir, 'GT', 'onesample_1')}; 
       SnPMmatFile = fullfile(resultDir, 'GT', 'onesample_1', 'SnPMcfg.mat');
