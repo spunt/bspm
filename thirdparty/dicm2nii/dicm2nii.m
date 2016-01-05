@@ -107,8 +107,8 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % used on scanner console. If both original and MoCo series are converted,
 % '_MoCo' will be appended for MoCo series. For phase image, such as those from
 % field map, '_phase' will be appended to the name. If multiple subjects data
-% are mixed (strongly discouraged), subject name will be in file name. In case
-% of name conflict, SeriesNumber, such as '_s005', will be appended to make file
+% are mixed (highly discouraged), subject name will be in file name. In case of
+% name conflict, SeriesNumber, such as '_s005', will be appended to make file
 % names unique. It is suggested to use short and descriptive SeriesDescription
 % on the scanner console.
 % 
@@ -313,6 +313,9 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 150930 Remove slice_dir guess; Use NiftiName for error info.
 % 151115 GUI: remove srcType; Implement drag&drop for src and dst.
 % 151117 save_json proposed by ChrisG; won't flush nii_viewer para.
+% 151212 Bug fix for missing pref_file.
+% 151217 gui callback uses subfunc directly, also include fh as argument.
+% 151221 dim_info stores phaseDir at highest 2 bits (1 pos, 2 neg, 0 unknown).
 % End of history. Don't edit this line!
 
 % TODO: need testing files to figure out following parameters:
@@ -321,22 +324,17 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 %    Phase image flag for GE
 
 if nargout, varargout{1} = ''; end
-if nargin==3 && ischar(varargin{1}) % mis-use 3rd input for GUI and func handle
-    if strcmp(varargin{1}, 'gui_callback')
-        dicm2nii_gui(dataFolder);
-        return;
-    elseif strcmp(varargin{1}, 'func_handle')
-        if strcmp(dataFolder, 'all') % for command line test
-            fcns = localfunctions; % only for Matlab since 2013b
-            for i = 1:numel(fcns)
-                nam = func2str(fcns{i});
-                assignin('base', nam, eval(['@' nam]));
-            end
-        else
-            varargout{1} = eval(['@' dataFolder]);
+if nargin==3 && ischar(varargin{1}) && strcmp(varargin{1}, 'func_handle')
+    if strcmp(dataFolder, 'all') % for command line test
+        fcns = localfunctions; % only for Matlab since 2013b
+        for i = 1:numel(fcns)
+            nam = func2str(fcns{i});
+            assignin('base', nam, eval(['@' nam]));
         end
-        return;
+    else
+        varargout{1} = eval(['@' dataFolder]);
     end
+    return;
 end
 
 %% Deal with output format first, and error out if invalid
@@ -607,7 +605,7 @@ for i = 1:nRun
                     h{i}{1}.(fldsCp{j}) = s.(fldsCp{j}); 
                 end
             end
-            if ~isfield(s, fldsCp{1})
+            if ~isfield(s, fldsCp{1}) % assumption: 1st instance is earliest
                 h{i}{1}.(fldsCp{1}) = [tryGetField(s, 'AcquisitionDate', '') ...
                                        tryGetField(s, 'AcquisitionTime', '')];
             end
@@ -1054,8 +1052,12 @@ if ~strcmp(tryGetField(s, 'MRAcquisitionType'), '3D') && ~isempty(iPhase)
 end
 
 if ~isempty(iPhase)
-    if isempty(phPos), pm = '?'; elseif phPos, pm = ''; else pm = '-'; end
-    axes = 'xyz';
+    if isempty(phPos), pm = '?'; b67 = 0;
+    elseif phPos,      pm = '';  b67 = 1;
+    else               pm = '-'; b67 = 2;
+    end
+    nii.hdr.dim_info = nii.hdr.dim_info + b67*64;
+    axes = 'xyz'; % actually ijk
     phDir = [pm axes(iPhase)];
     s.UnwarpDirection = phDir;
     descrip = sprintf('phase=%s;%s', phDir, descrip);
@@ -1363,7 +1365,7 @@ if isempty(pixdim), pixdim = [1 1]; end
 pixdim = [pixdim(:); thk];
 R = R * diag(pixdim); % apply vox size
 % Next is almost dicom xform matrix, except mosaic trans and unsure slice_dir
-R = [R tryGetField(s, 'ImagePositionPatient', [0 0 0]'); 0 0 0 1];
+R = [R tryGetField(s, 'ImagePositionPatient', -dim'/2); 0 0 0 1];
 
 % rest are former: R = verify_slice_dir(R, s, dim, iSL)
 if dim(3)<2, return; end % don't care direction for single slice
@@ -1457,13 +1459,13 @@ elseif isequal(sig, [31 139]) % gz, tgz, tar
 end
 % ! "c:\program Files (x86)\7-Zip\7z.exe" x -y -oF:\tmp\ F:\zip\3047ZL.zip
 
-%% Subfuction: for GUI subfunctions
-function dicm2nii_gui(cmd, hs)
-if nargin<2, hs = guidata('dicm' * 256.^(0:3)'); end
+%% Subfuction: for GUI callbacks
+function gui_callback(h, evt, cmd, fh)
+hs = guidata(fh);
 drawnow;
 switch cmd
     case 'do_convert'
-        src = get(hs.fig, 'UserData');
+        src = get(fh, 'UserData');
         dst = hs.dst.Text;
         if isempty(src) || isempty(dst)
             str = 'Source folder/file(s) and Result folder must be specified';
@@ -1474,13 +1476,15 @@ switch cmd
         if get(hs.gzip,  'Value'), rstFmt = rstFmt + 1; end % 1 or 3 
         if get(hs.rst3D, 'Value'), rstFmt = rstFmt + 4; end % 4 to 7
         mocoOpt = get(hs.mocoOpt, 'Value') - 1;
-        set(hs.convert, 'Enable', 'off', 'string', 'Conversion in progress');
-        clnObj = onCleanup(@()set(hs.convert, 'Enable', 'on', 'String', 'Start conversion')); 
+        set(h, 'Enable', 'off', 'string', 'Conversion in progress');
+        clnObj = onCleanup(@()set(h, 'Enable', 'on', 'String', 'Start conversion')); 
         drawnow;
         dicm2nii(src, dst, rstFmt, mocoOpt);
         
         % save parameters if last conversion succeed
-        para = load(hs.pref_file); para = para.para;
+        if exist(hs.pref_file, 'file')
+            para = load(hs.pref_file); para = para.para;
+        end
         para.rstFmt = get(hs.rstFmt, 'Value');
         para.rst3D = get(hs.rst3D, 'Value');
         para.gzip = get(hs.gzip, 'Value');
@@ -1517,7 +1521,7 @@ switch cmd
         if isnumeric(src), return; end
         src = cellstr(src); % in case only 1 file selected
         src = strcat(folder, filesep, src);
-        set(hs.fig, 'UserData', src);
+        set(fh, 'UserData', src);
         n = numel(src);
         if n > 1 % +1 files
             src = strcat(folder, sprintf(' {%g files}', n));
@@ -1531,7 +1535,7 @@ switch cmd
             val = dir(str);
             folder = fileparts(str);
             if isempty(val)
-                val = get(hs.fig, 'UserData');
+                val = get(fh, 'UserData');
                 if iscellstr(val)
                     val = [fileparts(val{1}), sprintf(' {%g files}', numel(val))];
                 end
@@ -1542,7 +1546,7 @@ switch cmd
             str = {val.name};
             str = strcat(folder, filesep, str);
         end
-        set(hs.fig, 'UserData', str);
+        set(fh, 'UserData', str);
     case 'set_dst'
         str = hs.dst.Text;
         if isempty(str), return; end
@@ -1573,27 +1577,40 @@ switch cmd
             doc dicm2nii;
         end
         set(hs.about, 'Value', 1);
+    case 'drop_src' % Java drop source
+        try
+            if strcmp(evt.DropType, 'file')
+                n = numel(evt.Data);
+                if n == 1
+                    hs.src.Text = evt.Data{1};
+                    set(hs.fig, 'UserData', evt.Data{1});
+                else
+                    hs.src.Text = sprintf('%s {%g files}', ...
+                        fileparts(evt.Data{1}), n);
+                    set(fh, 'UserData', evt.Data);
+                end
+            else % string
+                hs.src.Text = strtrim(evt.Data);
+                gui_callback([], [], 'set_src', fh);
+            end
+        catch me
+            errordlg(me.message);
+        end
+    case 'drop_dst' % Java drop dst
+        try
+            if strcmp(evt.DropType, 'file')
+                nam = evt.Data{1};
+                if ~isdir(nam), nam = fileparts(nam); end
+                hs.dst.Text = nam;
+            else
+                hs.dst.Text = strtrim(evt.Data);
+                gui_callback([], [], 'set_dst', fh);
+            end
+        catch me
+            errordlg(me.message);
+        end
     otherwise
         create_gui;
-end
-
-%% Subfuction: parameter file, used by GUI and save_json
-function fname = param_file
-if ispc, home = [getenv('HOMEDRIVE') getenv('HOMEPATH')];
-else home = getenv('HOME');
-end
-fnameH = fullfile(home, 'dicm2nii_gui_para.mat');
-fname = fnameH;
-if ~exist(fname, 'file')
-    fname = [fileparts(which(mfilename)) '/dicm2nii_gui_para.mat'];
-    if ~exist(fname, 'file')
-        fid = fopen(fname, 'w'); % check permission
-        if fid<1
-            fname = fnameH;
-        else
-            fclose(fid); delete(fname);
-        end
-    end
 end
 
 %% Subfuction: create GUI or bring it to front if exists
@@ -1601,17 +1618,18 @@ function create_gui
 fh = figure('dicm' * 256.^(0:3)'); % arbitury integer
 if strcmp('dicm2nii_fig', get(fh, 'Tag')), return; end
 
-hs.pref_file = param_file;
+param_file = nii_tool('func_handle', 'param_file');
+hs.pref_file = param_file('dicm2nii_gui_para.mat');
 scrSz = get(0, 'ScreenSize');
 clr = [1 1 1]*206/256;
 clrButton = [1 1 1]*216/256;
-cb = @(cmd)['dicm2nii([], ''' cmd ''', ''gui_callback'');']; % callback shortcut
+cb = @(cmd) {@gui_callback cmd fh}; % callback shortcut
 uitxt = @(txt,pos) uicontrol('Style', 'text', 'Position', pos, 'FontSize', 9, ...
     'HorizontalAlignment', 'left', 'String', txt, 'BackgroundColor', clr);
 
 set(fh, 'Toolbar', 'none', 'Menubar', 'none', 'Resize', 'off', 'Color', clr, ...
     'Tag', 'dicm2nii_fig', 'Position', [200 scrSz(4)-500 420 256], ...
-    'Name', 'DICOM to NIfTI Converter', 'NumberTitle', 'off');
+    'Name', 'dicm2nii - DICOM to NIfTI Converter', 'NumberTitle', 'off');
 
 uitxt('Browse source', [8 218 88 16]);
 uicontrol('Style', 'Pushbutton', 'Position', [98 214 48 24], ...
@@ -1630,7 +1648,7 @@ jSrc = javaObjectEDT('javax.swing.JTextField');
 hs.src = javacomponent(jSrc, [114 176 294 24], fh);
 hs.src.FocusLostCallback = cb('set_src');
 % hs.src.ActionPerformedCallback = cb('set_src'); % fire when pressing ENTER
-hs.src.ToolTipText = 'Input source folder or file';
+hs.src.ToolTipText = 'Source folder or file';
 
 uicontrol('Style', 'Pushbutton', 'Position', [8 136 104 24], ...
     'FontSize', 9, 'String', 'Result folder', 'Background', clrButton, ...
@@ -1638,7 +1656,6 @@ uicontrol('Style', 'Pushbutton', 'Position', [8 136 104 24], ...
 jDst = javaObjectEDT('javax.swing.JTextField');
 hs.dst = javacomponent(jDst, [114 136 294 24], fh);
 hs.dst.FocusLostCallback = cb('set_dst');
-% hs.dst.ActionPerformedCallback = cb('set_dst');
 hs.dst.ToolTipText = ['Input folder name to save result files, or drag ' ...
     'and drop a folder'];
 
@@ -1675,10 +1692,9 @@ hs.fig = fh;
 guidata(fh, hs); % store handles
 set(fh, 'HandleVisibility', 'callback'); % protect from command line
 
-try
-    dndcontrol.initJava();
-    dndcontrol(jSrc, @dropSrcFcn, @dropSrcFcn);
-    dndcontrol(jDst, @dropDstFcn, @dropDstFcn);
+try % java_dnd is based on dndcontrol by Maarten van der Seijs
+    java_dnd(jSrc, cb('drop_src'));
+    java_dnd(jDst, cb('drop_dst'));
 catch me
     fprintf(2, '%s\n', me.message);
 end
@@ -1698,45 +1714,7 @@ for i = 1:numel(fn)
         set(hs.(tag), 'Value', para.(tag));
     end
 end
-dicm2nii_gui('set_src');
-
-%% Jave drop callback
-function dropSrcFcn(~, evt)
-try
-    hs = guidata('dicm' * 256.^(0:3)');
-    if strcmp(evt.DropType, 'file')
-        n = numel(evt.Data);
-        if n == 1
-            hs.src.Text = evt.Data{1};
-            set(hs.fig, 'UserData', evt.Data{1});
-        else
-            hs.src.Text = sprintf('%s {%g files}', fileparts(evt.Data{1}), n);
-            set(hs.fig, 'UserData', evt.Data);
-        end
-    else
-        hs.src.Text = evt.Data;
-        dicm2nii_gui('set_src', hs);
-    end
-catch me
-    errordlg(me.message);
-    return;
-end
-
-function dropDstFcn(~, evt)
-try
-    hs = guidata('dicm' * 256.^(0:3)');
-    if strcmp(evt.DropType, 'file')
-        nam = evt.Data{1};
-        if ~isdir(nam), nam = fileparts(nam); end
-        hs.dst.Text = nam;
-    else
-        hs.dst.Text = evt.Data;
-        dicm2nii_gui('set_dst', hs);
-    end
-catch me
-    errordlg(me.message);
-    return;
-end
+gui_callback([], [], 'set_src', fh);
 
 %% subfunction: return phase positive and phase axis (1/2) in image reference
 function [phPos, iPhase] = phaseDirection(s)
@@ -1768,10 +1746,10 @@ elseif strncmpi(s.Manufacturer, 'Philips', 7)
         iPhase = ceil(iPhase/2); % 1/2/3 for RL/AP/FH
         iPhase = find(ixy==iPhase); % now 1 or 2
     end
-    if     any(d == 'LPH'), phPos = false;
+    if     any(d == 'LPH'), phPos = false; % in dicom ref
     elseif any(d == 'RAF'), phPos = true;
     end
-    if R(ixy(iPhase), iPhase)<0, phPos = ~phPos; end % tricky!
+    if R(ixy(iPhase), iPhase)<0, phPos = ~phPos; end % tricky! in image ref
 end
 
 %% subfunction: extract useful fields for multiframe dicom
@@ -1897,12 +1875,10 @@ end
 pffgs = 'PerFrameFunctionalGroupsSequence';
 if nargin<2, val = {'SharedFunctionalGroupsSequence' pffgs sq fld}; return; end
 try 
-    s1 = s.SharedFunctionalGroupsSequence.Item_1;
-    val = s1.(sq).Item_1.(fld);
+    val = s.SharedFunctionalGroupsSequence.Item_1.(sq).Item_1.(fld);
 catch
     try
-        s1 = s.(pffgs).(sprintf('Item_%g', iFrame));
-        val = s1.(sq).Item_1.(fld);
+        val = s.(pffgs).(sprintf('Item_%g', iFrame)).(sq).Item_1.(fld);
     catch
         val = [];
     end
@@ -2287,7 +2263,8 @@ function save_json(s, fname)
 persistent doSave;
 global dicm2nii_SAVE_JSON;
 if isempty(doSave)
-    pref_fname = param_file;
+    param_file = nii_tool('func_handle', 'param_file');
+    pref_fname = param_file('dicm2nii_gui_para.mat');
     para = struct;
     if exist(pref_fname, 'file')
         para = load(pref_fname); para = para.para;
@@ -2324,7 +2301,7 @@ for i = 1:nFields
         val = val / 1000; % in sec now
     elseif strcmp(nam, 'UnwarpDirection')
         nam = 'PhaseEncodingDirection';
-        if val(1) == '-' || val(1) == '?', val = val(2:-1:1); end
+        if val(1) == '-' || val(1) == '?', val = val([2 1]); end
     elseif strcmp(nam, 'EffectiveEPIEchoSpacing')
         nam = 'EffectiveEchoSpacing';
         val = val / 1000;

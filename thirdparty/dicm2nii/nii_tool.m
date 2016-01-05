@@ -240,6 +240,9 @@ function varargout = nii_tool(cmd, varargin)
 % 150617 auto detect rgb_dim 1&3 for 'load' etc using ChrisR method
 % 151025 Change subfunc img2datatype as 'update' for outside access
 % 151109 Include dd.win (exe) from WinAVR-20100110 for partial gz unzip
+% 151205 Partial gunzip: fix fname with space & unknown pigz | dd error.
+% 151219 Put param_file in this m file (dicm2nii and nii_viewer use from here).
+% 151222 Take care of img for intent_code 2003/2004: anyone uses it?
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -430,7 +433,13 @@ elseif strcmpi(cmd, 'hdr')
     end
     
     fname = nii_name(varargin{1}, '.hdr'); % get .hdr if it is .img
-    [fid, clnObj, niiVer] = fopen_nii(fname, [], 544); %#ok<ASGLU>
+    if numel(fname)>7 && strcmpi(fname((-6:0)+end), '.nii.gz')
+        bytes = 544; % do full gunzip for .hdr.gz
+    else
+        bytes = [];
+    end
+
+    [fid, clnObj, niiVer] = fopen_nii(fname, [], bytes); %#ok<ASGLU>
     varargout{1} = read_hdr(fid, niiVer, C, fname);
    
 elseif any(strcmpi(cmd, {'ext' 'img' 'load'})) 
@@ -527,13 +536,7 @@ elseif strcmpi(cmd, 'default')
     end
     if val.version ~= para.version, C = niiHeader(para.version); end
     
-    fname = [fileparts(which(mfilename)) '/nii_tool_para.mat'];
-    fid = fopen(fname, 'w'); % check writing permission
-    if fid<1
-        fname = [getenv('HOME') '/nii_tool_para.mat'];
-    else
-        fclose(fid);
-    end
+    fname = param_file('nii_tool_para.mat');
     try
         save(fname, '-struct', 'para', flds{:}); % overwrite
     catch me
@@ -857,20 +860,17 @@ end
 
 [pth1, outName, ext] = fileparts(fname);
 outName = fullfile(pth, outName);
-done = false;
 if ~isempty(dd) && nargin>1 && ~isempty(bytes) % unzip only part of data
     try
         n = num2str(ceil(bytes/512)); % 512: default ibs
-        [err, str] = system([cmd 'c ' fname dd n ' of="' outName '"']);
-        done = true;
+        [err, str] = system([cmd 'c "' fname '"' dd n ' of="' outName '"']);
+        if err==0 && isempty(strfind(str, 'error')), return; end
     catch
     end
 end
 
-if ~done
-    if ~strcmp(pth1, pth), copyfile(fname, [outName ext], 'f'); end
-    [err, str] = system([cmd ' "' outName ext '"']); % overwrite if exist
-end
+if ~strcmp(pth1, pth), copyfile(fname, [outName ext], 'f'); end
+[err, str] = system([cmd ' "' outName ext '"']); % overwrite if exist
 if err, fprintf(2, 'Error during decompression:\n%s\n', str); end
 
 %% subfunction: read hdr
@@ -999,6 +999,11 @@ else % all others: valpix=1
     img = reshape(img, dim);
 end
 
+if (hdr.intent_code == 2003 && dim(5) == 3) || ...  % RGB triplet in 5th dim
+      (hdr.intent_code == 2004  && dim(5) == 4) % RGBA quadruplet in 5th dim
+    img = permute(img, [1:4 6:8 5]);
+end
+
 %% Return requested fname with ext, useful for .hdr and .img files
 function fname = nii_name(fname, ext)
 [~, f, e] = fileparts(fname);
@@ -1024,7 +1029,7 @@ n = fread(fid, 4, '*uint8')'; % sizeof_hdr or signature
 isGz = isequal(n(1:2), [31 139]); % gz, tgz, tar file
 fnameIn = fname; % for error msg
 if isGz
-    if nargin<3 || isempty(bytes), bytes = []; end
+    if nargin<3, bytes = []; end
     fclose(fid); % close .gz file
     fname = gunzipOS(fname, bytes); % guzipped file, return unzipped fname
     fid = fopen(fname, 'r', endian);
@@ -1154,3 +1159,23 @@ end
 
 % if we reach here, no subcmd found in syntax
 fprintf(2, ' Unknown command for %s: %s\n', mfile, subcmd);
+
+%% Subfuction: parameter file, used also by nii_viewer and dicm2nii
+function fname = param_file(nam)
+if ispc, home = [getenv('HOMEDRIVE') getenv('HOMEPATH')];
+else home = getenv('HOME');
+end
+fnameH = fullfile(home, nam);
+fname = fnameH;
+if ~exist(fname, 'file')
+    fname = fullfile(fileparts(which(mfilename)), nam);
+    if ~exist(fname, 'file')
+        fid = fopen(fname, 'w'); % check permission
+        if fid<1
+            fname = fnameH;
+        else
+            fclose(fid); delete(fname);
+        end
+    end
+end
+%%
