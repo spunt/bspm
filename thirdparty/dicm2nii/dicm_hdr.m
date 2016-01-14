@@ -88,6 +88,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 150526 read_sq: use ItemDelimitationItem instead of empty dat1 as SQ end.
 % 150924 philips_par: store SliceNumber if not acsending/decending order.
 % 151001 check Manufacturer in advance for 'search' method.
+% 160105 Bug fix for b just missing iPixelData (Thx Andrew S).
 
 persistent dict_full;
 s = []; info = '';
@@ -118,7 +119,7 @@ if ~isDicm
         isTruncated = true;
     end
 end
-if ~isDicm && ~isTruncated % may be PAR or HEAD file
+if ~isDicm && ~isTruncated % may be PAR/HEAD/BV file
     [~, ~, ext] = fileparts(fname);
     try
         if strcmpi(ext, '.PAR') % || strcmpi(ext, '.REC')
@@ -143,7 +144,7 @@ end
 % This is the trick to make partial hdr faster.
 b = [];
 tag_7fe00010 = char([224 127 16 0]); % PixelData, can't add VR
-for nb = [120000 2e6 20e6 Inf] % if not enough, read more
+for nb = [130000 2e6 20e6 Inf] % if not enough, read more
     b = [b fread(fid, nb, '*uint8')']; %#ok
     allRead = feof(fid);
     i = strfind(char(b), tag_7fe00010);
@@ -253,6 +254,7 @@ else
     iPixelData = iPixelData + 139; i=i+2;
 end
 s.PixelData.Start = uint32(iPixelData);
+if numel(b)<i+1, b = [b fread(fid, i+1-numel(b), '*uint16')']; end
 s.PixelData.Bytes = typecast(b(i+(0:1)), 'uint32');
 
 % if iPixelData is not right, re-do with full header
@@ -433,7 +435,7 @@ end % main func
 % subfunction: decode Siemens CSA image and series header
 function csa = read_csa(csa)
 b = csa';
-if ~strcmp(char(b(1:4)), 'SV10'), return; end % no op if not SV10
+if numel(b)<4 || ~strcmp(char(b(1:4)), 'SV10'), return; end % no op if not SV10
 chDat = 'AE AS CS DA DT LO LT PN SH ST TM UI UN UT';
 i = 8; % 'SV10' 4 3 2 1
 try %#ok in case of error, we return the original uint8

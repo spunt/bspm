@@ -34,6 +34,7 @@ function img = dicm_img(s, xpose)
 % 150115 SamplesPerPixel>1 works: put it as dim3, and push rest to dim4.
 % 150211 dim3 reserved for RGB, even if SamplesPerPixel=1 (like dicomread). 
 % 150404 Add 'if' block for numeric s.PixelData (BVfile). 
+% 160114 cast s.PixelData.Bytes to double (thx DavidR). 
 
 persistent flds dict;
 if isempty(flds)
@@ -78,7 +79,7 @@ if nargin<2 || isempty(xpose), xpose = true; end % same as dicomread by default
 if ~isfield(s, 'TransferSyntaxUID') || ... % maybe PAR or AFNI file
         strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2.1') || ...
         strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2')
-    n = s.PixelData.Bytes / double(s.BitsAllocated) * 8;
+    n = double(s.PixelData.Bytes) / (double(s.BitsAllocated) / 8);
     img = fread(fid, n, fmt);
     dim = double([s.Columns s.Rows]);
     if ~isfield(s, 'PlanarConfiguration') || s.PlanarConfiguration==0

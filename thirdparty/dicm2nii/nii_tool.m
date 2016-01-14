@@ -243,6 +243,8 @@ function varargout = nii_tool(cmd, varargin)
 % 151205 Partial gunzip: fix fname with space & unknown pigz | dd error.
 % 151219 Put param_file in this m file (dicm2nii and nii_viewer use from here).
 % 151222 Take care of img for intent_code 2003/2004: anyone uses it?
+% 160110 Use matlab pref method to replace para file.
+% End of history. Don't edit this line!
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -497,7 +499,7 @@ elseif strcmpi(cmd, 'RGBStyle')
         error('nii_tool(''RGBStyle'') can have 1, 3, or 4 as second input'); 
     end
     if nargout, varargout{1} = curStyle; end % return old one
-    para.rgb_dim = irgb;
+    para.rgb_dim = irgb; % no save to pref
 elseif strcmpi(cmd, 'cat3D')
     if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     fnames = varargin{1};
@@ -519,30 +521,20 @@ elseif strcmpi(cmd, 'cat3D')
     varargout{1} = nii_tool('update', nii); % update dim
 elseif strcmpi(cmd, 'default')
     flds = {'version' 'rgb_dim'}; % may add more in the future
-    for i = 1:numel(flds), val.(flds{i}) = para.(flds{i}); end
+    pf = getpref('nii_tool_para');
+    for i = 1:numel(flds), val.(flds{i}) = pf.(flds{i}); end
     if nargin<2, varargout{1} = val; return; end % query only
     if nargout, varargout{1} = val; end % return old val
     in2 = varargin;
     if ~isstruct(in2), in2 = struct(in2{:}); end
     nam = fieldnames(in2);
     for i = 1:numel(nam)
-        if strcmpi(nam{i}, 'rgb_dim')
-            nii_tool('RGBstyle', in2.(nam{i}));
-            continue;
-        end
         ind = strcmpi(nam{i}, flds);
         if isempty(ind), continue; end
         para.(flds{ind}) = in2.(nam{i});
+        setpref('nii_tool_para', flds{ind}, in2.(nam{i}));
     end
     if val.version ~= para.version, C = niiHeader(para.version); end
-    
-    fname = param_file('nii_tool_para.mat');
-    try
-        save(fname, '-struct', 'para', flds{:}); % overwrite
-    catch me
-        fprintf(2, 'Failed to save default parameters for future use.\n');
-        fprintf(2, '%s\n', me.message);
-    end
 elseif strcmpi(cmd, 'update') % old img2datatype subfunction
     if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     nii = varargin{1};
@@ -611,21 +603,12 @@ end
 
 %% Subfunction: all nii header in the order in NIfTI-1/2 file
 function [C, para] = niiHeader(niiVer)
-rgb_dim = 1;
-if nargin<1 || isempty(niiVer)
-    fname = [getenv('HOME') '/nii_tool_para.mat'];
-    if ~exist(fname, 'file')
-        fname = [fileparts(which(mfilename)) '/nii_tool_para.mat'];
-    end
-
-    try
-        val = load(fname);
-        niiVer = val.version;
-        rgb_dim = val.rgb_dim;
-    catch
-        niiVer = 1;
-    end
+pf = getpref('nii_tool_para');
+if isempty(pf)
+    pf = struct('version', 1, 'rgb_dim', 1);
+    setpref('nii_tool_para', fieldnames(pf), struct2cell(pf));
 end
+if nargin<1 || isempty(niiVer), niiVer = pf.version; end
 
 if niiVer == 1
     C = {
@@ -748,7 +731,7 @@ para.format   =  D(:,1)';
 para.datatype = [D{:,2}];
 para.bitpix   = [D{:,3}];
 para.valpix   = [D{:,4}];
-para.rgb_dim  = rgb_dim; % dim of RGB/RGBA in NIfTI FILE
+para.rgb_dim  = pf.rgb_dim; % dim of RGB/RGBA in NIfTI FILE
 para.version  = niiVer;
 
 %% Subfunction: use pigz or system gzip if available (faster)
@@ -1160,22 +1143,4 @@ end
 % if we reach here, no subcmd found in syntax
 fprintf(2, ' Unknown command for %s: %s\n', mfile, subcmd);
 
-%% Subfuction: parameter file, used also by nii_viewer and dicm2nii
-function fname = param_file(nam)
-if ispc, home = [getenv('HOMEDRIVE') getenv('HOMEPATH')];
-else home = getenv('HOME');
-end
-fnameH = fullfile(home, nam);
-fname = fnameH;
-if ~exist(fname, 'file')
-    fname = fullfile(fileparts(which(mfilename)), nam);
-    if ~exist(fname, 'file')
-        fid = fopen(fname, 'w'); % check permission
-        if fid<1
-            fname = fnameH;
-        else
-            fclose(fid); delete(fname);
-        end
-    end
-end
 %%

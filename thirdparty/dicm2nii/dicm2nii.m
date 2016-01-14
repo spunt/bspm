@@ -91,9 +91,9 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % Starting from 20151120, the converter can optionally save a .json file for
 % each converted NIfTI. This can be turned on by running following line from
 % Command Window for a new session:
-%  global dicm2nii_SAVE_JSON; dicm2nii_SAVE_JSON = 1;
+%  setpref('dicm2nii_gui_para', 'save_json', true);
 % It will stay on (saving json files) until a new session with
-%  global dicm2nii_SAVE_JSON; dicm2nii_SAVE_JSON = 0;
+%  setpref('dicm2nii_gui_para', 'save_json', false);
 % For more information about the purpose of json file, check
 %  http://bids.neuroimaging.io/ 
 % 
@@ -316,6 +316,8 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 151212 Bug fix for missing pref_file.
 % 151217 gui callback uses subfunc directly, also include fh as argument.
 % 151221 dim_info stores phaseDir at highest 2 bits (1 pos, 2 neg, 0 unknown).
+% 160110 Implement "Check update" based on findjobj; Preference method updated.
+% 160112 SeriesInstanceUID & SeriesNumber only need one (thx DavidR).
 % End of history. Don't edit this line!
 
 % TODO: need testing files to figure out following parameters:
@@ -452,12 +454,12 @@ nFile = numel(fnames);
 if nFile<1, error(' No files found in the data source.'); end
 
 %% Check each file, store partial header in cell array hh
-% first 4 fields are must to be valid dicom
-flds = {'SeriesInstanceUID' 'Columns' 'Rows' 'BitsAllocated' 'InstanceNumber' ...
+% first 3 fields are must, 4 or 5 must have one
+flds = {'Columns' 'Rows' 'BitsAllocated' 'SeriesInstanceUID' 'SeriesNumber' ...
     'ImageOrientationPatient' 'ImagePositionPatient' 'PixelSpacing' ...
     'PixelRepresentation' 'BitsStored' 'HighBit' 'SamplesPerPixel' ...
     'PlanarConfiguration' 'EchoNumber' 'RescaleIntercept' 'RescaleSlope' ...
-    'NumberOfFrames' 'B_value' 'DiffusionGradientDirection' ...
+    'InstanceNumber' 'NumberOfFrames' 'B_value' 'DiffusionGradientDirection' ...
     'RTIA_timer' 'RBMoCoTrans' 'RBMoCoRot' ...
     'SliceThickness' 'SpacingBetweenSlices'};
 dict = dicm_dict('SIEMENS', flds); % dicm_hdr will update vendor if needed
@@ -482,13 +484,16 @@ errInfo = '';
 seriesUIDs = {};
 for k = 1:nFile
     s = hh{k};
-    if isempty(s) || any(~isfield(s, flds(1:4))) % || isType(s, junk)
+    if isempty(s) || any(~isfield(s, flds(1:3))) || ~any(isfield(s, flds(4:5)))
         if ~isempty(errStr{k}) % && isempty(strfind(errInfo, errStr{k}))
             errInfo = sprintf('%s\n%s\n', errInfo, errStr{k});
         end
         continue; % skip the file
     end
 
+    if ~isfield(s, 'SeriesInstanceUID')
+        s.SeriesInstanceUID = num2str(s.SeriesNumber); % make up UID
+    end
     m = find(strcmp(s.SeriesInstanceUID, seriesUIDs));
     if isempty(m)
         m = numel(seriesUIDs)+1;
@@ -1356,12 +1361,15 @@ if any(ixyz(3) == ixyz(1:2)), ixyz(3) = setdiff(1:3, ixyz(1:2)); end
 iSL = ixyz(3); % 1/2/3 for Sag/Cor/Tra slice
 cosSL = R(iSL, 3);
 
-thk = tryGetField(s, 'SpacingBetweenSlices');
-if isempty(thk), thk = tryGetField(s, 'SliceThickness'); end
 pixdim = tryGetField(s, 'PixelSpacing');
-if isempty(thk) || isempty(pixdim), xyz_unit = 0; else xyz_unit = 2; end % mm
-if isempty(thk), thk = 1; end
-if isempty(pixdim), pixdim = [1 1]; end
+if isempty(pixdim)
+    pixdim = [1 1]; % fake
+    xyz_unit = 0; % not uint information
+else
+    xyz_unit = 2; % mm
+end
+thk = tryGetField(s, 'SpacingBetweenSlices');
+if isempty(thk), thk = tryGetField(s, 'SliceThickness', pixdim(1)); end
 pixdim = [pixdim(:); thk];
 R = R * diag(pixdim); % apply vox size
 % Next is almost dicom xform matrix, except mosaic trans and unsure slice_dir
@@ -1379,7 +1387,7 @@ if s.Columns > dim(1) % Siemens mosaic: use dim(1) since no transpose to img
     end
 elseif isfield(s, 'LastFile') && isfield(s.LastFile, 'ImagePositionPatient')
     R(1:3, 3) = (s.LastFile.ImagePositionPatient - R(1:3,4)) / (dim(3)-1);
-    pixdim(3) = abs(R(iSL,3) / cosSL); % override slice thickness of dcm hdr
+    pixdim(3) = abs(R(iSL,3) / cosSL); % override slice thickness from dcm hdr
     return; % almost all non-mosaic images return from here
 end
 
@@ -1482,18 +1490,16 @@ switch cmd
         dicm2nii(src, dst, rstFmt, mocoOpt);
         
         % save parameters if last conversion succeed
-        if exist(hs.pref_file, 'file')
-            para = load(hs.pref_file); para = para.para;
-        end
-        para.rstFmt = get(hs.rstFmt, 'Value');
-        para.rst3D = get(hs.rst3D, 'Value');
-        para.gzip = get(hs.gzip, 'Value');
-        para.mocoOpt = get(hs.mocoOpt, 'Value');
-        para.src = hs.src.Text;
-        ind = strfind(para.src, '{');
-        if ~isempty(ind), para.src = strtrim(para.src(1:ind-1)); end
-        para.dst = hs.dst.Text;
-        try save(hs.pref_file, 'para'); catch, end        
+        pf = getpref('dicm2nii_gui_para');
+        pf.rstFmt = get(hs.rstFmt, 'Value');
+        pf.rst3D = get(hs.rst3D, 'Value');
+        pf.gzip = get(hs.gzip, 'Value');
+        pf.mocoOpt = get(hs.mocoOpt, 'Value');
+        pf.src = hs.src.Text;
+        ind = strfind(pf.src, '{');
+        if ~isempty(ind), pf.src = strtrim(pf.src(1:ind-1)); end
+        pf.dst = hs.dst.Text;
+        setpref('dicm2nii_gui_para', fieldnames(pf), struct2cell(pf));
     case 'dstDialog'
         folder = hs.dst.Text; % current folder
         if ~isdir(folder), folder = hs.src.Text; end
@@ -1559,12 +1565,12 @@ switch cmd
         if get(hs.rst3D, 'Value'), set(hs.gzip, 'Value', 0); end
     case 'about'
         item = get(hs.about, 'Value');
-        if item == 1
+        if item == 1 % about
             str = sprintf(['dicm2nii.m by Xiangrui Li\n\n' ...
                 'Feedback to: xiangrui.li@gmail.com\n\n' ...
                 'Last updated on 20%s\n'], reviseDate);
             helpdlg(str, 'About dicm2nii')
-        elseif item == 2
+        elseif item == 2 % license
             fid = fopen([fileparts(which(mfilename)) '/license.txt']);
             if fid<1
                 str = 'license.txt file not found';
@@ -1573,8 +1579,10 @@ switch cmd
                 fclose(fid);
             end
             helpdlg(str, 'License')
-        else
+        elseif item == 3
             doc dicm2nii;
+        elseif item == 4
+            checkUpdate(mfilename);
         end
         set(hs.about, 'Value', 1);
     case 'drop_src' % Java drop source
@@ -1618,8 +1626,6 @@ function create_gui
 fh = figure('dicm' * 256.^(0:3)'); % arbitury integer
 if strcmp('dicm2nii_fig', get(fh, 'Tag')), return; end
 
-param_file = nii_tool('func_handle', 'param_file');
-hs.pref_file = param_file('dicm2nii_gui_para.mat');
 scrSz = get(0, 'ScreenSize');
 clr = [1 1 1]*206/256;
 clrButton = [1 1 1]*216/256;
@@ -1686,8 +1692,9 @@ hs.convert = uicontrol('Style', 'pushbutton', 'Position', [104 10 200 30], ...
     'Background', clrButton, 'Callback', cb('do_convert'), ...
     'TooltipString', 'Dicom source and Result folder needed before start');
 
-hs.about = uicontrol('Style', 'popup', 'String', 'About|License|Help', ...
-    'Position', [352 14 58 20], 'Callback', cb('about'));
+hs.about = uicontrol('Style', 'popup', ...
+    'String', 'About|License|Help text|Check update', ...
+    'Position', [348 14 64 20], 'Callback', cb('about'));
 hs.fig = fh;
 guidata(fh, hs); % store handles
 set(fh, 'HandleVisibility', 'callback'); % protect from command line
@@ -1699,19 +1706,23 @@ catch me
     fprintf(2, '%s\n', me.message);
 end
 
-if ~exist(hs.pref_file, 'file'), return; end
-para = load(hs.pref_file); para = para.para;
-fn = fieldnames(para);
+pf = getpref('dicm2nii_gui_para');
+if isempty(pf)
+    pf = struct('rstFmt', 1, 'rst3D', 0, 'gzip', 1, 'mocoOpt', 2, ...
+        'src', pwd, 'dst', pwd, 'save_json', false);
+    setpref('dicm2nii_gui_para', fieldnames(pf), struct2cell(pf));
+end
+fn = fieldnames(pf);
 for i = 1:numel(fn)
     tag = fn{i};
     if ~isfield(hs, tag)
         continue;  % avoid error
     elseif strcmp(tag, 'src') || strcmp(tag, 'dst')
-        hs.(tag).Text = para.(tag);
+        hs.(tag).Text = pf.(tag);
     elseif strcmpi(get(hs.(tag), 'Style'), 'edit')
-        set(hs.(tag), 'String', para.(tag));
+        set(hs.(tag), 'String', pf.(tag));
     else 
-        set(hs.(tag), 'Value', para.(tag));
+        set(hs.(tag), 'Value', pf.(tag));
     end
 end
 gui_callback([], [], 'set_src', fh);
@@ -2226,16 +2237,16 @@ if csa_header(s, 'ProtocolSliceNumber')>0, t = t(nSL:-1:1); end % rev-num
 function [err, nSL, sliceN, isTZ] = checkImagePostion(ipp)
 v = var(ipp); % ipp rows for slices
 [~, iSL] = max(v);
-ipp1 = ipp(:, v>0.01); % remove constant columns which give corr 0 or nan
+ipp1 = ipp(:, v>1e-6); % remove constant columns which give corr 0 or nan
 ipp = ipp(:,iSL); % ipp at SL dimension
 del = mean(diff(sort(ipp))) * 0.02; % allow 2% error: have seen error of 0.1/7
 nSL = sum(diff(sort(ipp)) > del) + 1;
 sliceN = []; err = '';
 nVol = numel(ipp) / nSL;
 if mod(nVol,1), err = 'Missing file(s) detected'; return; end
-if nSL<2, return; end
+if nSL<2, isTZ = false; return; end
 
-isTZ = all(abs(diff(ipp(1:nVol))) < del);
+isTZ = nVol>1 && all(abs(diff(ipp(1:nVol))) < del);
 if isTZ % Philips XYTZ
     a = ipp(1:nVol:end);
     b = reshape(ipp, nVol, nSL);
@@ -2260,24 +2271,22 @@ if ~isempty(c) && any(c>0.02), err = 'Irregular ImagePosition detected'; end
 
 %% Save JSON file, proposed by Chris G
 function save_json(s, fname)
-persistent doSave;
-global dicm2nii_SAVE_JSON;
-if isempty(doSave)
-    param_file = nii_tool('func_handle', 'param_file');
-    pref_fname = param_file('dicm2nii_gui_para.mat');
-    para = struct;
-    if exist(pref_fname, 'file')
-        para = load(pref_fname); para = para.para;
-    end
-    if isempty(dicm2nii_SAVE_JSON)
-        doSave = isfield(para, 'save_json') && para.save_json;
+global dicm2nii_SAVE_JSON; % remove this in the future
+persistent save_json;
+if isempty(save_json)
+    if ~isempty(dicm2nii_SAVE_JSON)
+        save_json = logical(dicm2nii_SAVE_JSON(1));
+        setpref('dicm2nii_gui_para', 'save_json', save_json);
     else
-        doSave = logical(dicm2nii_SAVE_JSON);
-        para.save_json = doSave; %#ok
-        save(pref_fname, 'para'); % update param for future use
+        try 
+            save_json = getpref('dicm2nii_gui_para', 'save_json');
+        catch
+            save_json = false; % default
+            setpref('dicm2nii_gui_para', 'save_json', save_json);
+        end
     end
 end
-if ~doSave, return; end
+if ~save_json, return; end
    
 flds = {
   'NiftiCreator' 'SeriesNumber' 'SeriesDescription' 'ImageType' 'Modality' ...
@@ -2350,3 +2359,61 @@ end
 fseek(fid, -2, 'cof'); % remove trailing comma and \n
 fprintf(fid, '\n}\n');
 fclose(fid);
+
+%% Check for newer version for 42997 at Matlab Central
+% Simplied from checkVersion in findjobj.m by Yair Altman
+function checkUpdate(mfile)
+webUrl = 'http://www.mathworks.com/matlabcentral/fileexchange/42997';
+try
+    str = urlread(webUrl);
+catch me
+    errordlg(me.message, 'Web access error');
+    return;
+end
+
+ind = strfind(str, '>Updates<');
+if isempty(ind), return; end
+
+str = str(ind:end);
+ind = strfind(str, 'class="date">');
+if isempty(ind), return; end
+
+try
+    i0 = ind(end)+27;
+    i1 = i0 + strfind(str(i0:i0+999), '<td>');
+    i2 = i0 + strfind(str(i0:i0+999), '</td>');
+    latestDate = str(i1(1)+3 : i2(1)-2); % use date as version
+    latestDate = datenum(latestDate, 'yyyy.mm.dd');
+catch
+    latestDate = str(ind(end)+13:ind(end)+23); % website recorded date
+    latestDate = datenum(latestDate, 'dd mmm yyyy')-2; % allow 2-day off
+end
+
+d = {reviseDate('nii_viewer') reviseDate('nii_tool') reviseDate('dicm2nii')};
+d = sort(d);
+myFileDate = datenum(d{end}, 'yymmdd');
+
+if myFileDate >= latestDate
+    msgbox([mfile ' is up to date.'], mfile);
+    return;
+end
+
+msg = ['A newer version (' latestDate ') is available on the ' ...
+       'MathWorks File Exchange. Update to the new version?'];
+answer = questdlg(msg, ['Update ' mfile], 'Yes', 'Later', 'Yes');
+if ~strcmp(answer, 'Yes'), return; end
+
+fileUrl = [webUrl '?controller=file_infos&download=true'];
+pth = fileparts(mfile);
+zipFileName = fullfile(pth, 'dicm2nii.zip');
+try
+    urlwrite(fileUrl, zipFileName);
+    unzip(zipFileName, pth);
+catch me
+    errordlg(['Error in updating: ' me.message], mfile);
+    return;
+end
+rehash;
+warndlg(['Updated successfully. Please restart ' mfile ', otherwise ' ...
+         'it may give error.'], mfile);
+%%
