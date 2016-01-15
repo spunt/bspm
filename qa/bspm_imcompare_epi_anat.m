@@ -1,22 +1,8 @@
 function data = bspm_imcompare_epi_anat(epi, anat, subnames)
-% BSPM_IMCOMPARE  Imcalc without writing image
+% BSPM_IMCOMPARE_EPI_ANAT 
 %
-%   USAGE: bspm_imcompare(in, option)
+%   USAGE: data = bspm_imcompare_epi_anat(epi, anat, subnames)
 %       
-%       in  =  array of images
-%       labels = string specifying option
-%       disptag = option to display bad images
-%
-%           PAIRWISE COMPARISONS (2 ONLY)
-%               'meanSS'        - mean sum of squared differences
-%               'corr'          - correlation across non-zero voxels
-%               
-%           DISTANCE FROM MEAN IMAGE (2 OR MORE)
-%               'MmeanSS'       - mean SS from mean across images
-%               'Mcorr'         - correlation with mean image
-%
-% CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2013.03.20
-% CREDIT: Loosely based on functionality of spm_imcalc_ui.m (SPM8)
 
 % ----------------------- Copyright (C) 2014 -----------------------
 %	Author: Bob Spunt
@@ -24,8 +10,7 @@ function data = bspm_imcompare_epi_anat(epi, anat, subnames)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<2, disp('USAGE: bspm_imcompare(in, option)'); return, end
+if nargin<2, disp('USAGE: data = bspm_imcompare_epi_anat(epi, anat, subnames)'); return, end
 if nargin<3, subnames = []; end
 
 % check variable formats

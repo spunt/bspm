@@ -51,7 +51,7 @@ function [stat, cfg] = statistics_wrapper(cfg, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: statistics_wrapper.m 9613 2014-06-10 13:51:24Z eelspa $
+% $Id: statistics_wrapper.m 11002 2015-12-14 10:25:22Z jansch $
 
 % check if the input cfg is valid for this function
 cfg = ft_checkconfig(cfg, 'renamed',     {'approach',   'method'});
@@ -225,7 +225,7 @@ if issource
 
   % check whether the original input data contains a dim, which would allow
   % for 3D reshaping and clustering with bwlabeln
-  if isfield(varargin{1}, 'transform') || (isfield(varargin{1}, 'dim') && prod(varargin{1}.dim)==size(varargin{1}.pos,1))
+  if isfield(varargin{1}, 'transform') || ((isfield(varargin{1}, 'dim') && prod(varargin{1}.dim)==size(varargin{1}.pos,1)))
     cfg.connectivity = 'bwlabeln';
   end
   

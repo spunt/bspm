@@ -318,6 +318,7 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 151221 dim_info stores phaseDir at highest 2 bits (1 pos, 2 neg, 0 unknown).
 % 160110 Implement "Check update" based on findjobj; Preference method updated.
 % 160112 SeriesInstanceUID & SeriesNumber only need one (thx DavidR).
+% 160115 checkUpdate: fix problem to download & unzip to pwd.
 % End of history. Don't edit this line!
 
 % TODO: need testing files to figure out following parameters:
@@ -2382,29 +2383,29 @@ try
     i0 = ind(end)+27;
     i1 = i0 + strfind(str(i0:i0+999), '<td>');
     i2 = i0 + strfind(str(i0:i0+999), '</td>');
-    latestDate = str(i1(1)+3 : i2(1)-2); % use date as version
-    latestDate = datenum(latestDate, 'yyyy.mm.dd');
+    latestStr = str(i1(1)+3 : i2(1)-2); % use date as version
+    latestNum = datenum(latestStr, 'yyyy.mm.dd');
 catch
-    latestDate = str(ind(end)+13:ind(end)+23); % website recorded date
-    latestDate = datenum(latestDate, 'dd mmm yyyy')-2; % allow 2-day off
+    latestStr = str(ind(end)+13:ind(end)+23); % website recorded date
+    latestNum = datenum(latestStr, 'dd mmm yyyy')-2; % allow 2-day off
 end
 
 d = {reviseDate('nii_viewer') reviseDate('nii_tool') reviseDate('dicm2nii')};
 d = sort(d);
 myFileDate = datenum(d{end}, 'yymmdd');
 
-if myFileDate >= latestDate
-    msgbox([mfile ' is up to date.'], mfile);
+if myFileDate >= latestNum
+    msgbox([mfile ' and the package are up to date.'], 'Check update');
     return;
 end
 
-msg = ['A newer version (' latestDate ') is available on the ' ...
+msg = ['A newer version (' latestStr ') is available on the ' ...
        'MathWorks File Exchange. Update to the new version?'];
 answer = questdlg(msg, ['Update ' mfile], 'Yes', 'Later', 'Yes');
 if ~strcmp(answer, 'Yes'), return; end
 
 fileUrl = [webUrl '?controller=file_infos&download=true'];
-pth = fileparts(mfile);
+pth = fileparts(which(mfile));
 zipFileName = fullfile(pth, 'dicm2nii.zip');
 try
     urlwrite(fileUrl, zipFileName);
@@ -2414,6 +2415,6 @@ catch me
     return;
 end
 rehash;
-warndlg(['Updated successfully. Please restart ' mfile ', otherwise ' ...
-         'it may give error.'], mfile);
+warndlg(['Package updated successfully. Please restart ' mfile ', otherwise ' ...
+         'it may give error.'], 'Check update');
 %%

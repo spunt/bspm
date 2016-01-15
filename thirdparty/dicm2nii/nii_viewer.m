@@ -1166,11 +1166,15 @@ for i = 1:n
                 im_neg = -single(im) .* (im<0);
                 im_neg = (im_neg-rg(1)) / (rg(2)-rg(1));
                 im_neg(im_neg>1) = 1; im_neg(im_neg<0) = 0;
+                alfa = im_neg;
                 im_neg = repmat(im_neg, [1 1 3]); % gray now
+            else
+                alfa = 0;
             end
             
             im = (single(im)-rg(1)) / (rg(2)-rg(1));
             im(im>1) = 1; im(im<0) = 0;
+            alfa = alfa + im;
             im = repmat(im, [1 1 3]); % gray now
             
             switch lut
@@ -1253,10 +1257,10 @@ for i = 1:n
         else % RGB
             if max(im(:))>2, im = single(im) / 255; end % guess uint8
             im(im>1) = 1; im(im<0) = 0;
+            alfa = sum(im,3) / dim4; % avoid mean
         end
         set(p(i).hsI(ix), 'CData', im);
         
-        alfa = mean(im,3);
         if i==n && isequal(get(hs.frame,'BackgroundColor'), [1 1 1])
             alfa = img2mask(alfa);
         else
