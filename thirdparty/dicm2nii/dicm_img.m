@@ -12,9 +12,6 @@ function img = dicm_img(s, xpose)
 % 
 % DICM_IMG is like dicomread from Matlab, but is independent of Image Processing
 % Toolbox.
-% 
-% Limitation: DICM_IMG reads only little endian format, and can deal with only
-% JPEG compression.
 %
 % See also DICM_HDR, DICM_DICT, DICM2NII
 
@@ -35,12 +32,13 @@ function img = dicm_img(s, xpose)
 % 150211 dim3 reserved for RGB, even if SamplesPerPixel=1 (like dicomread). 
 % 150404 Add 'if' block for numeric s.PixelData (BVfile). 
 % 160114 cast s.PixelData.Bytes to double (thx DavidR). 
+% 160127 support big endian files. 
 
 persistent flds dict;
 if isempty(flds)
     flds = {'Columns' 'Rows' 'BitsAllocated'};
     dict = dicm_dict('', [flds 'SamplesPerPixel' 'PixelRepresentation' ...
-                         'PlanarConfiguration' 'BitsStored' 'HighBit']);
+                     'PlanarConfiguration' 'BitsStored' 'HighBit']);
 end
 if isstruct(s) && ~all(isfield(s, flds)), s = s.Filename; end
 if ischar(s), [s, err] = dicm_hdr(s, dict); end % input is file name
@@ -76,8 +74,9 @@ end
 
 if nargin<2 || isempty(xpose), xpose = true; end % same as dicomread by default
 
-if ~isfield(s, 'TransferSyntaxUID') || ... % maybe PAR or AFNI file
+if ~isfield(s, 'TransferSyntaxUID') || ... % files other than dicom
         strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2.1') || ...
+        strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2.2') || ...
         strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2')
     n = double(s.PixelData.Bytes) / (double(s.BitsAllocated) / 8);
     img = fread(fid, n, fmt);
@@ -89,6 +88,10 @@ if ~isfield(s, 'TransferSyntaxUID') || ... % maybe PAR or AFNI file
         img = reshape(img, [dim spp n/spp/dim(1)/dim(2)]);
     end
     if xpose, img = permute(img, [2 1 3 4]); end
+    if isfield(s, 'TransferSyntaxUID') && ...
+            strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2.2');
+        img = swapbytes(img);
+    end
 else % rely on imread for decompression
     b = fread(fid, inf, '*uint8'); % read all as bytes
     nEnd = numel(b) - 8; % terminator 0xFFFE E0DD and its zero length

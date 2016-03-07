@@ -1,24 +1,26 @@
-function [xVi, mask, ResStats] = spm_rwls_est_non_sphericity(SPM)
+function [xVi, mask] = spm_rwls_est_non_sphericity(SPM)
 % Non-sphericity estimation using ReML
+% Modified version to allow for RWLS estimation (temporal non-stationarity
+% for outlier exclusion). 
 % FORMAT [xVi, mask] = spm_est_non_sphericity(SPM)
-% 
+%
 % Required fields of SPM structure (see spm_spm):
 % SPM.xY.VY  - nScan x 1 struct array of file handles
 % SPM.xX     - structure containing design matrix information
 % SPM.xX.W   - optional whitening/weighting matrix
 % SPM.xVi    - structure describing intrinsic non-sphericity
 % SPM.xM     - structure containing masking information
-% 
+%
 % Return xVi from SPM.xVi with extra fields:
 % xVi.V      - estimated non-sphericity, trace(V) = rank(V)
 % xVi.h      - hyperparameters  xVi.V = xVi.h(1)*xVi.Vi{1} + ...
 % xVi.Cy     - spatially whitened <Y*Y'> (used by ReML to estimate h)
-% 
+%
 % mask       - logical array of voxels within analysis mask
 %__________________________________________________________________________
 %
 % In a first pass, voxels over which non-sphericity will be estimated are
-% selected using an 'effects of interest' F-contrast (can be specified in 
+% selected using an 'effects of interest' F-contrast (can be specified in
 % SPM.xVi.Fcontrast) and critical threshold taken from SPM defaults
 % stats.<modality>.UFp.
 % The sample covariance matrix (xVi.Cy) is then estimated by pooling over
@@ -26,14 +28,19 @@ function [xVi, mask, ResStats] = spm_rwls_est_non_sphericity(SPM)
 % Finally, SPM will invoke ReML to estimate hyperparameters (xVi.h) of an
 % array of non-sphericity components (xVi.Vi), providing a high precise
 % estimate of the non-sphericity matrix (xVi.V).
+% 
+% References:  
+% Diedrichsen & Shadmehr (2006) Detecting and Adjusting for artifacts in
+%       fMRI time series data
+%
 %__________________________________________________________________________
 % Copyright (C) 1994-2012 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston & Guillaume Flandin
-% $Id: spm_est_non_sphericity.m 6015 2014-05-23 15:46:19Z guillaume $
+% Additons by Joern Diedrichsen
 
 
-SVNid = '$Rev: 6015 $';
+SVNid = '$Rev: 4.0 $';
 
 %-Say hello
 %--------------------------------------------------------------------------
@@ -53,6 +60,7 @@ if ~isfield(xX,'W')
 end
 
 xM           = SPM.xM;
+
 xVi          = SPM.xVi;
 
 %-Compute Hsqr and F-threshold under i.i.d.
@@ -83,19 +91,19 @@ trRV         = spm_SpUtil('trRV',xX.xKXs);
 
 %-Threshold for voxels entering non-sphericity estimates
 %--------------------------------------------------------------------------
-% RWLS
-if (strcmp(xVi.form,'wls'))
-    UF          = 0;
-else % end RWLS
-    try
-        modality = lower(spm_get_defaults('modality'));
-        UFp      = spm_get_defaults(['stats.' modality '.ufp']);
-    catch
-        UFp      = 0.001;
-    end
-    xVi.UFp      = UFp;
-    UF           = spm_invFcdf(1 - UFp,[trMV,trRV]);
+try
+    modality = lower(spm_get_defaults('modality'));
+    UFp      = spm_get_defaults(['stats.' modality '.ufp']);
+catch
+    UFp      = 0.001;
 end
+xVi.UFp      = UFp;
+UF           = spm_invFcdf(1 - UFp,[trMV,trRV]);
+% RWLS: in old versions, we set the analysis threshold to 0
+if (strcmp(xVi.form,'wls'))
+    UF=0;
+end;
+% END RWLS
 
 %==========================================================================
 %-         P O O L E D   V A R I A N C E   E S T I M A T I O N
@@ -130,19 +138,15 @@ chunks    = min(cumsum([1 repmat(chunksize,1,nbchunks)]),prod(DIM)+1);
 
 spm_progress_bar('Init',nbchunks,'Hyperparameter estimation','Chunks');
 
-% RWLS
-CTempSS = []; 
-CTempS = []; 
-
 for i=1:nbchunks
     chunk = chunks(i):chunks(i+1)-1;
     
     %-Report progress
     %======================================================================
-    if i > 1, fprintf(repmat(sprintf('\b'),1,72)); end                  %-# 
+    if i > 1, fprintf(repmat(sprintf('\b'),1,72)); end                  %-#
     fprintf('%-40s: %30s', sprintf('Chunk %3d/%-3d',i,nbchunks),...
-                           '...processing');                            %-#
-                       
+        '...processing');                            %-#
+    
     %-Get data & construct analysis mask
     %----------------------------------------------------------------------
     Y       = zeros(nScan,numel(chunk));
@@ -162,7 +166,7 @@ for i=1:nbchunks
     Cm(chunk)    = cmask;
     if ~any(cmask), continue, end
     Y       = Y(:,cmask);                          %-Data within mask
-
+    
     %-Remove filter confounds
     %----------------------------------------------------------------------
     KWY      = spm_filter(xX.K,xX.W*Y);
@@ -176,16 +180,6 @@ for i=1:nbchunks
         res = zeros(nScan,0);
     end
     ResSS   = sum(res.^2);                         %-Residual SSQ
-    
-    %-RWLS
-    %======================================================================
-    q           = size(res, 2); 
-    trRV        = spm_SpUtil('trRV',xX.xKXs);
-    q           = spdiags(sqrt(trRV./ResSS'),0,q,q);
-    wres        = res*q;
-    CTempSS     = [CTempSS, sum((wres.^2),2)]; % - weighted Residual SSQ over voxels
-    CTempS      = [CTempS, sum(wres,2)]; % - weighted Residual Sum over voxels
-    clear wres
     clear res
     
     %-F-threshold & accumulate spatially whitened Y*Y'
@@ -198,11 +192,6 @@ for i=1:nbchunks
         Y   = Y(:,j)*q;
         Cy  = Cy + Y*Y';
     end
-    
-    % RWLS
-    TEMPSTATS.N(i)      = length(chunk); 
-    TEMPSTATS.SS(:,i)   = nansum(CTempSS,2);
-    TEMPSTATS.S(:,i)    = nansum(CTempS,2);
     
     %-Report progress
     %======================================================================
@@ -234,7 +223,7 @@ end
 %     %--------------------------------------------------
 %     KY    = spm_filter(xX.K,Y);
 %     ResSS = spm_sp('r',xX.xKXs,KY);
-%     ResSS = sum(ResSS.^2); 
+%     ResSS = sum(ResSS.^2);
 %     %--------------------------------------------------
 %     q     = spdiags(sqrt(trRV./ResSS'),0,n,n);
 %     Y     = Y*q;
@@ -283,33 +272,23 @@ if isstruct(xX.K)
         % ReML
         %------------------------------------------------------------------
         fprintf('%-30s\n',sprintf('  ReML Block %i',i));
-        % RWLS
+        % [ RWLS
         if (strncmp(xVi.form,'wls',3))
             [Vp,hp]=spm_rwls_reml(Cy(q,q),Xp,Qp);
-        else % RWLS END
+        else % RWLS END] 
             [Vp,hp] = spm_reml(Cy(q,q),Xp,Qp);
         end;
         V(q,q)  = V(q,q) + Vp;
         h(p)    = hp;
     end
 else
-    % RWLS
+    % [ RWLS
     if (strncmp(xVi.form,'wls',3))
         [Vp,hp]=spm_rwls_reml(Cy(q,q),Xp,Qp);
-    else % RWLS END
+    else % RWLS END] 
         [V,h] = spm_reml(Cy,xX.X,xVi.Vi);
     end;
 end
-
-% RWLS
-% Statistics of the residuals
-% For inspection of Artifacts and outliers
-% ----------------------------------------------------------
-ResStats.s  = sum(TEMPSTATS.S,2);
-ResStats.ss = sum(TEMPSTATS.SS,2);
-ResStats.n  = sum(TEMPSTATS.N,2);
-ResStats.v  = ResStats.ss/ResStats.n; 
-% END RWLS
 
 %-Normalize non-sphericity and save hyperparameters
 %--------------------------------------------------------------------------

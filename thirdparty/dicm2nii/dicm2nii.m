@@ -319,6 +319,7 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 160110 Implement "Check update" based on findjobj; Preference method updated.
 % 160112 SeriesInstanceUID & SeriesNumber only need one (thx DavidR).
 % 160115 checkUpdate: fix problem to download & unzip to pwd.
+% 160127 dicm_hdr & dicm_img: support big endian dicom.
 % End of history. Don't edit this line!
 
 % TODO: need testing files to figure out following parameters:
@@ -2362,22 +2363,19 @@ fprintf(fid, '\n}\n');
 fclose(fid);
 
 %% Check for newer version for 42997 at Matlab Central
-% Simplied from checkVersion in findjobj.m by Yair Altman
+% Simplified from checkVersion in findjobj.m by Yair Altman
 function checkUpdate(mfile)
 webUrl = 'http://www.mathworks.com/matlabcentral/fileexchange/42997';
 try
     str = urlread(webUrl);
+    ind = strfind(str, '>Updates<');
+    str = str(ind:end);
+    ind = strfind(str, 'class="date">');
+    if isempty(ind), error('Date info not found'); end
 catch me
     errordlg(me.message, 'Web access error');
     return;
 end
-
-ind = strfind(str, '>Updates<');
-if isempty(ind), return; end
-
-str = str(ind:end);
-ind = strfind(str, 'class="date">');
-if isempty(ind), return; end
 
 try
     i0 = ind(end)+27;

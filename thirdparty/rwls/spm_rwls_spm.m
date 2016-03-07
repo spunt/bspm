@@ -6,13 +6,15 @@ function SPM = spm_rwls_spm(SPM)
 % 2. rWLS estimation based on estimated noise parameters
 % Functionality of the old SPM is preserved
 %
+% FORMAT SPM = spm_spm(SPM)
+%
 % Required fields of SPM:
 %
 % xY.VY - nScan x 1 struct array of image handles (see spm_vol)
 %         Images must have the same orientation, voxel size and data type
 %       - Any scaling should have already been applied via the image handle
 %         scalefactors.
-% 
+%
 % xX    - Structure containing design matrix information
 %       - Required fields are:
 %         xX.X      - Design matrix (raw, not temporally smoothed)
@@ -29,7 +31,7 @@ function SPM = spm_rwls_spm(SPM)
 %                     specified spm_spm will set this to whiten the data
 %                     and render the OLS estimates maximum likelihood
 %                     i.e. W*W' = inv(xVi.V).
-% 
+%
 % xVi   - Structure describing intrinsic temporal non-sphericity
 %       - Required fields are:
 %         xVi.Vi    - array of non-sphericity components
@@ -45,7 +47,7 @@ function SPM = spm_rwls_spm(SPM)
 %                     to estimate V.  A 2nd pass is then used to re-estimate
 %                     the parameters with WLS and save the ML estimates
 %                     (unless xX.W is already specified).
-% 
+%
 % xM    - Structure containing masking information, or a simple column vector
 %         of thresholds corresponding to the images in VY [default: -Inf]
 %       - If a structure, the required fields are:
@@ -59,7 +61,7 @@ function SPM = spm_rwls_spm(SPM)
 %                 interpolation to the voxel locations of the data Y.
 %       - Note that voxels with constant data (i.e. the same value across
 %         scans) are also automatically masked out.
-% 
+%
 % swd   - Directory where the output files will be saved [default: pwd]
 %         If exists, it becomes the current working directory.
 %
@@ -262,6 +264,11 @@ function SPM = spm_rwls_spm(SPM)
 %
 % References:
 %
+% References:
+%
+% Diedrichsen & Shadmehr (2006) Detecting and Adjusting for artifacts in
+%       fMRI time series data
+%
 % Statistical Parametric Maps in Functional Imaging: A General Linear
 % Approach. Friston KJ, Holmes AP, Worsley KJ, Poline JB, Frith CD,
 % Frackowiak RSJ. (1995) Human Brain Mapping 2:189-210.
@@ -275,14 +282,12 @@ function SPM = spm_rwls_spm(SPM)
 % $Id: spm_spm.m 6015 2014-05-23 15:46:19Z guillaume $
 
 
-SVNid = '$Rev: 6015 $';
+SVNid = '$Rev: 4.0$';
 
 %-Say hello
 %--------------------------------------------------------------------------
 SPMid = spm('FnBanner',mfilename,SVNid);
 spm('Pointer','Watch');
-
-
 
 %-Get SPM
 %--------------------------------------------------------------------------
@@ -397,6 +402,7 @@ if ~isstruct(xM)
                     'VM', {[]},...
                     'xs', struct('Masking','analysis threshold'));
 end
+
 mask           = true(DIM);
 
 %-Check confounds (xX.K)
@@ -420,9 +426,9 @@ if ~isfield(xVi,'V')
     SPM.xY.VY  = VY;
     SPM.xM     = xM;
     SPM.xX.K   = xX.K;
-    [xVi, am, ResStats]  = spm_rwls_est_non_sphericity(SPM);
+    [xVi, am]  = spm_rwls_est_non_sphericity(SPM);
     mask       = mask & am;
-    spm('FnBanner', mfilename, SVNid);
+    spm('FnBanner',mfilename,SVNid);
 end
 
 %-Get weight/whitening matrix:  W*W' = inv(V)
@@ -513,7 +519,11 @@ for i = 1:nSres
 end
 VResI = spm_data_hdr_write(VResI);
 
-
+% [RWLS Initialize residual stats 
+ResStats.s    = [];
+ResStats.ss   = [];
+ResStats.n    = []; 
+% END RWLS] 
 %==========================================================================
 %-               G E N E R A L   L I N E A R   M O D E L
 %==========================================================================
@@ -546,12 +556,7 @@ chunks    = min(cumsum([1 repmat(chunksize,1,nbchunks)]),prod(DIM)+1);
 
 spm_progress_bar('Init',nbchunks,'Parameter estimation','Chunks');
 
-% RWLS
-CTempSS = []; 
-CTempS = []; 
-
 for i=1:nbchunks
-    
     chunk = chunks(i):chunks(i+1)-1;
     
     %-Report progress
@@ -590,20 +595,21 @@ for i=1:nbchunks
         res      = zeros(nScan,0);
     end
     ResSS        = sum(res.^2);                    %-Residual SSQ
-    res          = res(iRes,:);
-    
-    %-RWLS
-    %======================================================================
-    q           = size(res, 2); 
-    trRV        = spm_SpUtil('trRV',xX.xKXs);
-    q           = spdiags(sqrt(trRV./ResSS'),0,q,q);
-    wres        = res*q;
-    TempSS      = sum((wres.^2),2);     % - weighted Residual SSQ over voxels
-    TempS       = sum(wres,2);          % - weighted Residual Sum over voxels
+
+    % [RWLS :
+    % Record the residual statistics for each time slice: 
+    numVox=size(res,2);
+    q  = spdiags(sqrt(trRV./ResSS'),0,numVox,numVox);
+    wres=res*q;
+    TempSS=sum((wres.^2),2);         %-weighted Residual SSQ over voxels
+    TempS=sum(wres,2);               %- weighted Residual Sum over voxels
     clear wres;
-    CTempSS    = [CTempSS, TempSS];
-    CTempS     = [CTempS, TempS];
-    clear wres
+    ResStats.ss  = [ResStats.ss, TempSS];
+    ResStats.s   = [ResStats.s , TempS];
+    ResStats.n   = [ResStats.n , numVox];
+    % RWLS END]
+    
+    res          = res(iRes,:);
     
     %-Write output files
     %======================================================================
@@ -633,22 +639,19 @@ for i=1:nbchunks
         VResI(j) = spm_data_write(VResI(j), c, chunk);
     end
     
-    % RWLS
-    TEMPSTATS.N(i)      = length(chunk); 
-    TEMPSTATS.SS(:,i)   = nansum(CTempSS,2);
-    TEMPSTATS.S(:,i)    = nansum(CTempS,2);
-
     %-Report progress
     %======================================================================
     fprintf('%s%30s',repmat(sprintf('\b'),1,30),'...done');             %-#
     spm_progress_bar('Set',i);
-    
 end
+
 fprintf('\n');                                                          %-#
 spm_progress_bar('Clear');
+
 if ~any(mask(:))
-    error('Please check your data: There are no in-mask voxels.');
+    error('Please check your data: There are no inmask voxels.');
 end
+
 
 %==========================================================================
 %-                 R e s M S   M O D I F I C A T I O N
@@ -698,7 +701,10 @@ end
 %-Delete the standardised residual files
 %--------------------------------------------------------------------------
 fres = cellstr(spm_select('FPList',SPM.swd,'^ResI_.{4}\..{3}$'));
-for i=1:numel(fres), spm_unlink(fres{i}); end
+for i=1:numel(fres)
+    spm_unlink(fres{i});
+end
+
 
 %==========================================================================
 %-                         S A V E   &   E X I T
@@ -726,13 +732,19 @@ SPM.xVol.VRpv  = VRpv;              %-Filehandle - Resels per voxel
 if spm_mesh_detect(VY)
     SPM.xVol.G = g;                 %-Mesh topology
 end
+
 SPM.Vbeta      = Vbeta;             %-Filehandle - Beta
 SPM.VResMS     = VResMS;            %-Filehandle - Hyperparameter
 SPM.VM         = VM;                %-Filehandle - Mask
+ 
 SPM.xVi        = xVi;               %-Non-sphericity structure
+
 SPM.xX         = xX;                %-Design structure
+ 
 SPM.xM         = xM;                %-Mask structure
+ 
 SPM.xCon       = struct([]);        %-Contrast structure
+ 
 SPM.SPMid      = SPMid;
 SPM.swd        = pwd;
 
@@ -740,7 +752,9 @@ SPM.swd        = pwd;
 % Statistics of the residuals
 % For inspection of Artifacts and outliers
 % ----------------------------------------------------------
-SPM.ResStats = ResStats; 
+SPM.ResStats.s=sum(ResStats.s,2);
+SPM.ResStats.ss=sum(ResStats.ss,2);
+SPM.ResStats.n=sum(ResStats.n,2);
 % END RWLS
 
 %-Save SPM.mat

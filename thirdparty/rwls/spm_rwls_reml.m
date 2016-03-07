@@ -50,7 +50,6 @@ function [C,h,Ph,F,Fa,Fc,k] = spm_rwls_reml(YY,X,Q,N,hE,hC,A,K)
 % 
 % 
 % 
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Joern Diedrichsen, Karl Friston 
 % $Id: spm_rwls_reml.m joern  $
@@ -65,7 +64,7 @@ try, N; catch, N  = 1;  end
  
 % default number of iterations
 %--------------------------------------------------------------------------
-try, K; catch, K  = 512; end
+try, K; catch, K  = 64; end
  
 % initialise h
 %--------------------------------------------------------------------------
@@ -92,32 +91,22 @@ end
 
 % scale Q and YY
 %--------------------------------------------------------------------------
-% if A
-%     sY = trace(R*YY)/N/n;
-%     YY = YY/sY;
-%     for i = 1:m
-%         sh(i,1) = trace(R*Q{i})/n;
-%         Q{i}    = Q{i}/sh(i);
-%     end
-%     keyboard; 
-% else
-%     sY = 1;
-%     sh = 1;
-% end
-
-% scale Q and YY
-%--------------------------------------------------------------------------
-sY = spm_trace(R,YY)/(N*n);
-YY = YY/sY;
-% V  = V/sY;
-for i = 1:m
-    sh(i,1) = spm_trace(R,Q{i})/n;
-    Q{i}    = Q{i}/sh(i);
+if A
+    sY = trace(R*YY)/N/n;
+    YY = YY/sY;
+    for i = 1:m
+        sh(i,1) = trace(R*Q{i})/n;
+        Q{i}    = Q{i}/sh(i);
+    end
+    keyboard; 
+else
+    sY = 1;
+    sh = 1;
 end
 
 % hyperpriors
 %--------------------------------------------------------------------------
-try, hE = hE(:);                               catch, hE = -32;   end
+try, hE = hE(:);                               catch, hE = 0;   end
 try, hP = inv(hC + speye(length(hC))/exp(16)); catch, hP = 1/256; end
  
 % check sise
@@ -143,8 +132,7 @@ for k = 1:K
     for i = 1:m
         C = C + Q{i}*exp(h(i));
     end
-%     iC    = inv(C + speye(n,n)/exp(32));
-    iC    = spm_inv(C);
+    iC    = inv(C + speye(n,n)/exp(32));
  
     % E-step: conditional covariance cov(B|y) {Cq}
     %======================================================================

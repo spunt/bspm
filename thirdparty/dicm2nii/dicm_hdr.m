@@ -18,10 +18,10 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % empty if there is no error.
 % 
 % DICM_HDR is like dicominfo from Matlab, but is independent of Image Processing
-% Toolbox. The limitation is it can deal with only little endian data for
-% popular vendors. The advantage is that it decodes most private and shadow tags
-% for Siemens, GE and Philips dicom, and runs faster, especially for partial
-% header and multi-frame dicom.
+% Toolbox. The limitation is that it may not work for some special dicom files.
+% The advantage is that it decodes most private and shadow tags for Siemens, GE
+% and Philips dicom, and runs faster, especially for partial header and
+% multi-frame dicom.
 % 
 % This can also read Philips PAR file, AFNI HEAD file and some BrainVoyager
 % files, and return needed fields for dicm2nii to convert into nifti.
@@ -89,6 +89,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 150924 philips_par: store SliceNumber if not acsending/decending order.
 % 151001 check Manufacturer in advance for 'search' method.
 % 160105 Bug fix for b just missing iPixelData (Thx Andrew S).
+% 160127 Support big endian dicom; Always return TransferSyntaxUID for dicm_img.
 
 persistent dict_full;
 s = []; info = '';
@@ -141,47 +142,53 @@ if ~isDicm && ~isTruncated % may be PAR/HEAD/BV file
     return; 
 end
 
+expl = false; explVR = false; % default for truncated dicom
+be = false; % little endian by default
+
+% Get TransferSyntaxUID first
+b8 = fread(fid, 130000, '*uint8')';
+i = strfind(char(b8), char([2 0 16 0 'UI'])); % TransferSyntaxUID, explicit LE
+if ~isempty(i) % empty for truncated
+    i = (i(1)+1) / 2;
+    len = min(i+50, round(numel(b8)/2)); % 50*2: enough for data+length
+    b = typecast(b8(1:len*2), 'uint16');
+    dat = read_item(i);
+    if ischar(dat)
+        expl = ~strcmp(dat, '1.2.840.10008.1.2');
+        be = strcmp(dat, '1.2.840.10008.1.2.2');
+        syntaxUID = dat;
+    end
+end
+
 % This is the trick to make partial hdr faster.
-b = [];
-tag_7fe00010 = char([224 127 16 0]); % PixelData, can't add VR
-for nb = [130000 2e6 20e6 Inf] % if not enough, read more
-    b = [b fread(fid, nb, '*uint8')']; %#ok
+tag_img = char([224 127 16 0]); % PixelData, VR uncertain even expl
+if be, tag_img = tag_img([2 1 4 3]); end
+for nb = [2e6 20e6 Inf] % if not enough, read more
     allRead = feof(fid);
-    i = strfind(char(b), tag_7fe00010);
+    i = strfind(char(b8), tag_img);
     if ~isempty(i)
         break;
     elseif allRead
-        % i = strfind(char(b), char([225 127 16 16])); % DTI tensor file
-        % if ~isempty(i), break; end
-        i = strfind(char(b), char([127 224 0 16]));
-        if isempty(i)
-            info = ['No PixelData in ' fname]; 
-        else
-            info = ['Likely big-endian file (not supported): ' fname]; 
-        end
+        info = ['No PixelData in ' fname]; 
         return; 
     end
+    b8 = [b8 fread(fid, nb, '*uint8')']; %#ok
 end
 s.Filename = fopen(fid);
 
 % iPixelData could be in header or data. Using full hdr can correct this
 iPixelData = i(end); % start of PixelData tag with 132 offset
-b = typecast(b, 'uint16'); % hope this makes the code faster
+b = typecast(b8, 'uint16'); % hope this makes the code faster
 
 i = 1; len = numel(b)-6; % 6 less avoid missing next tag
-expl = false; explVR = false; % default for truncated dicom
 toSearch = numel(dict.tag) < 10;
 
 if toSearch % search each tag if only a few fields
-    b8 = char(typecast(b, 'uint8'));
-    tg = char([2 0 16 0 'UI']); % TransferSyntaxUID
-    i = (strfind(b8, tg)+1) / 2; % i for uint16
-    if ~isempty(i) % empty for truncated 
-        dat = read_item(i(1));
-        if ischar(dat), expl = ~strcmp(dat, '1.2.840.10008.1.2'); end
-    end
+    b8 = char(b8);
+    if exist('syntaxUID', 'var'), s.TransferSyntaxUID = syntaxUID; end
     if ~isempty(dict.vendor)
         tg = char([8 0 112 0]); % Manufacturer
+        if be, tg = tg([2 1 4 3]); end
         if expl, tg = [tg 'LO']; end
         i = (strfind(b8, tg)+1) / 2;
         if ~isempty(i) % empty for truncated 
@@ -192,8 +199,10 @@ if toSearch % search each tag if only a few fields
         end
     end
     for k = 1:numel(dict.tag)
-        tg = char(typecast(dict.tag(k), 'uint8'));
+        tg = typecast(dict.tag(k), 'uint8');
         tg = tg([3 4 1 2]);
+        if be && ~isequal(tg(1:2), [2 0]), tg = tg([2 1 4 3]); end
+        tg = char(tg);
         i = (strfind(b8, tg)+1) / 2;
         if isempty(i), continue;
         elseif numel(i)>1 % +1 tags found
@@ -241,6 +250,7 @@ while ~toSearch
         end
     elseif strcmp(name, 'TransferSyntaxUID')
         expl = ~strcmp(dat, '1.2.840.10008.1.2'); % may be wrong for some
+        be = strcmp(dat, '1.2.840.10008.1.2.2');
     end
 end
 
@@ -255,7 +265,9 @@ else
 end
 s.PixelData.Start = uint32(iPixelData);
 if numel(b)<i+1, b = [b fread(fid, i+1-numel(b), '*uint16')']; end
-s.PixelData.Bytes = typecast(b(i+(0:1)), 'uint32');
+bytes = typecast(b(i+(0:1)), 'uint32');
+if be, bytes = swapbytes(bytes); end
+s.PixelData.Bytes = bytes;
 
 % if iPixelData is not right, re-do with full header
 if ~fullHdr
@@ -289,6 +301,11 @@ vr = 'CS'; % CS for Manufacturer and TransferSyntaxUID
 
 group = b(i); i=i+1;
 elmnt = b(i); i=i+1;
+if be && group>2
+    group = swapbytes(group);
+    elmnt = swapbytes(elmnt);
+end
+
 tag = uint32(group)*65536 + uint32(elmnt);
 if tag == 4294893581 %|| tag == 4294893789 % FFFE E00D ItemDelimitationItem
     i = i+2; % skip length, in case there is another SQ Item
@@ -300,12 +317,13 @@ explVR = expl || group==2;
 if explVR, vr = char(typecast(b(i), 'uint8')); i=i+1; end % 2-byte VR
 
 if ~explVR % implicit, length irrevalent to VR
-    n = typecast(b(i+(0:1)), 'uint32'); i=i+2;
+    n = typecast(b(i+(0:1)), 'uint32'); i = i+2;
 elseif ~isempty(strfind(len16, vr)) % data length in uint16
     n = b(i); i=i+1;
 else % length in uint32: skip 2 bytes
-    n = typecast(b(i+(1:2)), 'uint32'); i=i+3;
+    n = typecast(b(i+(1:2)), 'uint32'); i = i+3;
 end
+if be && group>2, n = swapbytes(n); end
 if n<1, return; end % empty val
 
 % Look up item name in dictionary
@@ -360,6 +378,7 @@ else % numeric data, or UN
         info = sprintf('Given up: Invalid VR (%d %d) for %s', vr, name);
     else
         dat = typecast(b(i+(0:n-1)), fmt)'; i=i+n;
+        if be, dat = swapbytes(dat); end
     end
 end
 end % nested func
@@ -369,8 +388,11 @@ function [rst, info, i] = read_sq(i, nEnd, isPerFrameSQ)
 rst = []; info = ''; j = 0; % j is frame index
 
 while i<nEnd
-    tag = typecast(b(i+(0:1)), 'uint32'); i=i+2;
+    tag = b(i+(0:1)); i=i+2;
+    if be, tag = swapbytes(tag); end
+    tag = typecast(tag, 'uint32');
     n = typecast(b(i+(0:1)), 'uint32'); i=i+2; % n may be 0xffff ffff
+    if be, n = swapbytes(n); end
     if tag ~= 3758161918, return; end % only do FFFE E000, Item
     if isPerFrameSQ && ~ischar(iFrames)
         if j==0, i0 = i; j = 1; % always read 1st frame
@@ -382,6 +404,7 @@ while i<nEnd
             j = 2; iItem = 2;
             tag1 = char(typecast(tag1, 'uint8'));
             tag1 = tag1([3 4 1 2]);
+            if be, tag1 = tag1([2 1 4 3]); end
             ind = strfind(char(typecast(b(i0:(iPixelData+1)/2), 'uint8')), tag1);
             ind = (ind-1)/2 + i0;
             nInd = numel(ind);
@@ -415,7 +438,7 @@ while i<nEnd
         if isnumeric(name1), continue; end % 0-length or skipped item
         if tag == 4294893581, break; end % FFFE E00D ItemDelimitationItem
         if isempty(dat1), continue; end
-        if isempty(rst), tag1 = tag; end % first wanted tag in SQ
+        if isempty(rst), tag1 = tag; end % first wanted tag in PerFrame SQ
         rst.(Item_n).(name1) = dat1;
     end
 end
@@ -445,8 +468,7 @@ try %#ok in case of error, we return the original uint8
         vr = char(b(i+(1:2))); i=i+8; % vr(4), syngodt(4)
         n = typecast(b(i+(1:4)), 'int32'); i=i+8;
         if n<1, continue; end % skip name decoding, faster
-        ind = find(b(i-84+(1:64))==0, 1) - 1;
-        name = char(b(i-84+(1:ind)));
+        name = strtok(char(b(i-84+(1:64))), char(0));
         % fprintf('%s %3g %s\n', vr, n, name);
 
         dat = [];

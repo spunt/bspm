@@ -18,20 +18,22 @@ function bspm_regress_out(images, covariates, outprefix)
 if nargin<3, outprefix = 'r'; end
 if nargin<2, display('USAGE: bspm_regress_out(images, covariates, outprefix)'); return; end
 if iscell(images); images = char(images); end;
-if iscell(covariates), covariates = char(covariates); end
-if exist(covariates, 'file'), covariates = load(covariates); end
-
+if ~isnumeric(covariates)
+    if iscell(covariates), covariates = char(covariates); end
+    if exist(covariates, 'file'), covariates = load(covariates); end
+end
 % make X matrix
-X = [covariates ones(length(covariates),1)];
-
+% X = [covariates ones(length(covariates),1)];
 % load in raw timeseries
-hdr = spm_vol(images); ts = spm_read_vols(hdr);
-dims = size(ts);
-ts_rs = reshape(ts,prod(dims(1:3)),dims(4))';
-tmp = nanmean(ts_rs);
-maskidx = find(tmp>mean(tmp)/8);
+[ts, hdr]   = bspm_read_vol(images);
+dims        = size(ts);
+ts_rs       = reshape(ts,prod(dims(1:3)),dims(4))';
+ts_rs_clean = NaN(size(ts_rs));
+maskidx     = ~any(isnan(ts_rs), 1);
+% tmp = nanmean(ts_rs);
+% maskidx = find(tmp>mean(tmp)/8);
 fprintf('\nRunning Voxelwise Regression: ');
-ts_rs_clean = bspm_residuals(ts_rs, X);
+ts_rs_clean(:,maskidx) = bspm_residuals(ts_rs(:,maskidx), covariates);
 fprintf('Complete!\n');
 ts_clean = reshape(ts_rs_clean',dims);
 fprintf('Writing New Volumes: ');
@@ -43,7 +45,6 @@ for i = 1:length(hdr)
     spm_write_vol(h,ts_clean(:,:,:,i));
 end
 fprintf('Complete!\n\n');
-    
  
  
  

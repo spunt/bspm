@@ -241,9 +241,9 @@ function varargout = nii_tool(cmd, varargin)
 % 151025 Change subfunc img2datatype as 'update' for outside access
 % 151109 Include dd.win (exe) from WinAVR-20100110 for partial gz unzip
 % 151205 Partial gunzip: fix fname with space & unknown pigz | dd error.
-% 151219 Put param_file in this m file (dicm2nii and nii_viewer use from here).
 % 151222 Take care of img for intent_code 2003/2004: anyone uses it?
 % 160110 Use matlab pref method to replace para file.
+% 160120 check_gzip: use "" for included pigz; ignore dd error if err is false.
 % End of history. Don't edit this line!
 
 persistent C para; % C columns: name, length, format, value, offset
@@ -629,7 +629,7 @@ if niiVer == 1
     'bitpix'            1   'int16'     0               72
     'slice_start'       1   'int16'     0               74
     'pixdim'            8   'single'    zeros(1,8)      76
-    'vox_offset'        1   'single'    0               108
+    'vox_offset'        1   'single'    352             108
     'scl_slope'         1   'single'    1               112
     'scl_inter'         1   'single'    0               116
     'slice_end'         1   'int16'     0               120
@@ -670,7 +670,7 @@ elseif niiVer == 2
     'intent_p2'         1   'double'    0               88
     'intent_p3'         1   'double'    0               96
     'pixdim'            8   'double'    zeros(1,8)      104
-    'vox_offset'        1   'int64'     0               168
+    'vox_offset'        1   'int64'     544             168
     'scl_slope'         1   'double'    1               176
     'scl_inter'         1   'double'    0               184
     'cal_max'           1   'double'    0               192
@@ -697,7 +697,7 @@ elseif niiVer == 2
     'intent_code'       1   'int32'     0               504
     'intent_name'       16  'char*1'    ''              508
     'dim_info'          1   'uint8'     0               524
-    'unused_str'        15  'char*1'    0               525
+    'unused_str'        15  'char*1'    ''              525
     'extension'         4   'uint8'     [0 0 0 0]       540
     };
 else
@@ -782,7 +782,8 @@ elseif ispc % rename back pigz for Windows. Renamed to trick Matlab Central
     end
 end
 
-cmd = fullfile(m_dir, 'pigz -n');
+cmd = fullfile(m_dir, 'pigz');
+cmd = ['"' cmd '" -n'];
 [err, ~] = system([cmd ' -V 2>&1']);
 if ~err, return; end
 
@@ -846,8 +847,10 @@ outName = fullfile(pth, outName);
 if ~isempty(dd) && nargin>1 && ~isempty(bytes) % unzip only part of data
     try
         n = num2str(ceil(bytes/512)); % 512: default ibs
-        [err, str] = system([cmd 'c "' fname '"' dd n ' of="' outName '"']);
-        if err==0 && isempty(strfind(str, 'error')), return; end
+%         [err, str] = system([cmd 'c "' fname '"' dd n ' of="' outName '"']);
+%         if err==0 && isempty(strfind(str, 'error')), return; end
+        [err, ~] = system([cmd 'c "' fname '"' dd n ' of="' outName '"']);
+        if err==0, return; end
     catch
     end
 end

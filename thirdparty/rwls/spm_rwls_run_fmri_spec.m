@@ -1,5 +1,5 @@
 function out = spm_rwls_run_fmri_spec(job)
-% Set up the design matrix and run a design.
+% Setting up the general linear model for fMRI time-series
 % SPM job execution function
 % takes a harvested job data structure and call SPM functions to perform
 % computations on the data.
@@ -7,10 +7,9 @@ function out = spm_rwls_run_fmri_spec(job)
 % job    - harvested job data structure (see matlabbatch help)
 % Output:
 % out    - computation results, usually a struct variable.
-%_______________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+%__________________________________________________________________________
+% Modifications for RWLS toolbox - Joern Diedrichsen 
 
-% $Id: spm_rwls_run_fmri_spec.m 2948 2010-05-05 11:27:40Z joern $
 
 %-Check presence of previous analysis
 %==========================================================================
@@ -25,21 +24,20 @@ if ~exist(d,'dir')
 end
 cd(d);
 
-%-Ask about overwriting files from previous analyses...
-%-------------------------------------------------------------------
-if exist(fullfile(job.dir{1},'SPM.mat'),'file')
-    str = { 'Current directory contains existing SPM file:',...
-        'Continuing will overwrite existing file!'};
+%-Ask about overwriting files from previous analyses
+%--------------------------------------------------------------------------
+if exist(fullfile(pwd,'SPM.mat'),'file')
+    str = {'Current directory contains existing SPM file:',...
+           'Continuing will overwrite existing file!'};
     if spm_input(str,1,'bd','stop|continue',[1,0],1,mfilename);
         fprintf('%-40s: %30s\n\n',...
             'Abort...   (existing SPM file)',spm('time'));
-        return
+        out = []; return
     end
 end
 
-% If we've gotten to this point we're committed to overwriting files.
-% Delete them so we don't get stuck in spm_spm
-%------------------------------------------------------------------------
+%-Delete old analysis files
+%--------------------------------------------------------------------------
 files = {'^mask\..{3}$','^ResMS\..{3}$','^RPV\..{3}$',...
     '^beta_.{4}\..{3}$','^con_.{4}\..{3}$','^ResI_.{4}\..{3}$',...
     '^ess_.{4}\..{3}$', '^spm\w{1}_.{4}\..{3}$'};
@@ -50,6 +48,7 @@ for i=1:length(files)
         spm_unlink(deblank(j(k,:)));
     end
 end
+
 
 %-Timing parameters & Basis functions
 %==========================================================================
@@ -67,7 +66,9 @@ SPM.xBF.T0    = job.timing.fmri_t0;
 %-Basis functions
 %--------------------------------------------------------------------------
 bf = char(fieldnames(job.bases));
-if strcmp(bf,'hrf')
+if strcmp(bf,'none')
+    SPM.xBF.name = 'NONE';
+elseif strcmp(bf,'hrf')
     if all(job.bases.hrf.derivs == [0 0])
         SPM.xBF.name = 'hrf';
     elseif all(job.bases.hrf.derivs == [1 0])
@@ -98,9 +99,12 @@ end
 %--------------------------------------------------------------------------
 SPM.xBF.Volterra = job.volt;
 
+
 %-Data & Design
 %==========================================================================
+
 design_only = ~isfield(job,'mask');
+
 if ~design_only
     SPM.xY.P = [];
 end
@@ -155,8 +159,17 @@ for i = 1:numel(job.sess)
             %-Mutiple Conditions: names, onsets and durations
             %--------------------------------------------------------------
             cond.name     = multicond.names{j};
+            if isempty(cond.name)
+                error('MultiCond file: sess %d cond %d has no name.',i,j);
+            end
             cond.onset    = multicond.onsets{j};
+            if isempty(cond.onset)
+                error('MultiCond file: sess %d cond %d has no onset.',i,j);
+            end
             cond.duration = multicond.durations{j};
+            if isempty(cond.onset)
+                error('MultiCond file: sess %d cond %d has no duration.',i,j);
+            end
             
             %-Mutiple Conditions: Time Modulation
             %--------------------------------------------------------------
@@ -192,7 +205,11 @@ for i = 1:numel(job.sess)
             
             %-Mutiple Conditions: Orthogonalisation of Modulations
             %--------------------------------------------------------------
-            cond.orth        = true;
+            if isfield(multicond,'orth') && (j <= numel(multicond.orth))
+                cond.orth    = multicond.orth{j};
+            else
+                cond.orth    = true;
+            end
             
             %-Append to singly-specified conditions
             %--------------------------------------------------------------
@@ -225,9 +242,17 @@ for i = 1:numel(job.sess)
         P  = [];
         q1 = 0;
         %-Time Modulation
+        switch job.timing.units
+            case 'secs'
+                sf    = 1 / 60;
+            case 'scans'
+                sf    = job.timing.RT / 60;
+            otherwise
+                error('Unknown unit "%s".',job.timing.units);
+        end
         if cond.tmod > 0
             P(1).name = 'time';
-            P(1).P    = U(j).ons * job.timing.RT / 60;
+            P(1).P    = U(j).ons * sf;
             P(1).h    = cond.tmod;
             q1        = 1;
         end
@@ -332,28 +357,27 @@ else
     SPM.factor = [];
 end
 
-% Globals
-%-------------------------------------------------------------
+%-Globals
+%--------------------------------------------------------------------------
 SPM.xGX.iGXcalc = job.global;
-SPM.xGX.sGXcalc = 'mean voxel value';
-SPM.xGX.sGMsca  = 'session specific';
 
 %-Masking threshold
 %--------------------------------------------------------------------------
 SPM.xM.gMT = job.mthresh;
 
-% High Pass filter
-%-------------------------------------------------------------
+%-High Pass filter
+%--------------------------------------------------------------------------
 for i = 1:numel(job.sess),
     SPM.xX.K(i).HParam = job.sess(i).hpf;
 end
 
-% Autocorrelation
-%-------------------------------------------------------------
+%-Autocorrelation
+%--------------------------------------------------------------------------
 SPM.xVi.form = job.cvi;
 
-% Let SPM configure the design
-%-------------------------------------------------------------
+
+%-Setting up the GLM
+%==========================================================================
 SPM = spm_rwls_fmri_spm_ui(SPM);
 
 %-Explicit mask
@@ -378,4 +402,3 @@ out.spmmat{1} = fullfile(pwd, 'SPM.mat');
 %-Change back directory
 %--------------------------------------------------------------------------
 cd(cwd);
-
