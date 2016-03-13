@@ -43,8 +43,7 @@ function bspm_imcalc(in, outname, operation)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<3, disp('USAGE: bspm_imcalc(in, outname, operation)'); return, end
+if nargin<3, mfile_showhelp; return; end
 
 % | check variable formats
 if ischar(in), in = cellstr(in); end
@@ -321,7 +320,12 @@ end
 Vo = spm_write_vol(Vo,Y);
 
 end  
- 
+function mfile_showhelp(varargin)
+% MFILE_SHOWHELP
+ST = dbstack('-completenames');
+if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; end
+eval(sprintf('help %s', ST(2).file));  
+end
  
  
  
