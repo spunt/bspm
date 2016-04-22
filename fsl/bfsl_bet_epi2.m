@@ -16,8 +16,6 @@ function bfsl_bet_epi2(epi, outprefix)
 if nargin<2, outprefix = 'b'; end
 if nargin<1, disp('USAGE: bfsl_bet_epi2(epi, outprefix)'); return; end
 if iscell(epi), epi = char(epi); end
-
-% | skull strip first image
 fprintf('\n | - Running BET'); 
 [p, n, e] = fileparts(epi);
 output  = [p filesep outprefix n '.nii.gz'];

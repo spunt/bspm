@@ -2,7 +2,7 @@ home; clear all
 
 % | options
 runit.omitvols      = 0; 
-runit.slicetime     = 1;
+runit.slicetime     = 0;
 opt.slice_times     = 0; % 1 do slice-timing using actual times, 0 will do using order
 opt.coreg_epi2t1    = 0; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
 runit.segment       = 1;
@@ -41,7 +41,7 @@ if ~isempty(omitpat), subdirs(cellstrfind(subdirs, omitpat)) = []; end
 
 % | Omit Initial Volumes
 if runit.omitvols
-    omitpat = {'fad*1-000001*nii' 'fad*2-000002*nii' 'fad*3-000003*nii' 'fad*4-000004*nii'};
+    omitpat = {'fad*_00001.nii' 'fad*_00002*nii'};
     bspm_omit_vols(fullfile(path.study, pattern.subdir, 'raw', pattern.epidir), omitpat);
 end
 

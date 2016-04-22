@@ -15,7 +15,7 @@ function bspm_reorient_batch(imdirs)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin < 1, error('USAGE: bspm_reorient_batch(imdirs)'); end
+if nargin < 1, disp('USAGE: bspm_reorient_batch(imdirs)'); end
 if ~ischar(imdirs), imdirs = cellstr(imdirs); end
 basedir = pwd;
 ndir = length(imdirs);

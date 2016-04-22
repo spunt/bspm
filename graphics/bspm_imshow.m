@@ -17,10 +17,10 @@ if iscell(im), im = im{1}; end
 if ischar(im), im = spm_vol(im); im = spm_read_vols(im); end
 
 imsize = size(im);
-if isempty(slices), 
+if isempty(slices)
     msize = [3 5];
     nim = prod(msize);
-    slices = 1:floor(imsize(3)/nim):imsize(3); 
+    slices = 1:floor(imsize(3)/nim):imsize(3);
 else
     msize = [1 length(slices)];
     nim = prod(msize);

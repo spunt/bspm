@@ -753,23 +753,7 @@ for i = 1:nRun
         error('Image with 5 or more dim not supported: %s', s.NiftiName);
     end
     img(:, :, :, 2:nFile) = 0; % pre-allocate
-    for j = 2:nFile
-        try
-            img(:,:,:,j) = dicm_img(h{i}{j}, 0);
-        catch
-            tmpim = dicm_img(h{i}{j}, 0);
-            if size(tmpim, 4)==2
-                tmpim = squeeze(tmpim);
-                if isequal(tmpim(:,:,1), tmpim(:,:,2))
-                    img(:,:,:,j) = tmpim(:,:,1);
-                else
-                    emsg = sprintf('\n\nProblem with dimensions of\n\t%s\nGIVING UP...\n\n', h{i}{j}.Filename); 
-                    error(emsg);
-                end
-            end
-        end
-    end
-%     for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
+    for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
     if size(img,3)<2, img = permute(img, [1 2 4 3]); end % put frames into dim3
     
     if tryGetField(s, 'SamplesPerPixel', 1) > 1 % color image
@@ -866,6 +850,7 @@ for i = 1:nRun
     h{i} = h{i}{1}; % keep 1st dicm header only
     if isnumeric(h{i}.PixelData), h{i} = rmfield(h{i}, 'PixelData'); end % BV
 end
+
 h = cell2struct(h, fnames, 2); % convert into struct
 fname = [dataFolder 'dcmHeaders.mat'];
 if exist(fname, 'file') % if file exists, we update fields only
