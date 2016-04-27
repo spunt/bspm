@@ -48,10 +48,7 @@ if nan2zero, bspm_batch_imcalc(cons, '', 'nan2zero'); end
 if isempty(outdir)
     
     % | Contrast Name
-    hdr = spm_vol(cons{1});
-    idx = strfind(hdr.descrip,':');
-    cname = hdr.descrip(idx+1:end);
-    cname = strtrim(regexprep(cname,'- All Sessions',''));
+    cname = char(bspm_con2name(cons{1}));
     
     % | Analysis Name
     [p, level1name]  = fileparts(fileparts(cons{1})); 
@@ -69,14 +66,15 @@ if isempty(outdir)
     if ~isdir(gasubdir), mkdir(gasubdir); end
     
 end
+
 if ~isdir(outdir), mkdir(outdir); end
 
 % | PCTGROUP (IF APPLICABLE)
 if ~isempty(pctgroup)
     if ~isempty(mask)
-        [d,h] = bspm_read_vol(cons, 'mask', mask);
+        [d,h,info] = bspm_read_vol(cons, 'mask', mask, 'maskthresh', .10);
     else
-        [d,h] = bspm_read_vol(cons); 
+        [d,h,info] = bspm_read_vol(cons); 
     end
     d(isnan(d)) = 0; 
     m = double(sum(d~=0, 4))/length(cons);

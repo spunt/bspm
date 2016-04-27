@@ -1,6 +1,8 @@
 function matlabbatch = bspm_dartel_norm_con(analysisdirs, flowfields, template, voxsize, fwhm)
 % BSPM_DARTEL_NORM_CON
 %
+%   USAGE: matlabbatch = bspm_dartel_norm_con(analysisdirs, flowfields, template, voxsize, fwhm)
+%
 %   ARGUMENTS:
 %       analysisdirs = analysis dirs containg con*img files
 %       flowfields = flowfields (i.e. u_rc1*) (same length/order as images)
@@ -15,8 +17,7 @@ function matlabbatch = bspm_dartel_norm_con(analysisdirs, flowfields, template, 
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
-if nargin<3, error('USAGE: bspm_dartel_norm_func(analysisdirs, flowfields, template, voxsize, fwhm)'); end
+if nargin<3, mfile_showhelp; return; end
 if nargin<4, voxsize = 3; end
 if nargin<5, fwhm = 8; end
 if length(fwhm)==1, fwhm = repmat(fwhm,1,3); end
@@ -28,25 +29,26 @@ nsubs = length(analysisdirs);
 matlabbatch{1}.spm.tools.dartel.mni_norm.template = cellstr(template);
 cnames = cell(nsubs,1);
 for s = 1:nsubs
-    cim = files([analysisdirs{s} filesep 'con*img']);
-    tmp = spm_vol(char(cim));
-    cnames{s} = {tmp.descrip};
+    cim         = files([analysisdirs{s} filesep 'con*img']);
     if isempty(cim), cim = files([analysisdirs{s} filesep 'con*nii']); end
+    tmp         = spm_vol(char(cim));
+    cnames{s}   = {tmp.descrip};
     if isempty(cim), error('No contrast images found in %s', analysisdirs{s}); end
-    cim = strcat(cim, ',1');
     matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).flowfield = flowfields(s);
-    matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).images = cim;
+    matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).images    = cim;
 end
 matlabbatch{1}.spm.tools.dartel.mni_norm.vox = voxsize;
 matlabbatch{1}.spm.tools.dartel.mni_norm.bb = [-78 -112 -50; 78 76 85];
 matlabbatch{1}.spm.tools.dartel.mni_norm.preserve = 0;
 matlabbatch{1}.spm.tools.dartel.mni_norm.fwhm = fwhm;
+
 if nargout==0
     spm_jobman('initcfg'); spm_jobman('run',matlabbatch);
     for s = 1:nsubs
         cc = cnames{s};
         basename = sprintf('%s/s%dw%d', analysisdirs{s}, fwhm(1), voxsize(1));
         wim = files([analysisdirs{s} filesep 'sw*img']);
+        if isempty(wim), wim = files([analysisdirs{s} filesep 'sw*nii']); end
         for i = 1:length(wim)
             h = spm_vol(wim{i});
             d = spm_read_vols(h);
@@ -59,5 +61,3 @@ if nargout==0
     end
 end
 end
-
-

@@ -45,7 +45,7 @@ if isfield(job.method,'Classical'),
     
     %-Automatically set up contrasts for factorial designs
     %-------------------------------------------------------------------
-    if isfield(SPM,'factor')
+    if isfield(SPM,'factor') && ~isempty(SPM.factor)
         if SPM.factor(1).levels > 1
         % don't both if you've only got 1 level and 1 factor
             cons = spm_design_contrasts(SPM);

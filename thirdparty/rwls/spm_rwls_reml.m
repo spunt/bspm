@@ -64,8 +64,9 @@ try, N; catch, N  = 1;  end
  
 % default number of iterations
 %--------------------------------------------------------------------------
-try, K; catch, K  = 64; end
- 
+% try, K; catch, K  = 64; end
+try, K; catch, K  = 256; end % BS 2016-04-27
+
 % initialise h
 %--------------------------------------------------------------------------
 n     = length(Q{1});

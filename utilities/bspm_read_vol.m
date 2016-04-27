@@ -12,6 +12,8 @@ function [data, hdr, info] = bspm_read_vol(in, varargin)
 %       'zscoretime'  - zscores the image data by time
 %       'implicit'- NaNs voxels less than 10% of the mean
 %       'mask' - (must pair with filename)
+%       'maskthresh' - (default is any non-zero value, must be paied with
+%       value)
 %       'reslice' - (must pair with reference filename)
 %       
 
@@ -32,6 +34,14 @@ hdr     = spm_vol(char(in));
 data    = spm_read_vols(hdr);
 nvol    = length(hdr);
 if optional
+    
+    if ~ismember('maskthresh', cellnum2str(varargin))
+        maskthresh = 0; 
+    else
+        argidx = find(ismember(cellnum2str(varargin), 'maskthresh'));
+        maskthresh = varargin{argidx + 1};
+        varargin(argidx:argidx+1) = []; 
+    end
     varargin = lower(varargin);
     if ismember('reslice', varargin) 
         ref = varargin{find(ismember(varargin, 'reslice'))+1};
@@ -70,18 +80,18 @@ if optional
             mask = bspm_reslice(maskfile, hdr(1).fname, 1, 1);
         end
         if length(datadim)==3 datadim(4) = 1; end
-        tmp = data;
-        tmp = reshape(tmp, prod(datadim(1:3)), datadim(4)); 
-        tmp(mask(:)~=1,:) = NaN;
-        data = reshape(tmp, datadim);
+        tmp          = data;
+        tmp          = reshape(tmp, prod(datadim(1:3)), datadim(4));
+        tmp(mask(:)<=maskthresh,:) = NaN;
+        data         = reshape(tmp, datadim);
     end
     if ismember('reshape', varargin);
         if length(datadim)==3 datadim(4) = 1; end
         data = reshape(data, prod(datadim(1:3)), datadim(4));
         if ismember('zscoretime', varargin);
-            d = bsxfun(@minus, data', nanmean(data'));
-            d = bsxfun(@rdivide, d, nanstd(d));
-            data = d';
+            d       = bsxfun(@minus, data', nanmean(data'));
+            d       = bsxfun(@rdivide, d, nanstd(d));
+            data    = d';
         end
         if ismember('zscore', varargin);
             for i = 1:size(data,2), data(~isnan(data(:,i)),i) = zscore(data(~isnan(data(:,i)),i)); end
@@ -91,23 +101,49 @@ if optional
     if ismember('zscoretime', varargin);
         if nvol>1
             data = reshape(data, prod(datadim(1:3)), datadim(4));
-            d = bsxfun(@minus, data', nanmean(data'));
-            d = bsxfun(@rdivide, d, nanstd(d));
+            d    = bsxfun(@minus, data', nanmean(data'));
+            d    = bsxfun(@rdivide, d, nanstd(d));
             data = d';
             data = reshape(data, datadim);
         end  
     end
 end
 if nargout==3
-    info.dim = size(data);
-    info.nvalid = sum(~isnan(data(:)));
-    info.mean = nanmean(data(:));
+    info.dim    = size(data);
+    info.n_nan  = sum(isnan(data(:)));
+    info.n_zero = sum(data(:)==0);
+    info.mean   = nanmean(data(:));
     info.median = nanmedian(data(:));
-    info.std = nanstd(data(:)); 
-    info.max = nanmax(data(:));
-    info.min = nanmin(data(:));
+    info.std    = nanstd(data(:));
+    info.max    = nanmax(data(:));
+    info.min    = nanmin(data(:));
 end
- 
- 
- 
- 
+end
+function out = cellnum2str(in, ndec, leftzeropad)
+    % CELLNUM2STR 
+    %
+    %  USAGE: out = cellnum2str(in, ndec, leftzeropad)
+    % __________________________________________________________________________
+    %  INPUTS
+    %   in:     numeric cell array
+    %   ndec:   number of decimal points to display
+    %
+
+    % ---------------------- Copyright (C) 2015 Bob Spunt ----------------------
+    %   Created:  2015-01-13
+    %   Email:    spunt@caltech.edu
+    % __________________________________________________________________________
+    if nargin < 1, mfile_showhelp; return; end
+    if nargin < 2, ndec = 3; end
+    if nargin < 3, leftzeropad = 1; end
+    if ~iscell(in), error('Input array must be cell!'); end
+    numidx                  = cell2mat(cellfun(@isnumeric, in, 'Unif', false))==1;
+    out                     = in;
+    innum                   = in(numidx);
+    decidx                  = mod(cell2mat(innum), 1) > 0;
+    outnum                  = innum;
+    outnum(~decidx)         = cellfun(@num2str, innum(~decidx), 'Unif', false);
+    outnum(decidx)          = cellfun(@num2str, innum(decidx), repmat({['%2.' num2str(ndec) 'f']}, size(innum(decidx))), 'Unif', false);
+    if ~leftzeropad, outnum = regexprep(outnum, '0\.', '\.'); end
+    out(numidx)             = outnum;
+end

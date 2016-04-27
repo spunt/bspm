@@ -7,8 +7,11 @@ if nargin==0, mfile_showhelp; return; end
 if iscell(con), con = char(con); end
 h       = spm_vol(con);
 name    = {h.descrip}';
-name    = regexprep(name, '.*\d+:\s', '');
-name    = regexprep(name, '\s\W\sAll\sSessions', '');
+rmpat   = {
+    '.*\d+:\s' 
+    '(\s\W\sAll\sS\w*)$'
+    };
+for i = 1:length(rmpat), name = regexprep(name, rmpat{i}, ''); end
 name    = regexprep(name, '\s', '_'); 
 if numberit
     ncon = length(name);

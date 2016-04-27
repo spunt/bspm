@@ -43,7 +43,7 @@ gnames = {'MEAN' 'SD' 'MAX'};
 sub = [sub gnames];
 disptable(data,cols,sub,'%2.2f');
 if writereport
-    outname = sprintf('motion_report_%s.xls', bspm_timestamp);
+    outname = sprintf('motion_report_%s.xlsx', bspm_timestamp);
     allcell = [[{''} cols]; [sub' num2cell(data)]];
     xlwrite(outname, allcell);
 end
