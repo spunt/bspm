@@ -168,10 +168,7 @@ if nan2zero, bspm_batch_imcalc(cons, '', 'nan2zero'); end
 if isempty(outdir)
     
     % | Contrast Name
-    hdr = spm_vol(cons{1});
-    idx = strfind(hdr.descrip,':');
-    cname = hdr.descrip(idx+1:end);
-    cname = strtrim(regexprep(cname,'- All Sessions',''));
+    cname = char(bspm_con2name(cons{1}));
     
     % | Analysis Name
     [p, level1name]  = fileparts(fileparts(cons{1})); 

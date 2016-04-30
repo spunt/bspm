@@ -1,5 +1,5 @@
 function allinput = wrapper_level1_surf2(covidx, varargin)
-% matlabbatch = wrapper_level1_surf2(covidx, varargin)
+% allinput = wrapper_level1_surf2(covidx, varargin)
 %
 % To show default settings, run without any arguments
 %
@@ -14,14 +14,14 @@ function allinput = wrapper_level1_surf2(covidx, varargin)
 defaults = {
            'studydir',    '/Users/bobspunt/Documents/fmri/dog', ...
            'studyname',   'dog',                                ...
-           'nuisancepat', 'rp*.txt',                ...
-           'epipat',      'lswbua*nii',                           ...
+           'nuisancepat', 'badscan_s6w2_grey*.txt',                ...
+           'epipat',      'swbua*nii',                           ...
            'subid',       'RA*',                                ...
            'runid',       'EP*SURF2*',                          ...
            'behavid',     'surf2*mat',                          ...
            'rateid',      'rate*mat',                           ...
            'basename',    'SURF2',                              ...
-           'tag',         's0w2',                               ...
+           'tag',         's6w2badscan',                               ...
            'brainmask',   '',                                   ...
            'epifname',    [],                                   ...
            'model',       '2X3',                                ...
@@ -217,6 +217,12 @@ for s = 1:length(subdir)
                    -2  1  1 -2  1  1;
                     1  1  1 -1 -1 -1; 
                     0  1  1  0 -1 -1;
+                    1 -1  0  0  0  0;
+                    1  0 -1  0  0  0;
+                    0  1 -1  0  0  0;
+                    0  0  0  1 -1  0;
+                    0  0  0  1  0 -1;
+                    0  0  0  0  1 -1;
                     ];
     w2pos = w2;w2pos(w2<0) = 0;
     wscale = sum(w2pos, 2);
@@ -344,13 +350,13 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     
     % | summarize
     % | ========================================================================
-    b.summary.ntrial = ntrial; 
-    b.summary.ncond = ncond;
+    b.summary.ntrial        = ntrial;
+    b.summary.ncond         = ncond;
     b.summary.percentnoresp = 100*(sum(nridx)/ntrial);
-    b.summary.percenterror = 100*(sum(data(:,11))/ntrial);
-    varidx = [6 5 7:10];
-    b.summary.varlabels = b.varlabels(varidx);
-    b.summary.data = zeros(ncond, length(varidx)); 
+    b.summary.percenterror  = 100*(sum(data(:,11))/ntrial);
+    varidx                  = [6 5 7:10];
+    b.summary.varlabels     = b.varlabels(varidx);
+    b.summary.data          = zeros(ncond, length(varidx));
     for i = 1:ncond
         cdata = b.data(b.data(:,2)==i, varidx);
         tmp = nanmean(cdata);

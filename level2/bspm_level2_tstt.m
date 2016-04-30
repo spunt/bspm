@@ -47,10 +47,7 @@ end
 if isempty(outdir)
     
     % | Contrast Name
-    hdr     = spm_vol(cons1{1});
-    idx     = strfind(hdr.descrip,':');
-    cname   = hdr.descrip(idx+1:end);
-    cname   = strtrim(regexprep(cname,'- All Sessions',''));
+    cname = char(bspm_con2name(cons1{1}));
     
     % | Analysis Name
     [p, level1name] = fileparts(fileparts(cons1{1})); 

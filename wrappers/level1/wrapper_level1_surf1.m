@@ -1,5 +1,5 @@
-function matlabbatch = wrapper_level1_surf1(pmidx, varargin)
-% matlabbatch = wrapper_level1_surf1(covidx, varargin)
+function allinput = wrapper_level1_surf1(pmidx, varargin)
+% mallinput = wrapper_level1_surf1(pmidx, varargin)
 %
 % To show default settings, run without any arguments.
 %
@@ -14,25 +14,26 @@ function matlabbatch = wrapper_level1_surf1(pmidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Documents/fmri/dog',            ...
-            'studyname',        'dog',          ...
-            'HPF',              100,            ...
-            'armethod',         2,              ... 
-            'nuisancepat',      'bad*txt',      ...
-            'epipat',           'swbua*nii*',     ...
-            'subid',            'RA*',          ...
-            'runid',            'EP*SURF1*',    ...
-            'behavid',          'surf1*mat',    ...
-            'rateid',           'rate*mat',     ...
-            'basename',         'SURF1',        ...
-            'brainmask',        '',             ...
-            'fcontrast',        0,              ...
-            'nskip',            4,              ...
-            'runtest',          0,              ...
-            'is4D',             1,              ...
-            'TR',               1,              ...
-            'yesnokeys',        [1 2]           ...
-             };
+         'studydir',    '/Users/bobspunt/Documents/fmri/dog', ...
+         'studyname',   'dog',                                ...
+         'HPF',         100,                                  ...
+         'armethod',    2,                                    ...
+         'nuisancepat', 'rp*txt',                             ...
+         'epipat',      'swbua*nii*',                         ...
+         'subid',       'RA*',                                ...
+         'runid',       'EP*SURF1*',                          ...
+         'tag',         's6w2rp',                             ...
+         'behavid',     'surf1*mat',                          ...
+         'rateid',      'rate*mat',                           ...
+         'basename',    'SURF1',                              ...
+         'brainmask',   '',                                   ...
+         'fcontrast',   0,                                    ...
+         'nskip',       4,                                    ...
+         'runtest',     0,                                    ...
+         'is4D',        1,                                    ...
+         'TR',          1,                                    ...
+         'yesnokeys',   [1 2]                                 ...
+         };
 vals = setargs(defaults, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
@@ -52,7 +53,7 @@ if ~isempty(pmidx)
 else
     pmstr = 'None'; 
 end
-analysisname  = sprintf('%s_Pmodby_%s_%s_%ds_%s', basename, ...
+analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, tag, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
@@ -129,9 +130,9 @@ for s = 1:length(subdir)
             runs(r).conditions(c).durations = b.data(b.data(:,2)==c, 4);
             if ~isempty(pmidx) && c < 4
                 for p = 1:length(modelpmnames)
-                    runs(r).conditions(c).parameters(p).name    = strcat(b.condlabels{c}, {'_'}, modelpmnames{p}); 
-                    allcondname = [allcondname {strcat(b.condlabels{c}, {'_'}, modelpmnames{p})}]; 
-                    runs(r).conditions(c).parameters(p).values  = modelpm(b.data(:,2)==c, p) - modelpm(b.data(:,2)==c, p); 
+                    runs(r).conditions(c).parameters(p).name    = strcat(b.condlabels{c}, '_', modelpmnames{p});
+                    allcondname = [allcondname strcat(b.condlabels{c}, {'_'}, modelpmnames{p})]; 
+                    runs(r).conditions(c).parameters(p).values  = modelpm(b.data(:,2)==c, p) - mean(modelpm(b.data(:,2)==c, p));
                 end
             end
         end
@@ -158,6 +159,7 @@ for s = 1:length(subdir)
     % | Contrasts
     % | ========================================================================
     ncond   = length(allcondname); 
+    
     rmidx   = ismember(allcondname, {'Scramble' 'Catch'});
     w1      = eye(ncond);
     w1(find(rmidx), :) = [];
@@ -187,7 +189,7 @@ for s = 1:length(subdir)
 
     % | Make Job
     % | ========================================================================
-    matlabbatch = [matlabbatch bspm_level1(images, general_info, runs, contrasts)]; 
+    allinput{s} = bspm_level1(images, general_info, runs, contrasts); 
 
     % | Cleanup Workspace
     % | ========================================================================
@@ -199,62 +201,64 @@ end
 % * SUBFUNCTIONS
 % =========================================================================
 function b = get_behavior(in, rate)
-    % GET_BEHAVIOR
-    %
-    %   USAGE: b = get_behavior(in)
-    %       
-    %       in      behavioral data filename (.mat)
-    %
-    %       Columns for b.data
-    %          1 - Trial #
-    %          2 - Cond
-    %          3 - Onset
-    %          4 - Duration
-    %          5 - Signed Valence Rating (1=Very Bad, 9=Very Good)
-    %          6 - Signed Valence Rating RT
-    %          7 - Unsigned Valence Rating 
-    %          8 - Understanding Rating (1=Not at all, 9=Completely)
-    %          9 - Understanding Rating RT
-    %
-    % RATINGS
-    %   1 - How does the photograph make you feel? (1=Very Bad, 9=Very Good)
-    %   2 - Do you understand what he or she is feeling? (1=Not at all, 9=Completely)
-    %
-    % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
-    % =========================================================================
-    if nargin < 2, error('USAGE: b = get_behavior(in, rate)'); end
-    if iscell(in), in = char(in); end
-    if iscell(rate), rate = char(rate); end
+% GET_BEHAVIOR
+%
+%   USAGE: b = get_behavior(in)
+%       
+%       in      behavioral data filename (.mat)
+%
+%       Columns for b.data
+%          1 - Trial #
+%          2 - Cond
+%          3 - Onset
+%          4 - Duration
+%          5 - Signed Valence Rating (1=Very Bad, 9=Very Good)
+%          6 - Signed Valence Rating RT
+%          7 - Unsigned Valence Rating 
+%          8 - Understanding Rating (1=Not at all, 9=Completely)
+%          9 - Understanding Rating RT
+%
+% RATINGS
+%   1 - How does the photograph make you feel? (1=Very Bad, 9=Very Good)
+%   2 - Do you understand what he or she is feeling? (1=Not at all, 9=Completely)
+%
+% CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
+% =========================================================================
+if nargin < 2, error('USAGE: b = get_behavior(in, rate)'); end
+if iscell(in), in = char(in); end
+if iscell(rate), rate = char(rate); end
 
-    % | read task data
-    % | ========================================================================
-    d = load(in);
-    b.subjectID     = d.subjectID;
-    [~,b.stimulus]  = cellfun(@fileparts, d.slideName', 'unif', false); 
-    b.condlabels    = {'Human' 'Monkey' 'Dog' 'Scramble' 'Catch'};
-    b.varlabels     = {'Trial' 'Cond' 'Onset' 'Duration' 'Signed_Valence' 'Valence_RT' 'Unsigned_Valence' 'Understanding' 'Understanding_RT'};
-    data            = d.Seeker;
-    b.percentcaught = 100*(sum(data(:,3)==1 & data(:,7)==1)/sum(data(:,3)==1));
-    data(data(:,3)==1, 2) = 5; % catch trials 
-    data(data(:,8)==0, 8) = 1.75; % duration
-    stimidx = data(data(:,2) < 4, 4); 
-    b.data = data(:,[1 2 6 8]);
-    b.data(:,5:8) = NaN; 
-     
-    % | read rating data
-    % | ========================================================================
-    r = load(rate); 
-    ratedata        = r.Seeker;
-    [~, ratestim]   = cellfun(@fileparts, r.slideName', 'unif', false);
-    % 1 - How does the photograph make you feel? (1=Very Bad, 9=Very Good)
-    valence         = ratedata(ratedata(:,2)==1, [1 3 4]); 
-    valence         = sortrows(valence, 1);
-    b.data(data(:,2)<4, 5:6) = valence(stimidx, 2:3);
-    b.data(data(:,2)<4, 7) = abs(5 - valence(stimidx,2));
-    % 2 - Do you understand what he or she is feeling? (1=Not at all, 9=Completely)
-    understand      = ratedata(ratedata(:,2)==2, [1 3 4]);
-    understand      = sortrows(understand, 1); 
-    b.data(data(:,2)<4, 8:9) = understand(stimidx, 2:3); 
-      
+% | read task data
+% | ========================================================================
+d = load(in);
+b.subjectID     = d.subjectID;
+[~,b.stimulus]  = cellfun(@fileparts, d.slideName', 'unif', false);
+b.condlabels    = {'Human' 'Monkey' 'Dog' 'Scramble' 'Catch'};
+b.varlabels     = {'Trial' 'Cond' 'Onset' 'Duration' 'Signed_Valence' 'Valence_RT' 'Unsigned_Valence' 'Understanding' 'Understanding_RT'};
+data            = d.Seeker;
+b.percentcaught = 100*(sum(data(:,3)==1 & data(:,7)==1)/sum(data(:,3)==1));
+data(data(:,3)==1, 2) = 5; % catch trials 
+data(data(:,8)==0, 8) = 1.75; % duration
+stimidx = data(data(:,2) < 4, 4);
+b.data = data(:,[1 2 6 8]);
+b.data(:,5:8) = NaN;
+
+% | read rating data
+% | ========================================================================
+r = load(rate); 
+ratedata        = r.Seeker;
+[~, ratestim]   = cellfun(@fileparts, r.slideName', 'unif', false);
+
+% 1 - How does the photograph make you feel? (1=Very Bad, 9=Very Good)
+valence         = ratedata(ratedata(:,2)==1, [1 3 4]); 
+valence         = sortrows(valence, 1);
+b.data(data(:,2)<4, 5:6) = valence(stimidx, 2:3);
+b.data(data(:,2)<4, 7) = abs(5 - valence(stimidx,2));
+
+% 2 - Do you understand what he or she is feeling? (1=Not at all, 9=Completely)
+understand      = ratedata(ratedata(:,2)==2, [1 3 4]);
+understand      = sortrows(understand, 1); 
+b.data(data(:,2)<4, 8:9) = understand(stimidx, 2:3); 
+
 end    
 

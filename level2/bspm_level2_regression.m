@@ -44,10 +44,7 @@ nreg = length(regressors);
 if isempty(outdir)
     
     % | Contrast Name
-    hdr     = spm_vol(cons{1});
-    idx     = strfind(hdr.descrip,':');
-    cname   = hdr.descrip(idx+1:end);
-    cname   = strtrim(regexprep(cname,'- All Sessions',''));
+    cname = char(bspm_con2name(cons{1}));
     
     % | Regressors
     regname = strcat('_', {regressors.name});
