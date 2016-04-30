@@ -1,4 +1,4 @@
-function allinput = wrapper_level1_surf2(covidx, varargin)
+function allinput = wrapper_level1_surf2_qwise(covidx, varargin)
 % allinput = wrapper_level1_surf2(covidx, varargin)
 %
 % To show default settings, run without any arguments
@@ -20,15 +20,15 @@ defaults = {
            'runid',       'EP*SURF2*',                          ...
            'behavid',     'surf2*mat',                          ...
            'rateid',      'rate*mat',                           ...
-           'basename',    'SURF2',                              ...
+           'basename',    'SURF2_QWISE',                              ...
            'tag',         's6w2rp',                               ...
            'brainmask',   '',                                   ...
            'epifname',    [],                                   ...
-           'model',       '2X3',                                ...
+           'model',       'QWISE',                                ...
            'HPF',         100,                                  ...
            'armethod',    2,                                    ...
            'junkerrors',  0,                                    ...
-           'fcontrast',   1,                                    ...
+           'fcontrast',   0,                                    ...
            'nskip',       4,                                    ...
            'runtest',     0,                                    ...
            'is4D',        1,                                    ...
@@ -127,7 +127,13 @@ for s = 1:length(subdir)
         if isempty(images{r}), error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); end
         b = get_behavior(behav{r}, rate, yesnokeys, junkerrors);
         b.data(:,4) = b.data(:,4) - adjons;
-        
+        ncond = length(b.qwise.condlabels);
+        if any(b.data(:,2)==7)
+            b.qwise.condidx(b.data(:,2)==7) = ncond + 1;
+            b.qwise.condlabels{end + 1} = 'No_Response';
+            ncond = ncond + 1; 
+        end
+            
         % | Columns for b.data
         % | =====================================================================
         % 01 - Trial
@@ -144,17 +150,17 @@ for s = 1:length(subdir)
 
         % | Conditions
         % | =====================================================================
-        for c = 1:length(b.condlabels)
-            runs(r).conditions(c).name      = b.condlabels{c};
-            runs(r).conditions(c).onsets    = b.data(b.data(:,2)==c, 4);
-            runs(r).conditions(c).durations = b.data(b.data(:,2)==c, 5);
+        for c = 1:ncond
+            runs(r).conditions(c).name      = b.qwise.condlabels{c};
+            runs(r).conditions(c).onsets    = b.data(b.qwise.condidx==c, 4);
+            runs(r).conditions(c).durations = b.data(b.qwise.condidx==c, 5);
         end
 
         % | Floating Parametric Modulators
         % | =====================================================================
         if ~isempty(covidx)
-            valididx        = b.data(:,2) < 7; 
-            allpm           = b.data(valididx, [5 6 3]); 
+            valididx        = b.data(:,2) < 7;
+            allpm           = b.data(valididx, [5 6 3]);
             modelpm         = allpm(:,covidx);
             modelpmnames    = pmnames;
             novaridx = find(nanstd(modelpm)==0);
@@ -199,45 +205,21 @@ for s = 1:length(subdir)
     % 4 - How_Human
     % 5 - How_Primate
     % 6 - How_Dog
-
-    ncond           = b.summary.ncond; 
-    b.condlabels    = b.condlabels(1:ncond); 
-    w1              = eye(ncond);
-    w2              =   [
-                    1  0  0 -1  0  0; 
-                    0  1  0  0 -1  0; 
-                    0  0  1  0  0 -1; 
-                   -1  1  0  1 -1  0; 
-                   -1  0  1  1  0 -1; 
-                   -1  1  0 -1  1  0; 
-                   -1  0  1 -1  0  1;
-                    0  1 -1  0  1 -1;
-                    0  1 -1  0 -1  1;
-                   -2  1  1  2 -1 -1;
-                   -2  1  1 -2  1  1;
-                    1  1  1 -1 -1 -1; 
-                    0  1  1  0 -1 -1;
-                    1 -1  0  0  0  0;
-                    1  0 -1  0  0  0;
-                    0  1 -1  0  0  0;
-                    0  0  0  1 -1  0;
-                    0  0  0  1  0 -1;
-                    0  0  0  0  1 -1;
-                    ];
-    w2pos = w2;w2pos(w2<0) = 0;
-    wscale = sum(w2pos, 2);
-    w2 = w2./repmat(wscale, 1, size(w2, 2));
-    w2pos = w2;w2pos(w2<0) = 0;
-    wscale = sum(w2pos, 2);
-    w2 = w2./repmat(wscale, 1, size(w2, 2));
-    weights = w1; 
-    weights(end+1:end+size(w2,1),:) = 0; 
-    weights(size(w1,1)+1:end,1:size(w2,2)) = w2;
+    clab = b.qwise.condlabels; 
+    ncond = length(clab);
+    w0  = zeros(1, ncond);
+    why = cellstrfind(clab, 'WHY');
+    how = cellstrfind(clab, 'HOW');
+    weights = repmat(w0, length(why), 1);
+    weights(:,how) = -1/length(how);
+    weights(:,why) = eye(length(why));
+    conname = regexprep(clab(why), 'WHY-', '');
+    conname = strcat(conname, '_-_', 'HOW');
     ncon    = size(weights,1);
     for c = 1:ncon
         contrasts(c).type       = 'T';
         contrasts(c).weights    = weights(c,:);
-        contrasts(c).name       = bspm_conweights2names(weights(c,:), b.condlabels);
+        contrasts(c).name       = conname{c};
     end
     if fcontrast
         contrasts(ncon+1).type      = 'F';
@@ -326,12 +308,29 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     b.data                           = data(:,[1 2 3 8 10 11]);
     b.data(:,3)                      = b.data(:,3) - 1;
     b.data(:,7:11)                   = NaN;
-    stimidx                          = data(:, 4);
+    
+    % | Question Wise
+    % | ========================================================================
+   stimidx                          = data(:,4);
     qidx                             = data(:,5);
+    b.question = d.qstim(data(:,5));
+    [~,tmp] = cellfileparts(d.slideName);
+    tmp = cellfun(@(x) x(1:2), tmp, 'Unif', false);
+    tmp = regexprep(tmp, 'F_', 'Human');
+    tmp = regexprep(tmp, 'M_', 'Primate');
+    tmp = regexprep(tmp, 'D_', 'Dog');
+    qtmp = regexprep(b.question, '\?', '');
+    qtmp = caseconvert(qtmp, 'title');
+    qtmp = regexprep(qtmp, ' ', '_');
+    qtmp = regexprep(qtmp, 'Looking_At_The_Camera', 'Looking_at_Camera'); 
+    ctmp = repmat({'WHY'}, size(qtmp));
+    ctmp(b.data(:,2)>3) = {'HOW'};
+    b.qwise.triallabels = strcat(ctmp, '-', qtmp, '_', tmp');
+    [b.qwise.condlabels, ia, b.qwise.condidx] = unique(b.qwise.triallabels); 
     
     % | read rating data
     % | ========================================================================
-    b.question = d.qstim(data(:,5));
+    
     r = load(rate); 
     ratedata        = r.Seeker;
     [~, ratestim, ext]   = cellfun(@fileparts, r.slideName', 'unif', false);
