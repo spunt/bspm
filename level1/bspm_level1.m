@@ -66,7 +66,7 @@ if nargin==1
         docon     = 0; 
     end
 else
-    if nargin < 3, disp('USAGE: matlabbatch = bspm_level1(images, general_info, runs, contrasts)'); return; end
+    if nargin < 3, mfile_showhelp; return; end
     if nargin < 4, docon = 0; end
 end
 
@@ -211,7 +211,6 @@ end
 if nargout==0, spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
 
 end
-
  
  
  

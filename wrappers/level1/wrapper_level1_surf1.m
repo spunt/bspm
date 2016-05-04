@@ -18,11 +18,11 @@ defaults = {
          'studyname',   'dog',                                ...
          'HPF',         100,                                  ...
          'armethod',    2,                                    ...
-         'nuisancepat', 'rp*txt',                             ...
+         'nuisancepat', 'badscan*txt',                             ...
          'epipat',      'swbua*nii*',                         ...
          'subid',       'RA*',                                ...
          'runid',       'EP*SURF1*',                          ...
-         'tag',         's6w2rp',                             ...
+         'tag',         's6w2bad',                             ...
          'behavid',     'surf1*mat',                          ...
          'rateid',      'rate*mat',                           ...
          'basename',    'SURF1',                              ...
@@ -136,7 +136,17 @@ for s = 1:length(subdir)
                 end
             end
         end
-  
+        
+        % | Nuisance Regressors
+        % | =====================================================================
+        nuisreg = load(nuisance{r});
+        nuisreg = zscore(nuisreg);
+        nreg    = size(nuisreg, 2);
+        for n = 1:nreg
+            runs(r).regressors(n).name      = sprintf('NUISANCE_%02d', n); 
+            runs(r).regressors(n).values    = nuisreg(:,n)';
+        end
+
     end
     if length(rundir)==1 
         images = images{1}; 
@@ -150,7 +160,8 @@ for s = 1:length(subdir)
     general_info.TR                 = TR;
     general_info.hpf                = HPF;
     general_info.autocorrelation    = armethod;
-    general_info.nuisance_file      = nuisance;
+    general_info.nuisance_file      = '';
+%     general_info.nuisance_file      = nuisance;
     general_info.brainmask          = brainmask;
     general_info.hrf_derivs         = [0 0];
     general_info.mt_res             = 16; 
@@ -158,8 +169,7 @@ for s = 1:length(subdir)
 
     % | Contrasts
     % | ========================================================================
-    ncond   = length(allcondname); 
-    
+    ncond   = length(allcondname);
     rmidx   = ismember(allcondname, {'Scramble' 'Catch'});
     w1      = eye(ncond);
     w1(find(rmidx), :) = [];
