@@ -15,7 +15,7 @@ function XYZmm = bspm_vol_xyzmm(im)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, error('USAGE: XYZmm = bspm_vol_xyzmm(im)'); end
+if nargin<1, mfile_showhelp; return; end
 if iscell(im), im = char(im); end
 hdr = spm_vol(im);
 [R,C,P]  = ndgrid(1:hdr.dim(1),1:hdr.dim(2),1:hdr.dim(3));

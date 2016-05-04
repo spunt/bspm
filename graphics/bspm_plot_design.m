@@ -20,7 +20,7 @@ function bspm_plot_design(spmmat, rptag, trantag, xlabels)
 if nargin<4, xlabels = []; end
 if nargin<3, trantag = 0; end
 if nargin<2, rptag = 1; end
-if nargin<1, disp('USAGE: bspm_plot_design(spmmat, rptag, trantag, xlabels)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if iscell(spmmat), spmmat = char(spmmat); end
 
 % get X matrix and names

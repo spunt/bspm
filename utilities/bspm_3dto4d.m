@@ -16,7 +16,7 @@ function matlabbatch = bspm_3dto4d(in, outname)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin < 1, error('USAGE: matlabbatch = bspm_3dto4d(in, outname)'); end
+if nargin < 1, mfile_showhelp; return; end
 if ischar(in), in = cellstr(in);end
 if nargin < 2
     [p,n,e] = cellfun(@fileparts, in, 'unif', false);

@@ -3,6 +3,7 @@ function bspm_movie_compare(in1, in2, slice)
 %
 %   USAGE: bspm_show4Dmovie
 %
+if nargin==0, mfile_showhelp; return; end
 if iscell(in1), in1 = char(in1); end
 if iscell(in2), in2 = char(in2); end
 fprintf('Reading data... ');

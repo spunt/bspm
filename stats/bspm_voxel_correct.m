@@ -33,12 +33,8 @@ function u = bspm_voxel_correct(im,alpha)
 
 if nargin < 1
     tmp = files('*T*');
-    if isempty(tmp)
-        disp('USAGE: [k info] = bspm_cluster_correct(im,u,alpha,range)'); 
-        return; 
-    else
-        im = tmp(1);
-    end
+    if isempty(tmp), mfile_showhelp; return; 
+    else im = tmp(1); end
 end
 if nargin < 2, alpha = .05; end
 if iscell(im), im = char(im); end

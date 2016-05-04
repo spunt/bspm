@@ -13,7 +13,7 @@ function TS = bspm_dvars(epi, cutoff, maskfn, nosave)
 %	$Revision Date: Aug_20_2014
 
 %% CHECK INPUTS
-if nargin<1, error('TS = bspm_dvars(epi, cutoff, maskfn, nosave)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(epi), epi = cellstr(epi); end
 if nargin<2, cutoff = 3; end
 if nargin<3, maskfn = []; maskfn = 'none'; end

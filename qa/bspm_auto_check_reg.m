@@ -14,7 +14,7 @@ function bspm_auto_check_reg(imcell,subname,xpos,imname)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, error('USAGE: bspm_auto_check_reg(imcell,subname,xpos,imname)'); end;
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, xpos = 0; end
 if nargin<4, 
     imname = cell(size(imcell,2),1); 

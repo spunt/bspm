@@ -11,7 +11,7 @@ function TS = bspm_get_global(epifiles, rpfile, maskfile, plotit)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, error('TS = bspm_get_global(epifiles, rpfile, maskfile)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(epifiles), epifiles = cellstr(epifiles); end
 if nargin<2 || isempty(rpfile)
     tmp = fileparts(epifiles{1});

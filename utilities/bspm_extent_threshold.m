@@ -13,7 +13,7 @@ function out = bspm_extent_threshold(in, extent)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, disp('USAGE: out = bspm_extent_threshold(in, extent)'); return; end
+if nargin<2, mfile_showhelp; return; end
     
 imdims = size(in);
 [X Y Z] = ind2sub(size(in), find(in > 0));

@@ -10,7 +10,7 @@ function bspm_movie_surface(im, name, framesper)
 %
 %   default framerate = 30/sec
 % -----------------------------------------------------
-if nargin<3, disp('USAGE: bspm_movie_surface(im, name, framesper)'); return; end
+if nargin<3, mfile_showhelp; return; end
 vidObj = VideoWriter([name '.mp4'], 'MPEG-4');
 open(vidObj);
 [alld allh] = bspm_read_vol(im, 'implicit', 'zscoretime');

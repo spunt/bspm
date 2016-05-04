@@ -10,7 +10,7 @@ function bspm_imcrop(imfile, x, y, z)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, error('USAGE: bspm_imcrop(imfile, x, y, z)'); end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, x = []; end
 if nargin<3, y = []; end
 if nargin<4, z = []; end

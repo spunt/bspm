@@ -20,7 +20,7 @@ function o = bspm_sliceprint_roi(under,over,view,slices,basename)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
+if nargin<4, mfile_showhelp; return; end
 if nargin<5, basename = []; end
 if ischar(under), under = cellstr(under); end
 if ischar(over), over = cellstr(over); end

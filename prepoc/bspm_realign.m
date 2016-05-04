@@ -13,12 +13,8 @@ function matlabbatch = bspm_realign(epi_images, resliceflag)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1
-   disp('Give me arguments! bspm_realign(epi_images)');
-   return
-elseif nargin<2
-    resliceflag=0;
-end
+if nargin<1, mfile_showhelp; return; end
+if nargin<2, resliceflag=0; end
 
 resliceflag = resliceflag*2;
 

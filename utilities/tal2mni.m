@@ -6,7 +6,7 @@ function outpoints = tal2mni(inpoints)
 %  (N being the number of points)
 % outpoints is the coordinate matrix with MNI points
 % Matthew Brett 2/2/01
-
+if nargin==0, mfile_showhelp; return; end
 dimdim = find(size(inpoints) == 3);
 if isempty(dimdim)
   error('input must be a N by 3 or 3 by N matrix')

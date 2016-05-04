@@ -16,7 +16,7 @@ function ts = bspm_filter_mat(ts, TR, cutoff)
 %
 %	$Revision Date: Aug_20_2014
 
-
+if nargin < 3, mfile_showhelp; return; end
 dims = size(ts);
 
 % spm_filter stuff

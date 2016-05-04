@@ -2,7 +2,7 @@ function fn = bspm_expand4D(fn4D)
 % BSPM_EXPAND4D
 %   USAGE: fn = bspm_expand4D(fn4D)
 %
-if nargin<1, error('USAGE: fn = bspm_expand4D(fn4D)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(fn4D), fn4D = cellstr(fn4D); end
 fn      = [];
 fn4D    = regexprep(fn4D, ',\d+$', '');

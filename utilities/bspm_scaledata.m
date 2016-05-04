@@ -14,7 +14,7 @@ function out = bspm_scaledata(in, minmax)
 % Program written by:
 % Aniruddha Kembhavi, July 11, 2007
 if nargin<2, minmax = [0 1]; end
-if nargin<1, error('USAGE: out = scaledata(in, minmax)'); end
+if nargin<1, mfile_showhelp; return; end
 out = in - repmat(min(in), size(in, 1), 1); 
 out = ((out./repmat(range(out), size(out,1), 1))*(minmax(2)-minmax(1))) + minmax(1); 
 end

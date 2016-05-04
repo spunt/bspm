@@ -14,7 +14,7 @@ function [flag, volinfo] = bspm_check_orientations(images, verbose)
 
 % John Ashburner
 % $Id: spm_check_orientations.m 5097 2012-12-06 16:08:16Z guillaume $
-if nargin < 1, error('USAGE: [flag, volinfo] = bspm_check_orientations(images, verbose)'); end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, verbose = true; end
 if ~isstruct(images)
     if iscell(images), images = char(images); end

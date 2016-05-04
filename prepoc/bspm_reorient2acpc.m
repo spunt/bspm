@@ -14,7 +14,7 @@ function matlabbatch = bspm_reorient2acpc(images, opt)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<2, disp('USAGE: matlabbatch = bspm_reorient2acpc(images, opt)'); return; end
+if nargin<2, mfile_showhelp; return; end
 if ischar(images), images = cellstr(images); end
 images = strcat(images, ',1');
 spmdir = fileparts(which('spm'));

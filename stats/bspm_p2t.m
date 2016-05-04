@@ -11,7 +11,7 @@ function t = bspm_p2t(alpha, df)
 %       df = degrees of freedom
 %
 % =========================================
-if nargin<2, disp('USAGE: bspm_p2t(p, df)'); return, end
+if nargin<2, mfile_showhelp; return; end
 t = tinv(1-alpha, df);
 
 

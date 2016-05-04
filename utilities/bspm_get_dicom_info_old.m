@@ -36,7 +36,7 @@ function dicominfo = bspm_get_dicom_info(in,disptag)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin < 1, error('USAGE: bspm_get_dicom_info(in, disptag)'); end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, disptag = 1; end
 if iscell(in), in = char(in); end
 

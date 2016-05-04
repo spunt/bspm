@@ -24,7 +24,7 @@ function result = bspm_imcompare(in, labels, sdcut)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, disp('USAGE: bspm_imcompare(in, option)'); return, end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, labels = []; end
 if nargin<3, sdcut = 2.5; end
 

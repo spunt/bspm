@@ -14,7 +14,7 @@ function bspm_con2tstat(con)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin < 1, error('USAGE: [tstat df] = bspm_con2tstat(con)'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if ischar(con), con = cellstr(con); end
 
 for i = 1:length(con)

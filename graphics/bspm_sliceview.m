@@ -21,6 +21,7 @@ function o = bspm_sliceview(under,over,view,slices,thresh,labels,cbar)
 if nargin<7, cbar = 1; end
 if nargin<6, labels = 0; end
 if nargin<5, thresh = [.001 20]; end
+if nargin<4, mfile_showhelp; return; end
 if ischar(under), under = cellstr(under); end
 if ischar(over), over = cellstr(over); end
 

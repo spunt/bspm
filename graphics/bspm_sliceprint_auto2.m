@@ -25,6 +25,7 @@ if nargin<7, cbar = 0; end
 if nargin<6, labels = 1; end
 if nargin<7, basename = []; end
 if nargin<4, thresh = [.001 20 18]; end
+if nargin<3, mfile_showhelp; return; end
 if ischar(under), under = cellstr(under); end
 if ischar(over), over = cellstr(over); end
 

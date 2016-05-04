@@ -14,7 +14,7 @@ function bspm_nii2img(in, rmtag)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, disp('USAGE: bspm_nii2img(in, rmtag)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, rmtag = 0; end
 if ~iscell(in) & strfind(in,'*'); in = files(in); end
 if ischar(in), in = cellstr(in); end

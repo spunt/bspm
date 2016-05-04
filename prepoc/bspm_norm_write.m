@@ -14,10 +14,7 @@ function matlabbatch = bspm_norm_write(param, images, vox_size)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1
-   disp('bspm_norm_write(param, images, vox_size)');
-   return
-end
+if nargin<1, mfile_showhelp; return; end
 
 % make sure image names are cell arrays of strings
 if ischar(param)

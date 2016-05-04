@@ -14,7 +14,7 @@ function bspm_checkcountmap(countmap)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, display('USAGE: bspm_checkcountmap(countmap)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if iscell(countmap), countmap = char(countmap); end
 
 % masks

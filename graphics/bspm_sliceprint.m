@@ -21,7 +21,7 @@ function o = bspm_sliceprint(under,over,view,slices,thresh,basename,labels,cbar,
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
+if nargin<4, mfile_showhelp; return; end
 if nargin<9, cmap = []; end
 if nargin<8, cbar = 0; end
 if nargin<7, labels = 0; end

@@ -4,7 +4,7 @@ function bspm_bias_correct(in)
 %   USAGE: bspm_bias_correct(in)
 % 
 % -------------------------------------------------------------------------
-if nargin<1, error('bspm_bias_correct(in)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(in), in = cellstr(in); end
 startdir= pwd;
 progressbar(0); 

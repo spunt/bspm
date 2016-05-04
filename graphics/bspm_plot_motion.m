@@ -14,7 +14,7 @@ function bspm_plot_motion(rpfile)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, display('Must specify realignment parameter file!'); return; end
+if nargin<1, mfile_showhelp; return; end
 if iscell(rpfile), rpfile = char(rpfile); end
 
 % load in the rp file 

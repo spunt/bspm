@@ -13,7 +13,7 @@ function matlabbatch = bspm_slicetime(in, dcmfile, opt)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<2, disp('USAGE: matlabbatch = bspm_slicetime(in, dcmfile, opt)'); end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, opt = 2; end
 if ischar(in), in = cellstr(in); end
 if iscell(dcmfile), dcmfile = char(dcmfile); end

@@ -21,7 +21,7 @@ function matlabbatch = bspm_norm_estimate(source_img, template_img, source_weigh
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin < 2, error('USAGE: bspm_norm_estimate(source_img, template_img, source_weighting_img, template_weighting_img'); end
+if nargin < 2, mfile_showhelp; return; end
 if nargin < 3, source_weighting_img = {}; template_weighting_img = {}; end
 if ischar(source_img), source_img = cellstr(source_img); end
 if ischar(template_img), template_img = cellstr(template_img); end

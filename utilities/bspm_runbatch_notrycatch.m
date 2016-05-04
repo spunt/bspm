@@ -1,7 +1,7 @@
 function bspm_runbatch_notrycatch(job, doparfor)
 % USAGE: bspm_runbatch(job, doparfor)
 %
-if nargin<1, disp('USAGE: bspm_runbatch(job, doparfor)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, doparfor = 0; end
 % | Initialize SPM config 
 bspm_init;

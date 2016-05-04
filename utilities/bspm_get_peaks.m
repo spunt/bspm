@@ -21,7 +21,7 @@ function peaks = bspm_get_peaks(image,intensity,cluster,separation,notstat)
 %	$Revision Date: Aug_20_2014
 
 if nargin<5, notstat = 0; end
-if nargin<4, error('USAGE: bspm_get_peaks(image,intensity,cluster,separation)'); end
+if nargin<4, mfile_showhelp; return; end
 
 % make sure image name is character array
 if iscell(image), image = char(image); end

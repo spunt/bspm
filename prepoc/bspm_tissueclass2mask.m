@@ -9,7 +9,7 @@ function bspm_tissueclass2mask(cimages, outname)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin < 1, disp('USAGE: bspm_tissueclass2mask(cimages, outname)'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if ischar(cimages), cimages = cellstr(cimages); end
 if nargin < 2, outname = fullfile(fileparts(cimages{1}), 'mask_brain.nii'); end
 % | Read & Sum

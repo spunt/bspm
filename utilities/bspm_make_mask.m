@@ -18,7 +18,7 @@ function bspm_make_mask(in, thresh, conn)
 
 if nargin<3, conn = 6; end
 if nargin<2, thresh = [.1 .9]; end
-if nargin<1, error('USAGE: bspm_make_mask(in,thresh,conn)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(in), in = cellstr(in); end
 for i = 1:length(in)
     

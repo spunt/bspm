@@ -13,7 +13,7 @@ function name = bspm_conweights2names(weights, covnames)
 %	Created:  2015-02-24
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 2, disp('USAGE: names = bspm_conweights2names(weights, covnames)'); return; end
+if nargin < 2, mfile_showhelp; return; end
 if size(weights, 2)~=length(covnames), error('WEIGHTS and COVNAMES must be the same length'); end 
 posidx = []; posidx = find(weights>0);
 negidx = []; negidx = find(weights<0);

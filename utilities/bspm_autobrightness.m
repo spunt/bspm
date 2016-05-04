@@ -12,7 +12,7 @@ function out = bspm_autobrightness(in, nowrite)
 %	Created:  2014-10-04
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 1, disp('USAGE: out = bspm_autobrightness(in, *lim, *nowrite)	*optional input'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, nowrite = 0; end
 lim = 0.5;
 if iscell(in), in = char(in); end

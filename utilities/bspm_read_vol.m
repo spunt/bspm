@@ -24,7 +24,7 @@ function [data, hdr, info] = bspm_read_vol(in, varargin)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin < 1, error('USAGE: [data hdr info] = bspm_read_vols(in,option)'); end
+if nargin < 1, mfile_showhelp; return; end
 if nargin > 1, optional = 1; else optional = 0; end
 if any(cellfun(@iscell, varargin))
     varargin{cellfun(@iscell, varargin)} = char(varargin{cellfun(@iscell, varargin)}); 

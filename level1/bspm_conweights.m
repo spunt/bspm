@@ -16,7 +16,7 @@ function weights = bspm_conweights(design)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: weights = bspm_conweights(design)'); return; end
+if nargin<1, mfile_showhelp; return; end
 ncell = prod(design);
 nfact = length(design);
 if nfact > 1

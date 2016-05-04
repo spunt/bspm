@@ -17,7 +17,7 @@ if nargin<5, g = 0; end
 if nargin<4, nowaitbar = 0; end
 if nargin<3, outprefix = 'b'; end
 if nargin<2, f = 0.5; end
-if nargin<1, error('USAGE:  bfsl_bet(images, f, outprefix, nowaitbar, g, dorobust)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(images), images = cellstr(images); end
 nim = length(images);
 if ~nowaitbar

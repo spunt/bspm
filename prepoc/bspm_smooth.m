@@ -14,7 +14,7 @@ function matlabbatch = bspm_smooth(in, fwhm, implicitmaskTAG)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<2, disp('USAGE: matlabbatch = bspm_smooth(in, fwhm, implicitmaskTAG)'); return, end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, implicitmaskTAG = 0; end
 if length(fwhm)==1, fwhm = [fwhm fwhm fwhm]; end
 if ischar(in), in = cellstr(in); end

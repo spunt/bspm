@@ -21,7 +21,7 @@ function overlap = bspm_save_count_map(images, heightThresh, sizeThresh, outname
 %	$Revision Date: Aug_20_2014
 
 if nargin<5, pctflag = 0; end
-if nargin<4, disp('USAGE: bspm_save_count_map(images, heightThresh, sizeThresh, outname)'); return; end
+if nargin<4, mfile_showhelp; return; end
 
 nim = length(images);
 for i = 1:nim

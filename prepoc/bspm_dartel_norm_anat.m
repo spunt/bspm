@@ -15,7 +15,7 @@ function matlabbatch = bspm_dartel_norm_anat(images, flowfields, template, voxsi
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<3, disp('USAGE: bspm_dartel_norm_anat(images, flowfields, template, voxsize)'); return; end
+if nargin<3, mfile_showhelp; return; end
 if nargin<4, voxsize = 1; end
 fwhm = zeros(1,3); 
 if length(voxsize)==1, voxsize = repmat(voxsize,1,3); end

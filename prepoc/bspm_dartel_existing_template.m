@@ -11,7 +11,7 @@ function matlabbatch = bspm_dartel_existing_template(rc1, rc2, templatedir)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('matlabbatch = bspm_dartel_existing_template(rc1, rc2, templatedir)'), return; end
+if nargin<1, mfile_showhelp; return; end
 if iscell(templatedir), templatedir = char(templatedir); end
 if ischar(rc1), rc1 = cellstr(rc1); end
 if ischar(rc2), rc2 = cellstr(rc2); end

@@ -13,7 +13,7 @@ function [h1 hh1] = bspm_render(im, cmapflag, medialflag, outname)
 %	Created:  2014-10-07
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 1, disp('USAGE: bspm_render(im, *cmapflag, *medialflag)	*optional input'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, cmapflag = 1; end
 if nargin < 3, medialflag = 1; end
 

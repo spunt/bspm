@@ -15,7 +15,7 @@ function matlabbatch = bspm_Fcontrasts(analysis_dirs, weights, delete_tag)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Sep_23_2014
-if nargin<2, error('USAGE: bspm_Fcontrasts(analysis_dirs, weights, delete_tag)'); end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, delete_tag = 0; end
 if ischar(analysis_dirs), analysis_dirs = cellstr(analysis_dirs); end
 for s = 1:length(analysis_dirs)

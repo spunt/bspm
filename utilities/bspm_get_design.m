@@ -21,7 +21,7 @@ function [xmatrix xname sessidx] = bspm_get_design(spmmat, r_tag)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, disp('USAGE: [xmatrix xname sessidx] = bspm_get_design(spmmat, r_tag)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, r_tag = 1; end
 if iscell(spmmat), spmmat = char(spmmat); end
 

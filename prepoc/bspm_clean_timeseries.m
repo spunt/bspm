@@ -18,7 +18,7 @@ function bspm_clean_timeseries(images, TR, cutoff, covariates, outprefix)
 %	$Revision Date: Aug_20_2014
 
 if nargin<5, outprefix = 'f'; end
-if nargin<4, display('bspm_clean_timeseries(images, TR, cutoff, covariates, outprefix)'); return; end
+if nargin<4, mfile_showhelp; return; end
 if iscell(images); images = char(images); end;
 
 % load in raw timeseries

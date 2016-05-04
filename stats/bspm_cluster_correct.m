@@ -33,12 +33,8 @@ function [extent, info] = bspm_cluster_correct(im,u,alpha,range)
 
 if nargin < 1
     tmp = files('*T*');
-    if isempty(tmp)
-        disp('USAGE: [k info] = bspm_cluster_correct(im,u,alpha,range)'); 
-        return; 
-    else
-        im = tmp(1);
-    end
+    if isempty(tmp), mfile_showhelp; return; 
+    else im = tmp(1); end
 end
 if nargin < 2, u = .001; end
 if nargin < 3, alpha = .05; end

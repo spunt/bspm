@@ -19,10 +19,7 @@ function matlabbatch = bspm_contrasts(analysis_dir, weights, delete_tag, repl_ta
 if nargin<5, connames = []; end
 if nargin<4, repl_tag = 1; end
 if nargin<3, delete_tag = 0; end
-if nargin<2
-   disp('USAGE: bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag)');
-   return
-end
+if nargin<2, mfile_showhelp; return; end
 if ischar(analysis_dir), analysis_dir = cellstr(analysis_dir); end
 if repl_tag, repl_choice = 'repl'; else repl_choice = 'none'; end
 for s = 1:length(analysis_dir)

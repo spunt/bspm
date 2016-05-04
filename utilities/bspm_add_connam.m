@@ -20,7 +20,7 @@ if nargin<2, rmTAG = 0; end
 if nargin<1
     in = files('spmT*.img');
     if isempty(in), in = files('spmT*nii'); end
-    if isempty(in), error('USAGE: bspm_add_connam(in, ...)'); end
+    if isempty(in), mfile_showhelp; return; end
 end
 if ~iscell(in) & strfind(in,'*'); in = files(in); end
 

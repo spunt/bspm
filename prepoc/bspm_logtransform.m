@@ -10,7 +10,7 @@ function matlabbatch = bspm_logtransform(epi, is4D)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: matlabbatch = bspm_logtransform(epi, is4D)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, is4D = 0; end; 
 if ischar(epi), epi = cellstr(epi); end
 if is4D, epi = bspm_expand4D(char(epi)); 

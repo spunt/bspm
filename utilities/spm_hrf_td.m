@@ -5,7 +5,7 @@ function td = spm_hrf_td(TR)
 %
 % Pulled from code in spm5
 %_______________________________________________________________________
-
+if nargin==0, mfile_showhelp; return; end
 % get canonical hemodynaic response function
 %---------------------------------------------------------------
 [bf p]         = spm_hrf(TR);

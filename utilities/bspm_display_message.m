@@ -6,7 +6,7 @@ function bspm_display_message(message, border, titlestr)
 %
 % USAGE: bspm_display_message(message, border, titlestr)
 %
-if nargin<1, error('USAGE: bspm_display_message(message, border, titlestr)'); end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, border = '='; end
 if nargin<3, titlestr = []; end
 mln = length(message);

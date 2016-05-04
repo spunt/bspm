@@ -23,7 +23,7 @@ function success = bspm_save_cluster(in, outname, heightThresh, sizeThresh, mask
 
 if nargin<6, nameflag = 0; end
 if nargin<5, mask = []; end
-if nargin<4, disp('USAGE: bspm_save_cluster(in, outname, heightThresh, sizeThresh, mask, nameflag)'); return; end
+if nargin<4, mfile_showhelp; return; end
     
 % make sure image names are character arrays
 % ------------------------------------------------------

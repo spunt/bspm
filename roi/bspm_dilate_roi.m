@@ -14,7 +14,7 @@ function bspm_dilate_roi(in, ndilation, appendextent)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin < 1, disp('USAGE: bspm_dilate_roi(in, size)'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, ndilation = 1; end
 if nargin < 3, appendextent = 0; end
 if ischar(in), in = cellstr(in); end

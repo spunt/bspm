@@ -10,7 +10,7 @@ function data = bspm_imcompare_epi_anat(epi, anat, subnames)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<2, disp('USAGE: data = bspm_imcompare_epi_anat(epi, anat, subnames)'); return, end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, subnames = []; end
 
 % check variable formats

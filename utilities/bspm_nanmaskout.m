@@ -14,7 +14,7 @@ function bspm_nanmaskout(in, mask, outprefix)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, error('USAGE: bspm_nanmaskout(in, mask, outprefix)'); end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, outprefix = 'nanout'; end
 if ischar(in), in = cellstr(in); end
 if iscell(mask), mask = char(mask); end

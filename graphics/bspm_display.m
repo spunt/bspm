@@ -51,7 +51,6 @@ function bspm_display(imname)
 
 % John Ashburner
 % $Id: spm_image.m 4205 2011-02-21 15:39:08Z guillaume $
-
 if nargin<1
     P = uigetvol('Select an image'); 
     if isempty(P), return; end

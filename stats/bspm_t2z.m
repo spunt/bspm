@@ -11,7 +11,7 @@ function z = bspm_t2z(t, df)
 %       df = degrees of freedom
 %
 % =========================================
-if nargin<1, error('USAGE: bspm_t2z(t, df)'), end
+if nargin<1, mfile_showhelp; return; end
 z = -sqrt(2) * erfcinv((tcdf(t, df))*2);
 
  

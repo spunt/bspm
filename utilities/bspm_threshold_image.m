@@ -22,7 +22,7 @@ function out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outna
 if nargin<6, doposneg = 0; end
 if nargin<5, outname = []; end; 
 if nargin<4, binflag = 0; end;
-if nargin<3, disp('USAGE: out = bspm_threshold_image(in, heightThresh, sizeThresh, binflag, outnamem, doposneg)'); return; end
+if nargin<3, mfile_showhelp; return; end
 if iscell(in), in = char(in); end;
 if nargin<7, ndilate = 0; end
 

@@ -23,7 +23,7 @@ function out = bspm_harvest_betaseries(analysisdirs, patterns, rois)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, error('USAGE: bspm_harvest_beta(analysisdirs, rois, conidx, plotflag)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(analysisdirs), analysisdirs = cellstr(analysisdirs); end
 if ischar(rois), rois = cellstr(rois); end
 nroi = length(rois);

@@ -10,7 +10,7 @@ function matlabbatch = bspm_realign_and_unwarp(epi_images, phase_map)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: matlabbatch = bspm_realign_and_unwarp(epi_images, phase_map)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, phase_map = ''; end
 if ischar(epi_images{1})
     nsess = 1; charflag = 1;

@@ -11,7 +11,7 @@ function p = bspm_t2p(t, df)
 %       df = degrees of freedom
 %
 % =========================================
-if nargin<2, disp('USAGE: bspm_t2p(p, df)'); return, end
+if nargin<2, mfile_showhelp; return; end
 p = tcdf(t, df);
 p = 1 - p;
 

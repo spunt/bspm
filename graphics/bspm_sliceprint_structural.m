@@ -20,7 +20,7 @@ function o = bspm_sliceprint_structural(struct, view, slices, labels, name)
 
 if nargin<5, name = []; end
 if nargin<4, labels = 0; end
-if nargin<3, error('USAGE: o = bspm_sliceprint_structural(struct, view, slices, labels)'); end
+if nargin<3, mfile_showhelp; return; end
 if ischar(struct), anat = cellstr(struct); end
 
 % set up figure

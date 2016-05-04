@@ -14,7 +14,7 @@ function bspm_check_motion_print(rpfiles)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, display('USAGE: bspm_check_motion_print(subdirs)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if ischar(rpfiles), rpfiles = cellstr(rpfiles); end
 for i = 1:length(rpfiles)
     [runpath rpname e] = fileparts(rpfiles{i});

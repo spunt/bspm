@@ -12,7 +12,7 @@ function [Z,W,U,D] = whiten(X)
 % $Author$
 % ------------------------------------------------
 
-
+if nargin==0, mfile_showhelp; return; end
 
 sdim = min(size(X));
 % sdim = rank(X);  

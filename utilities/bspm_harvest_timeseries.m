@@ -15,7 +15,7 @@ function ts_roi = bspm_harvest_timeseries(images, roi, method)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<3, display('ts_roi = bspm_harvest_timeseries(images, roi, method)'); return; end
+if nargin<3, mfile_showhelp; return; end
 if iscell(images); images = char(images); end;
 if iscell(roi); roi = char(roi); end;
 

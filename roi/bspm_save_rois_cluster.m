@@ -22,7 +22,7 @@ function success = bspm_save_rois_cluster(in, heightThresh, sizeThresh, mask)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<3, disp('USAGE: success = bspm_save_rois_cluster(in, heightThresh, sizeThresh, mask)'); return; end
+if nargin<3, mfile_showhelp; return; end
 if nargin<4, mask = []; end
     
 % make sure image names are character arrays

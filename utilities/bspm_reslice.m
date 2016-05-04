@@ -17,7 +17,7 @@ function [out, outmat] = bspm_reslice(in, ref, int, nowrite)
 % State Key Laboratory of Cognitive Neuroscience and Learning 
 % Beijing Normal University, China, 100875
 % --------------------------------------------------------------------------
-if nargin<2, display('USAGE: out = bspm_reslice(in, ref, int, nowrite)'); return; end
+if nargin<2, mfile_showhelp; return; end
 if nargin<4, nowrite = 0; end
 if nargin<3, int = 1; end
 if iscell(in); in = char(in); end

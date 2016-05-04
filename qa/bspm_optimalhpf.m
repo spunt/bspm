@@ -35,7 +35,7 @@ function bspm_optimalhpf(r, filterRange)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
+if nargin==0, mfile_showhelp; return; end
 
 %---------USER INPUTS---------%
 contrasts=[1 0 0 -1 0 0; 0 1 0 0 -1 0; 0 0 1 0 0 -1; -.5 .5 0 .5 -.5 0; -.5 0 .5 .5 0 -.5]';             % contrasts of interest (each row = new contrast)

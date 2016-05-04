@@ -9,6 +9,7 @@ function bfsl_reslice(images)
 %   outprefix = prefix for output files
 %
 % ------------------------------------------------
+if nargin==0, mfile_showhelp; return; end
 if ischar(images), images = cellstr(images); end
 nim = length(images);
 for i = 1:nim

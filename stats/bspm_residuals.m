@@ -9,7 +9,7 @@ function res = bspm_residuals(Y,X)
 %       X:  n-by-m design matrix (do not include constant)
 %
 % ------------------------------------------------------------
-if nargin<2, display('USAGE: res = bspm_residuals(Y,X)'); return; end
+if nargin<2, mfile_showhelp; return; end
 X = [X ones(size(X(:,1)))]; % add constant
 res = Y - X*(X\Y); % compute residuals
 res = res + repmat(nanmean(Y), size(X,1), 1); % add mean to residuals

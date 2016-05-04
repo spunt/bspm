@@ -8,7 +8,7 @@ function info = bspm_check_vols(in, minnvalid)
 %	Created:  2014-11-26
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 1, disp('USAGE: info = bspm_check_vols(in, [minnvalid])'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, minnvalid = 0; end
 if iscell(in), in = char(in); end
 info.fname  = in; 

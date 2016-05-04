@@ -14,7 +14,7 @@ function bfsl_bet_epi2(epi, outprefix)
 %
 %	$Revision Date: Aug_20_2014
 if nargin<2, outprefix = 'b'; end
-if nargin<1, disp('USAGE: bfsl_bet_epi2(epi, outprefix)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if iscell(epi), epi = char(epi); end
 fprintf('\n | - Running BET'); 
 [p, n, e] = fileparts(epi);

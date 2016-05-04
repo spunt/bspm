@@ -5,7 +5,7 @@ function connams = bspm_print_connams(spmmat)
 %
 if nargin < 1
     spmmat = files('SPM*mat');
-    if isempty(spmmat), disp('USAGE: connam = bspm_print_connams(spmmat)'); return; end
+    if isempty(spmmat), mfile_showhelp; return; end
 end
 if iscell(spmmat), spmmat = char(spmmat); end
 load(spmmat);

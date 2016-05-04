@@ -19,7 +19,7 @@ function outname = bspm_coords2roi(xyz,roi,labels)
 %
 %	$Revision Date: Aug_12_2014
 
-if nargin<2, error('USAGE: bspm_coords2roi(xyz, roi, labels)'); return; end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, labels = repmat({''},size(xyz,1),1); end
 spmdir = fileparts(which('spm'));
 ref = fullfile(spmdir, 'templates', 'EPI.nii'); 

@@ -15,7 +15,7 @@ function bspm_checkreg_batch(in)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, disp('USAGE: bspm_checkreg_batch(in)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if ~iscell(in), in1 = cellstr(in); end
 nim = length(in);
 for i = 1:nim

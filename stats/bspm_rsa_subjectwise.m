@@ -17,7 +17,7 @@ function [rho, fishz] = bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag)
 if nargin < 4, rdmflag = 0; end
 if nargin < 3, eigenplot = 1; end
 if nargin < 2, mask = bspm_greymask; end
-if nargin < 1, error('USAGE: bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag)'); end
+if nargin < 1, mfile_showhelp; return; end
 
 % %% MASK
 % if iscell(mask), mask = char(mask); end

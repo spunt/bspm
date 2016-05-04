@@ -4,7 +4,7 @@ function z = bspm_p2z(p)
 %   USAGE: z = bspm_p2z(p)
 %       
 % =========================================
-if nargin<1, error('USAGE: z = bspm_p2z(p)'); end
+if nargin<1, mfile_showhelp; return; end
 z = -sqrt(2) * erfcinv((1-p)*2);
 
  

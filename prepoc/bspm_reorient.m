@@ -16,7 +16,7 @@ function bspm_reorient(images, reference)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, disp('USAGE: bspm_reorient(images, reference)'); return; end
+if nargin<2, mfile_showhelp; return; end
 if ~iscell(images), images = cellstr(images); end
 if iscell(reference), reference = char(reference); end
 

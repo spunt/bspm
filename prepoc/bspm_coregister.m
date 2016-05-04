@@ -18,7 +18,7 @@ function matlabbatch = bspm_coregister(reference, source, other, costfun)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, disp('USAGE: bspm_coregister(reference, source, other)'); return;
+if nargin<2, mfile_showhelp; return; end
 elseif nargin<3, other = {''}; end
 if nargin<4, costfun = 1; end
 

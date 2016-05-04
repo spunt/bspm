@@ -17,7 +17,7 @@ function bspm_checkreg_gui(in, subnames)
 %	$Revision Date: Aug_20_2014
 
 % CHECK ARGS
-if nargin<1, error('USAGE: bspm_checkreg_batch(in, subnames)'); end
+if nargin<1, mfile_showhelp; return; end
 if ~iscell(in), in = cellstr(in); end
 % GUI
 S.fig = spm_figure('Create','Graphics', 'Check Reg GUI', 'off');

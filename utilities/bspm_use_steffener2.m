@@ -37,7 +37,7 @@ function bspm_use_steffener2(analysisdirs)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-
+if nargin==0, mfile_showhelp; return; end
 if ischar(analysisdirs), analysisdirs = cellstr(analysisdirs); end
 nanalysis = length(analysisdirs);
 for i = 1:nanalysis

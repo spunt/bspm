@@ -13,7 +13,7 @@ function matlabbatch = bspm_dartel_create_template(anatpat)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<1, disp('USAGE: bspm_dartel_create_template(anatpat)'), return; end
+if nargin<1, mfile_showhelp; return; end
 allrc1 = files([anatpat filesep 'rc1*nii']);
 allrc2 = files([anatpat filesep 'rc2*nii']);
 for i = 1:length(allrc1)

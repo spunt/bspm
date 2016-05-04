@@ -10,7 +10,7 @@ function bspm_movie_multi(in, slice)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin < 1, error('USAGE: bspm_movie(in, [slice])'); end
+if nargin < 1, mfile_showhelp; return; end
 if ischar(in), in = cellstr(in); end
 ndisp   = length(in);
 for i = 1:ndisp

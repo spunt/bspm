@@ -15,7 +15,7 @@ function bspm_check_design_rank(spmmat)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, disp('bspm_check_design_rank(spmmat)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if iscell(spmmat), spmmat = char(spmmat); end
 
 % get X matrix and names

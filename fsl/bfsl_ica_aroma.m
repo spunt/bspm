@@ -18,7 +18,7 @@ function cmd = bfsl_ica_aroma(infile, TR, outdir)
 %	Created:  2015-03-24
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 1, disp('USAGE: bfsl_ica_aroma(infile, TR, outdir)'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if iscell(infile), infile = char(infile); end
 if nargin < 2, TR = []; end
 if nargin < 3, outdir = fileparts(infile); end

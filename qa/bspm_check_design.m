@@ -20,13 +20,8 @@ function [xmatrix, xname] = bspm_check_design(spmmat, r_tag)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2
-   disp('USAGE: [xmatrix xname] = bspm_check_design(spmmat, r_tag)');
-   return
-end
-if iscell(spmmat)
-    spmmat = char(spmmat);
-end
+if nargin<2, mfile_showhelp; return; end
+if iscell(spmmat), spmmat = char(spmmat); end
 
 % get X matrix and names
 load(spmmat)

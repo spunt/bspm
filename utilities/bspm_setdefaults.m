@@ -8,7 +8,7 @@ function bspm_setdefaults(def, args)
 %	Created:  2015-03-11
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 1, disp('USAGE: setdefaults(def, args)'); return; end
+if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, args = []; end
 def = reshape(def, 2, length(def)/2)'; 
 if ~isempty(args)

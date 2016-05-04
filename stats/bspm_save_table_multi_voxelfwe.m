@@ -21,7 +21,7 @@ function bspm_save_table_multi_voxelfwe(allim,intensity,separation,mask)
 %	$Revision Date: Aug_20_2014
 
 if nargin<4, mask = []; end
-if nargin<3, error('USAGE: bspm_save_table_multi(allim,intensity,separation,mask)'); return; end
+if nargin<3, mfile_showhelp; return; end
 
 %% Start it Off %%
 headers1 = {'Analysis Name' '' '' '' '' 'MNI Coordinates' '' ''};

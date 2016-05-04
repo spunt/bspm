@@ -8,7 +8,7 @@ function ref = bspm_dicomref(filepat)
 %         lois
 %         surf
 % 
-if nargin==0, disp('USAGE: ref = bspm_dicomref(filepat)'); end
+if nargin==0, mfile_showhelp; return; end
 bdir    = fullfile(getenv('HOME'), 'Github', 'bspm', 'imagedata'); 
 % bdir    = fileparts(whichdir('spm.m')); 
 ref     = files(fullfile(bdir, 'dicom_refs', filepat));

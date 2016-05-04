@@ -24,7 +24,7 @@ function bfsl_optibet(images)
 % export SHELLDIR PATH
 %
 % ------------------------------------------------
-if nargin<1, error('USAGE:  bfsl_optibet(images)'); end
+if nargin<1, mfile_showhelp; return; end
 if ischar(images), images = cellstr(images); end
 nim = length(images); 
 for i = 1:nim

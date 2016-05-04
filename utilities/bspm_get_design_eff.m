@@ -16,7 +16,7 @@ function eff = bspm_get_design_eff(X,L,W)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, display('USAGE: eff = bspm_get_design_eff(X,L,W)'); return; end
+if nargin<2, mfile_showhelp; return; end
 if nargin<3, W = ones(1,size(L,1)); end
 if size(L,2)~=size(X,2), error('X and L must have same number of columns!'); return; end
 if size(W,2)~=size(L,2), error('L and W must have same number of columsn!'); return; end

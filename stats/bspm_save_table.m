@@ -23,7 +23,7 @@ function bspm_save_table(image,intensity,cluster,separation,doinv,notstat)
 %	$Revision Date: Aug_20_2014
 
 if nargin<3, separation = 20; end
-if nargin<4, disp('USAGE: bspm_save_table(image,intensity,cluster,separation,doinv,notstat)'); return; end
+if nargin<4, mfile_showhelp; return; end
 if nargin<5, doinv = 1; end
 if nargin<6, notstat = 0; end
 

@@ -16,7 +16,7 @@ function bspm_regress_out(images, covariates, outprefix)
 %	$Revision Date: Aug_20_2014
 
 if nargin<3, outprefix = 'r'; end
-if nargin<2, display('USAGE: bspm_regress_out(images, covariates, outprefix)'); return; end
+if nargin<2, mfile_showhelp; return; end
 if iscell(images); images = char(images); end;
 if ~isnumeric(covariates)
     if iscell(covariates), covariates = char(covariates); end

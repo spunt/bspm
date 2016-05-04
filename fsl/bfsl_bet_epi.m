@@ -15,7 +15,7 @@ function bfsl_bet_epi(epi, f, outprefix)
 %	$Revision Date: Aug_20_2014
 if nargin<3, outprefix = 'b'; end
 if nargin<2, f = 0.3; end
-if nargin<1, disp('USAGE: bfsl_bet_epi(epi, f, outprefix)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if ischar(epi), epi = cellstr(epi); end
 
 % | skull strip first image

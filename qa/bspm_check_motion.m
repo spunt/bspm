@@ -15,7 +15,7 @@ function out = bspm_check_motion(rpfiles, writereport)
 %
 %	$Revision Date: Aug_20_2014
 if nargin<2, writereport = 0; end
-if nargin<1, display('USAGE: out = bspm_check_motion(rpfiles, writereport)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if ischar(rpfiles), rpfiles = cellstr(rpfiles); end
 nrp     = length(rpfiles);
 data    = NaN(nrp, 4);

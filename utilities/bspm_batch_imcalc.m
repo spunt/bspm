@@ -17,7 +17,7 @@ function [] = bspm_batch_imcalc(in, prefix, operation)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<3, disp('USAGE: bspm_batch_imcalc(in, prefix, operation)'); return, end
+if nargin<3, mfile_showhelp; return; end
 
 % check variable formats
 if ischar(in), in = cellstr(in); end

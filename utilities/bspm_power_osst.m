@@ -13,7 +13,7 @@ function [power,nsub] = bspm_power_osst(analysisdir, roifiles, nrange)
 %	Created:  2014-10-05
 %	Email:    spunt@caltech.edu
 % __________________________________________________________________________
-if nargin < 2, disp('power = bspm_power_osst(analysisdir, roifiles, *nrange)'); return; end
+if nargin < 2, mfile_showhelp; return; end
 if nargin < 3, nrange = 1:100; end
 if iscell(analysisdir), analysisdir = char(analysisdir); end
 needthese = {'mask.img' 'ResMS.img' 'con_0001.img'}; 

@@ -11,7 +11,7 @@ function bspm_imshow(im, slices)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<1, error('USAGE: bspm_imshow(im, slices)'); end
+if nargin<1, mfile_showhelp; return; end
 if nargin<2, slices = []; end
 if iscell(im), im = im{1}; end
 if ischar(im), im = spm_vol(im); im = spm_read_vols(im); end

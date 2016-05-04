@@ -13,7 +13,7 @@ function bspm_add_rwls(nuisancefile, goodspmmat)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<2, error('USAGE = bspm_add_rwls(nuisancefile, goodspmmat)'); end
+if nargin<2, mfile_showhelp; return; end
 if ischar(nuisancefile) nuisancefile = cellstr(nuisancefile); end
 
 %% GET RWLS

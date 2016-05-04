@@ -2,7 +2,7 @@ function bspm_print_reg(in,prefix)
 
 % ========================================================================%
 if nargin<2, prefix = 'printreg'; end
-if nargin<1, disp('USAGE: bspm_print_reg(in,outname)'); return; end
+if nargin<1, mfile_showhelp; return; end
 if ischar(in), in = cellstr(in); end
 allaxial = [];
 allsagittal = [];

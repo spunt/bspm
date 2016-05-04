@@ -23,7 +23,7 @@ function bspm_omit_vols(folderpat, omitpat)
 %
 %	$Revision Date: Aug_20_2014
 
-if nargin<2, error('USAGE: bspm_omit_vols(folderpat, omitpat)'); end
+if nargin<2, mfile_showhelp; return; end
 
 % get folders
 foldernames = files(folderpat);

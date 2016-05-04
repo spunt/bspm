@@ -12,7 +12,8 @@ function vox=mm2vox(varargin)
 % 
 
 if nargin<1
-    return
+    mfile_showhelp; 
+    return;
 else
     mm= varargin{1};
     d = find(size(mm) == 3);

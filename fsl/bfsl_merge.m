@@ -11,7 +11,7 @@ function bfsl_merge(images, outname)
 %      -a : auto-choose: single slices -> volume, volumes -> 4D (time series)
 %      -tr : concatenate images in time and set the output image tr to the final option value
 % --------------------------------------------------------------------------------------------
-if nargin < 1, error('USAGE: bfsl_merge(images, outname)'); end
+if nargin < 1, mfile_showhelp; return; end
 if ischar(images), images = cellstr(images); end
 [p1,n1] = fileparts(images{1});
 if nargin < 2
