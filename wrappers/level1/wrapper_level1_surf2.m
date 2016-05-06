@@ -14,20 +14,22 @@ function allinput = wrapper_level1_surf2(covidx, varargin)
 defaults = {
            'studydir',    '/Users/bobspunt/Documents/fmri/dog', ...
            'studyname',   'dog',                                ...
-           'nuisancepat', 'rp*.txt',                ...
-           'epipat',      'swbua*nii',                           ...
+           'nuisancepat', 'rp*.txt',                            ...
+           'epipat',      'swbua*nii',                          ...
            'subid',       'RA*',                                ...
            'runid',       'EP*SURF2*',                          ...
            'behavid',     'surf2*mat',                          ...
            'rateid',      'rate*mat',                           ...
            'basename',    'SURF2',                              ...
-           'tag',         's6w2rp',                               ...
+           'tag',         's6w2rp',                             ...
            'brainmask',   '',                                   ...
            'epifname',    [],                                   ...
            'model',       '2X3',                                ...
            'HPF',         100,                                  ...
            'armethod',    2,                                    ...
-           'junkerrors',  0,                                    ...
+           'junkerrors',  1,                                    ...
+           'junkfoils',   1,                                    ...
+           'modelcues',   1,                                    ...
            'fcontrast',   1,                                    ...
            'nskip',       4,                                    ...
            'runtest',     0,                                    ...
@@ -37,7 +39,19 @@ defaults = {
              };
 vals = setargs(defaults, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
-fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
+fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
+allinput = []; 
+
+% | CHECK INPUTS
+% | ===========================================================================
+if all([junkfoils ismember(3, covidx)])
+    printmsg('If you junk foils, you cannot include them as a covariate', 'msgtitle', 'ERROR');
+    return;
+end
+if all([junkerrors ismember(2, covidx)])
+    printmsg('If you junk errors, you cannot include them as a covariate', 'msgtitle', 'ERROR'); 
+    return;
+end
 
 % | PATHS
 % | ===========================================================================
@@ -69,8 +83,8 @@ if ~isempty(covidx)
 else
     pmstr = 'None';
 end
-analysisname  = sprintf('%s_%s_Pmodby_%s_%sERR_%s_%ds_%s', basename, tag, ...
-                        pmstr, labs{junkerrors + 1}, armethodlabels{armethod + 1}, HPF, bob_timestamp);
+analysisname  = sprintf('%s_%s_Pmodby_%s_%sERR_%sFOIL_%sCUE_%s_%ds_%s', basename, tag, ...
+                        pmstr, labs{junkerrors + 1}, labs{junkfoils + 1}, labs{2 - modelcues}, armethodlabels{armethod + 1}, HPF, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
 % | IMAGING PARAMETERS
@@ -144,10 +158,16 @@ for s = 1:length(subdir)
 
         % | Conditions
         % | =====================================================================
-        for c = 1:length(b.condlabels)
+        ncond = length(b.condlabels); 
+        for c = 1:ncond
             runs(r).conditions(c).name      = b.condlabels{c};
             runs(r).conditions(c).onsets    = b.data(b.data(:,2)==c, 4);
             runs(r).conditions(c).durations = b.data(b.data(:,2)==c, 5);
+        end
+        if modelcues
+            runs(r).conditions(ncond+1).name      = 'Question';
+            runs(r).conditions(ncond+1).onsets    = b.data(:,4) - 1.50; 
+            runs(r).conditions(ncond+1).durations = 1.35;
         end
 
         % | Floating Parametric Modulators
@@ -258,7 +278,7 @@ end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, rate, yesnokeys, junkerrors)
+function b = get_behavior(in, rate, yesnokeys, junkerrors, junkfoils)
     % GET_BEHAVIOR
     % 
     %   USAGE: b = get_behavior(in, rate, yesnokeys, junkerrors)
@@ -285,6 +305,7 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     if nargin < 2, error('USAGE: b = get_behavior(in, rate, yesnokeys, junkerrors)'); end
     if nargin < 3, yesnokeys = [1 2]; end
     if nargin < 4, junkerrors = 0; end
+    if nargin < 5, junkfoils = 0; end
     if iscell(in), in = char(in); end
     if iscell(rate), rate = char(rate); end
 
@@ -322,6 +343,7 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     data(nridx, 2)                   = 7; 
     data(nridx, 10)                  = 1.5;
     if junkerrors, data(data(:,11)==1, 2) = 7; end
+    if junkfoils, data(data(:,3)==2, 2) = 7; end
     if any(data(:,2)==7), b.condlabels{7}   = 'Junk'; end
     b.data                           = data(:,[1 2 3 8 10 11]);
     b.data(:,3)                      = b.data(:,3) - 1;

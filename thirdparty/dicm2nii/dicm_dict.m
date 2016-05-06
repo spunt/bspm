@@ -18,18 +18,13 @@ function dict = dicm_dict(vendor, flds)
 % 141024 Use LocationsInAcquisition as nSL for all vendors.
 % 141030 Make ScanningSequence & SequenceVariant consistent for vendors.
 % 150114 Add two more CSA header duplicate tags, and more command tags.
+% 160411 dict contains group and element.
 
 if nargin<1, vendor = 'SIEMENS'; end
 dict.vendor = vendor;
 % Shortened items common across vendors from Matlab dicom-dict.txt
 %    group element vr  name
 C = {   
-    '0000' '0002' 'UI' 'AffectedSOPClassUID'
-    '0000' '0100' 'US' 'CommandField'
-    '0000' '0110' 'US' 'MessageID'
-    '0000' '0700' 'US' 'Priority'
-    '0000' '0800' 'US' 'DataSetType'
-    '0000' '1000' 'UI' 'AffectedSOPInstanceUID'
     '0002' '0001' 'OB' 'FileMetaInformationVersion'
     '0002' '0002' 'UI' 'MediaStorageSOPClassUID'
     '0002' '0003' 'UI' 'MediaStorageSOPInstanceUID'
@@ -276,6 +271,7 @@ C = {
     '0018' '9239' 'SQ' 'SpecificAbsorptionRateSequence'
     '0018' '9240' 'US' 'RFEchoTrainLength'
     '0018' '9241' 'US' 'GradientEchoTrainLength'
+    '0018' '9302' 'CS' 'AcquisitionType'
     '0020' '000D' 'UI' 'StudyInstanceUID'
     '0020' '000E' 'UI' 'SeriesInstanceUID'
     '0020' '0010' 'SH' 'StudyID'
@@ -568,8 +564,8 @@ elseif strncmpi(vendor, 'GE', 2)
     '0019' '10E2' 'DS' 'VelocityEncodeScale'
     '0019' '10F2' 'SS' 'FastPhases'
     '0019' '10F9' 'DS' 'TransmitGain'
-    '0020' '9301' 'DS' 'ImagePositionPatient' % These 4 are not private
-    '0020' '9302' 'DS' 'ImageOrientationPatient' % but seems used only by GE
+    '0020' '9301' 'FD' 'ImagePositionPatient' % These 4 are not private
+    '0020' '9302' 'FD' 'ImageOrientationPatient' % but seems used only by GE
     '0020' '930E' 'SQ' 'PlanePositionSequence'
     '0020' '930F' 'SQ' 'PlaneOrientationSequence'
     '0021' '1003' 'SS' 'SeriesFromWhichPrescribed'
@@ -1008,7 +1004,9 @@ elseif strncmpi(vendor, 'Philips', 7)
 % elseif strncmpi(vendor, 'OtherVendor', n)
 end
 
-dict.tag = uint32(hex2dec(strcat(C(:,1), C(:,2))));
+dict.group = uint16(hex2dec(C(:,1)));
+dict.element = uint16(hex2dec(C(:,2)));
+dict.tag = uint32(dict.group) * 65536 + uint32(dict.element);
 dict.vr = C(:,3); % for implicit VR and some problematic explicit VR
 dict.name = C(:,4);
 
@@ -1022,8 +1020,12 @@ if nargin>1 && ~isempty(flds) % use only provided fields
     dict.tag  = dict.tag(ind);
     dict.vr   = dict.vr(ind);
     dict.name = dict.name(ind);
+    dict.group = dict.group(ind);
+    dict.element = dict.element(ind);
 end
 
 [dict.tag, ind] = unique(dict.tag); % sort by tag
 dict.vr = dict.vr(ind);
 dict.name = dict.name(ind);
+dict.group = dict.group(ind);
+dict.element = dict.element(ind);

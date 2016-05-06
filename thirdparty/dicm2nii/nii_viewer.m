@@ -15,7 +15,7 @@ function nii_viewer(fname, overlayName)
 % was tilted with a large angle, and then the orientation labeling will be less
 % accurate. The benefit is that no interpolation is needed for the background
 % image, and there is no need to switch coordinate system when images with
-% different systems are overlayed. The display is always in correct scale at
+% different systems are overlaid. The display is always in correct scale at
 % three axes even with non-isotropic voxels. The displayed IJK always correspond
 % to left -> right, posterior -> anterior and inferior -> superior directions,
 % although the NIfTI data may not be saved in this order or along these
@@ -44,15 +44,15 @@ function nii_viewer(fname, overlayName)
 % 
 % A special overlay feature "Add aligned overlay" can be used to check the
 % effect of registration, or overlay an image to a different coordinate system
-% without explicitly transformation. It will ask for a NIfTI and a tranformation
-% matrix which aligns the NIfTI to the background image. Here is an example to
-% check FSL alignment. From a .feat/reg folder, Open "highres" as background
-% image. "Add overlay" for "example_func". If there is head movement between the
-% highres and the functional scans, the overlap will be off. Now "Add aligned
-% overlay" for "example_func", and use "example_func2highres.mat" as the matrix.
-% The two dataset should overlap well if the alignment matrix is accurate. Here
-% is another example to overlay to a different system for FSL result. Open a
-% file .feat/reg/standard.nii.gz as background. If an image like
+% without explicitly transformation. It will ask for a NIfTI and a
+% transformation matrix which aligns the NIfTI to the background image. Here is
+% an example to check FSL alignment. From a .feat/reg folder, Open "highres" as
+% background image. "Add overlay" for "example_func". If there is head movement
+% between the highres and the functional scans, the overlap will be off. Now
+% "Add aligned overlay" for "example_func", and use "example_func2highres.mat"
+% as the matrix. The two dataset should overlap well if the alignment matrix is
+% accurate. Here is another example to overlay to a different system for FSL
+% result. Open a file .feat/reg/standard.nii.gz as background. If an image like
 % .feat/stats/zstat1.nii.gz is added as an overlay, a warning message will say
 % inconsistent coordinate system since the zstat image is in Scanner Anat. The
 % correct way is to "Add aligned overlay" for zstat1, and use
@@ -86,7 +86,7 @@ function nii_viewer(fname, overlayName)
 % feature is indicated by a frame grouping these parameters. Each NIfTI file has
 % its own set of parameters (display min and max value, LUT, alpha, whether to
 % smooth, interpolation method, and volume number) to control its display.
-% Moving the mouse onto a parameter will show what the paramter means.
+% Moving the mouse onto a parameter will show what the parameter means.
 % 
 % The lastly added overlay is on the top of display and top of the file list.
 % The background and overlay order can be changed by the two small buttons next
@@ -117,17 +117,23 @@ function nii_viewer(fname, overlayName)
 % 
 % Popular LUT options are implemented. Custom LUT can be added by File -> Load
 % custom LUT. The color coding can be shown by View -> Show colorbar. There are
-% two special LUTs. The "two-sided" allows to show both positive and negative
-% data in one view. For example, if the display range is 3 to 10 for a t-map,
-% positive T above 3 will be coded as red-yellow, and T below -3 will be coded
-% as blue-green. This means the absolute display range values are used.
+% several special LUTs. The "two-sided" allows to show both positive and
+% negative data in one view. For example, if the display range is 3 to 10 for a
+% t-map, positive T above 3 will be coded as red-yellow, and T below -3 will be
+% coded as blue-green. This means the absolute display range values are used.
 % 
-% The other special LUT is "lines" in red text. This is for normalized vector
+% One of the special LUT is "lines" in red text. This is for normalized vector
 % display, e.g. for diffusion vector. The viewer will refuse the LUT selection
 % if the data is not normalized vector. Under this LUT, all other parameters for
 % the display are ignored. The color of the "lines" is the max color of previous
 % LUT. For example, if one likes to show blue vector lines, choose LUT "blue"
 % first, then change it to "lines".
+% 
+% There are two special LUT to display phase of complex image. The magnitude is
+% used as threshold. The LUT "phase" maps 0~2*pi to red-yellow. The "phase2"
+% maps 0~2pi to red-yellow-green-cyan-blue, and is convenient to display
+% activation of rotating wedge for retinotopy. To use this feature, one can save
+% an complex NIfTI storing the Fourier component at the stimulus frequency.
 % 
 % Note that, in case of RGB NIfTI, the viewer will always display it as encoded
 % color regardless of the LUT option. The display min and max value also have no
@@ -197,7 +203,8 @@ function nii_viewer(fname, overlayName)
 % 160208 Allow moving background image in stack.
 % 160209 RGBA data supported; Background image can use lut "lines".
 % 160218 "lines": Fix non-isovoxel display; Same-dim background not required.
-% End of history. Don't edit this line!
+% 160402 nii_xform_mat: make up R for possible Analyze file.
+% 160506 Two phase LUT to map complex img: useful for retinotopy.
 
 haveFig = nargin>1 && isstruct(overlayName); % internal call by 'open' or dnd
 if haveFig
@@ -306,7 +313,7 @@ c = round(hs.q{1}.R \ [xyz 1]'); c = c(1:3)' + 1; %
 ind = c<=1 | c>=dim;
 c(ind) = round(dim(ind)/2);
 % c = round(dim/2); % start cursor at the center of images
-xyz = round(hs.q{1}.R * [c-1 1]'); % take care of round error
+xyz = round(hs.q{1}.R * [c-1 1]'); % take care of rounding error
 
 %% control panel
 pos = getpixelposition(fh); pos = [1 pos(4)-64 pos(3) 64];
@@ -325,7 +332,6 @@ setappdata(hs.files, 'PreviousValue', 1);
 try
     % java_dnd based on dndcontrol at matlabcentral/fileexchange/53511
     try java_dnd(jAxisComponent, {@javaDropFcn fh}); catch, end
-    
     drawnow; jScrollPane = jscroll_handle(jAxisComponent); % must drawnow
     % jScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED = 20
     cbStr = 'set(gcbo, ''VerticalScrollBarPolicy'', 20)';
@@ -373,7 +379,7 @@ hs.lut = uicontrol(ph, 'Style', 'popup', 'Position', [214 8 74 22], ...
     'String', {'grayscale' 'red' 'green' 'blue' 'violet' 'yellow' 'cyan' ...
     'red-yellow' 'blue-green' 'two-sided'  '<html><font color="red">lines' ...
     'parula' 'jet' 'hsv' 'hot' 'cool' 'spring' 'summer' 'autumn' 'winter' ...
-    'bone' 'copper' 'pink' 'prism' 'flag'}, ...
+    'bone' 'copper' 'pink' 'prism' 'flag' 'phase' 'phase2'}, ...
     'BackgroundColor', 'w', 'Callback', cb('lut'), 'Value', p.lut, ...
     'TooltipString', 'Lookup table options for non-RGB data');
 
@@ -572,17 +578,25 @@ switch cmd
         i = get(hs.files, 'Value');
         val = get(h, 'Value');
         
-        if strcmp(cmd, 'lut') && val == 11 % error check for vector lines
-            err = true;
+        if val == 11 && val~=p(i).lut
             set(hs.lut, 'UserData', p(i).lut); % remember old lut
-            if size(hs.q{i}.nii.img,4)~=3
-                errordlg('Not valid vector data: dim4 is not 3');
-            else
-                a = sum(hs.q{i}.nii.img.^2, 4); a = a(a(:)>1e-4);
-                if any(abs(a-1)>0.1)
-                    errordlg('Not valid vector data: squared sum is not 1');
-                else err = false; % passed all checks
+        end
+        if strcmp(cmd, 'lut')
+            err = false;
+            if val == 11 % error check for vector lines
+                err = true;
+                if size(hs.q{i}.nii.img,4)~=3
+                    errordlg('Not valid vector data: dim4 is not 3');
+                else
+                    a = sum(hs.q{i}.nii.img.^2, 4); a = a(a(:)>1e-4);
+                    if any(abs(a-1)>0.1)
+                        errordlg('Not valid vector data: squared sum is not 1');
+                    else err = false; % passed all checks
+                    end
                 end
+            elseif any(val == [26 27]) % error check for phase img
+                err = ~isfield(hs.q{i}, 'phase');
+                if err, warndlg('Seleced image is not complex data.'); end
             end
             if err, set(hs.lut, 'Value', p(i).lut); return; end % undo selection
         end
@@ -1123,6 +1137,11 @@ for i = 1:numel(p)
     if isfield(hs.q{i}, 'modulation')
         img = bsxfun(@times, img, hs.q{i}.modulation);
     end
+
+    if lut == 26 || lut == 27 % borrow interp/smooth method for phase img
+        img(:,:,:,2) = hs.q{i}.phase(:,:,:,t);
+        dim4 = dim4 + 1; % not elegant
+    end
     
     for ix = iaxis
         ind = get(hs.ijk(ix), 'Value'); % faster than hs.ijk(ix).getValue
@@ -1179,8 +1198,12 @@ for i = 1:numel(p)
         elseif ix == 3, im = permute(im, [2 1 4 3]);
         end
         
-        if dim4 == 1 % not RGB
+        if dim4 < 3 % not RGB
             rg = sort([p(i).lb p(i).ub]);
+            if lut == 26 || lut == 27
+                im = im(:,:,2) .* single(im(:,:,1)>min(abs(rg))); % mag as mask
+                rg = [0 1]; % disable later scaling
+            end
             if rg(2)<0 % asking for negative data
                 rg = -rg([2 1]);
                 if lut~=10, im = -im; end
@@ -1190,7 +1213,7 @@ for i = 1:numel(p)
                 im_neg = -single(im) .* (im<0);
                 im_neg = (im_neg-rg(1)) / (rg(2)-rg(1));
                 im_neg(im_neg>1) = 1; im_neg(im_neg<0) = 0;
-                alfa = im_neg; % add positve part later
+                alfa = im_neg; % add positive part later
                 im_neg = repmat(im_neg, [1 1 3]); % gray now
             else
                 alfa = single(0);
@@ -1209,7 +1232,7 @@ for i = 1:numel(p)
                 case 5, im(:,:,2) = 0; % violet
                 case 6, im(:,:,3) = 0; % yellow
                 case 7, im(:,:,1) = 0; % cyan
-                case {8 19}% red_yellow, autumn
+                case {8 19} % red_yellow, autumn
                     a = im(:,:,1); a(a>0) = 1; im(:,:,1) = a;
                     im(:,:,3) = 0;
                 case 9 % blue_green
@@ -1242,6 +1265,27 @@ for i = 1:numel(p)
                     a = im(:,:,1); a = a*1.25; a(a>1) = 1; im(:,:,1) = a;
                     im(:,:,2) = im(:,:,2) * 0.7812;
                     im(:,:,3) = im(:,:,3) * 0.5;
+                case 26 % phase, like red_yellow
+                    im(:,:,1) = 1; im(:,:,3) = 0;
+                case 27 % red-yellow-green-cyan-blue
+                    a = im(:,:,1);
+                    b1 = a<=0.25;
+                    b2 = a>0.25 & a<=0.5;
+                    b3 = a>0.5 & a<=0.75;
+                    b4 = a>0.75;
+                    a(b2)= (0.5-a(b2))*4; a(b1) = 1;
+                    a(b3 | b4) = 0;
+                    im(:,:,1) = a;
+                    
+                    a = im(:,:,2);
+                    a(b1)= a(b1)*4; a(b2) = 1;
+                    a(b3)= 1; a(b4) = (1-a(b4))*4;
+                    im(:,:,2) = a;
+                    
+                    a = im(:,:,3);
+                    a(b1 | b2) = 0;
+                    a(b3) = (a(b3)-0.5)*4; a(b4) = 1;
+                    im(:,:,3) = a;
                 otherwise % parula(12), jet(13), hsv(14), bone(21), pink(23), custom
                     if lut <= 25
                         str = get(hs.lut, 'String');
@@ -1256,7 +1300,7 @@ for i = 1:numel(p)
                         end
                         a = round(im(:,:,1) * size(map,1));
                     else % custom
-                        map = hs.custom{lut-25};
+                        map = hs.custom{lut-27};
                         a = round(im(:,:,1) * (size(map,1)-1)) + 1; % 1st is bkgrnd
                     end
                     
@@ -1468,10 +1512,17 @@ if q.nii.hdr.intent_code == 1002 % Label
     end
 end
 
+if ~isreal(q.nii.img)
+    q.phase = angle(q.nii.img); % -pi to pi
+    q.phase = mod(q.phase/(2*pi), 1); % 0~1
+    q.nii.img = abs(q.nii.img); % real now
+end
+
 img = q.nii.img(:,:,:,1,1,1,1,1);
 if ~isfloat(img)
     img = single(img) * q.nii.hdr.scl_slope + q.nii.hdr.scl_inter;
 end
+
 if q.nii.hdr.intent_code > 1000 || isfield(q, 'labels')
     rg = [min(img(:)) max(img(:))];
 elseif q.nii.hdr.datatype == 511
@@ -1485,6 +1536,13 @@ end
 %% Return xform mat and form_code: form_code may have two if no valid ask_code
 function [R, frm] = nii_xform_mat(hdr, ask_code)
 c = [hdr.sform_code hdr.qform_code];
+f = c(c>=1 & c<=4); f(mod(f,1)>0) = []; % 1/2/3/4 only
+if isempty(f) || ~strncmp(hdr.magic, 'n', 1) % make up R for Analyze file
+    R = [diag(hdr.pixdim(2:4)) -(hdr.dim(2:4).*hdr.pixdim(2:4)/2)'; 0 0 0 1];
+    R(1,:) = -R(1,:); % left handed?
+    frm = 0;
+    return;
+end
 useS = true; frm = c(1);
 if nargin<2 || isempty(ask_code)
     if c(1)<1 && c(2)>0, frm = c(2); useS = false; end
@@ -1497,11 +1555,7 @@ elseif numel(ask_code) == 2
         frm = c(2); useS = false;
     end
 end
-if frm == 0
-    R = diag(hdr.pixdim(2:4));
-    R(:,4) = -hdr.pixdim(2:4) .* hdr.dim(2:4) / 2;
-    R = [R; 0 0 0 1];
-elseif useS
+if useS
     R = [hdr.srow_x; hdr.srow_y; hdr.srow_z; 0 0 0 1];
 else % use qform
     b = hdr.quatern_b;
@@ -1509,10 +1563,10 @@ else % use qform
     d = hdr.quatern_d;
     a = sqrt(1-b*b-c*c-d*d);
     R = [1-2*(c*c+d*d)  2*(b*c-d*a)     2*(b*d+c*a);
-        2*(b*c+d*a)    1-2*(b*b+d*d)   2*(c*d-b*a);
-        2*(b*d-c*a )   2*(c*d+b*a)     1-2*(b*b+c*c)];
+         2*(b*c+d*a)    1-2*(b*b+d*d)   2*(c*d-b*a);
+         2*(b*d-c*a )   2*(c*d+b*a)     1-2*(b*b+c*c)];
     R = R * diag(hdr.pixdim(2:4));
-    if hdr.pixdim(1)<0, R(:,3)= -R(:,3); end
+    if hdr.pixdim(1)<0, R(:,3)= -R(:,3); end % qfac
     R = [R [hdr.qoffset_x hdr.qoffset_y hdr.qoffset_z]'; 0 0 0 1];
 end
 
@@ -1548,6 +1602,7 @@ if rg(1)<mi || isnan(rg(1)), rg(1) = mi; end
 if rg(2)>ma || isnan(rg(2)), rg(2) = ma; end
 if rg(1)==rg(2), rg(1) = mi; end
 rg = str2num(sprintf('%.2g ', rg)); %#ok<*ST2NM>
+if rg(1)==rg(2), rg(1) = mi; end
 if abs(rg(1))>10, rg(1) = floor(rg(1)/2)*2; end % even number
 if abs(rg(2))>10, rg(2) = ceil(rg(2)/2)*2; end % even number
 
@@ -1657,7 +1712,7 @@ elseif lut == 4, map(:,1:2) = 0; % blue
 elseif lut == 5, map(:,2) = 0; % violet
 elseif lut == 6, map(:,3) = 0; % yellow
 elseif lut == 7, map(:,1) = 0; % cyan
-elseif lut == 8, map(:,3) = 0; map(:,1) = 1; % red_yellow
+elseif any(lut == [8 19 26]), map(:,3) = 0; map(:,1) = 1; % red_yellow
 elseif lut == 9, map(:,1) = 0; map(:,3) = map(end:-1:1,3); % blue_green
 elseif lut == 10 % two-sided
     map = map(1:2:end,:); % half
@@ -1734,8 +1789,17 @@ elseif lut == 12 % parula not in old matlab, otherwise this can be omitted
 elseif lut < 26 % matlab LUT
     str = get(hs.lut, 'String');
     map = feval(str{lut}, 64);
+elseif lut == 27 % phase2: red-yellow-green-cyan-blue
+    a = map;
+    a(33:64, 1) = a(64:-2:1, 1); a(1:32, 1) = 1; 
+    a(:,2) = a(64:-1:1, 1);
+    a(:,3) = 0;
+    map(1:32,:) = a(1:2:64,:);
+    a = a(:, [3 1 2]);
+%     a = a(:, [3 2 1]); % sharp change at pi
+    map(33:64,:) = a(1:2:64,:);
 else % custom
-    map = hs.custom{lut-25};
+    map = hs.custom{lut-27};
 end
 
 %% Preference dialog
@@ -2159,7 +2223,9 @@ if lut == 11, map = lut2map(get(hs.lut, 'UserData'), hs);
 else map = lut2map(lut, hs);
 end
 rg = sort([p(i).lb p(i).ub]);
-if lut~=10
+if lut == 26 || lut == 27
+    labls = {'0' char(960) ['2' char(960)]};
+elseif lut~=10
     if rg(2)<0, rg = rg([2 1]); end
     mn = str2double(num2str(mean(rg), '%.4g'));
     labls = [rg(1) mn rg(2)];
@@ -2333,10 +2399,12 @@ end
 function jObj = childScroll(parent)
 jObj = [];
 try nComp = parent.getComponentCount; catch, return; end
+% for i = nComp-1:-1:0
 for i = 0:nComp-1
     try
         h = parent.getComponent(i);
         typ = h.getUIClassID;
+%         disp(typ)
         if strcmp(typ, 'ScrollPaneUI')
             jObj = handle(h, 'CallbackProperties'); % got it
         elseif ~isempty(strfind(typ, 'Menu'))

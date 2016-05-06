@@ -244,7 +244,7 @@ function varargout = nii_tool(cmd, varargin)
 % 151222 Take care of img for intent_code 2003/2004: anyone uses it?
 % 160110 Use matlab pref method to replace para file.
 % 160120 check_gzip: use "" for included pigz; ignore dd error if err is false.
-% End of history. Don't edit this line!
+% 160326 fix setpref for older Octave: set each parameter separately.
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -605,8 +605,9 @@ end
 function [C, para] = niiHeader(niiVer)
 pf = getpref('nii_tool_para');
 if isempty(pf)
-    pf = struct('version', 1, 'rgb_dim', 1);
-    setpref('nii_tool_para', fieldnames(pf), struct2cell(pf));
+    setpref('nii_tool_para', 'version', 1);
+    setpref('nii_tool_para', 'rgb_dim', 1);
+    pf = getpref('nii_tool_para');
 end
 if nargin<1 || isempty(niiVer), niiVer = pf.version; end
 

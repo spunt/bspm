@@ -40,7 +40,7 @@ if isempty(flds)
     dict = dicm_dict('', [flds 'SamplesPerPixel' 'PixelRepresentation' ...
                      'PlanarConfiguration' 'BitsStored' 'HighBit']);
 end
-if isstruct(s) && ~all(isfield(s, flds)), s = s.Filename; end
+if isstruct(s) && ~all(isfield(s, [flds 'PixelData'])), s = s.Filename; end
 if ischar(s), [s, err] = dicm_hdr(s, dict); end % input is file name
 if isempty(s), error(err); end
 if isfield(s, 'SamplesPerPixel'), spp = double(s.SamplesPerPixel);
@@ -55,6 +55,13 @@ end
 if all(isfield(s, {'BitsStored' 'HighBit'})) && s.BitsStored ~= s.HighBit+1
     error('Please report to author: HighBit+1 ~= BitsStored, %s', s.Filename);
 end
+if ~isfield(s.PixelData, 'Format')
+    fmt = sprintf('*uint%g', s.BitsAllocated);
+else
+    fmt =  s.PixelData.Format;
+end
+
+if nargin<2 || isempty(xpose), xpose = true; end % same as dicomread by default
 
 fid = fopen(s.Filename);
 if fid<0
@@ -66,13 +73,6 @@ if fid<0
 end
 closeFile = onCleanup(@() fclose(fid));
 fseek(fid, s.PixelData.Start, -1);
-if ~isfield(s.PixelData, 'Format')
-    fmt = sprintf('*uint%g', s.BitsAllocated);
-else
-    fmt =  s.PixelData.Format;
-end
-
-if nargin<2 || isempty(xpose), xpose = true; end % same as dicomread by default
 
 if ~isfield(s, 'TransferSyntaxUID') || ... % files other than dicom
         strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2.1') || ...
@@ -136,4 +136,5 @@ end
 
 if isfield(s, 'PixelRepresentation') && s.PixelRepresentation>0
     img = reshape(typecast(img(:), fmt(3:end)), size(img)); % signed
+    % img = feval(fmt(3:end), img); % slower than above
 end
