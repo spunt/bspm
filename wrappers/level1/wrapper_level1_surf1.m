@@ -9,7 +9,11 @@ function allinput = wrapper_level1_surf1(pmidx, varargin)
 %          3 - Unsigned Valence Rating 
 %          4 - Understanding Rating (1=Not at all, 9=Completely)
 %          5 - Understanding Rating RT
-%  
+%         6 - Polarity
+%         7 - Polarity-Abs
+%         8 - Polarity-Abs x Understanding
+%         9 - Consensus-Why
+%         10 - Consensus-How
 
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
@@ -18,15 +22,15 @@ defaults = {
          'studyname',   'dog',                                ...
          'HPF',         100,                                  ...
          'armethod',    2,                                    ...
-         'nuisancepat', 'badscan*txt',                             ...
-         'epipat',      'swbua*nii*',                         ...
+         'nuisancepat', 'rp*txt',                        ...
+         'epipat',      'lswbua*nii*',                         ...
          'subid',       'RA*',                                ...
          'runid',       'EP*SURF1*',                          ...
-         'tag',         's6w2bad',                             ...
+         'tag',         'ls6w2rp',                            ...
          'behavid',     'surf1*mat',                          ...
          'rateid',      'rate*mat',                           ...
          'basename',    'SURF1',                              ...
-         'brainmask',   '',                                   ...
+         'brainmask',   bspm_brainmask,                       ...
          'fcontrast',   0,                                    ...
          'nskip',       4,                                    ...
          'runtest',     0,                                    ...
@@ -43,10 +47,14 @@ fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals);
 if strfind(pwd,'/home/spunt'), studydir = fullfile('/home/spunt/data', studyname); end
 [subdir, subnam] = files([studydir filesep subid]);
 
+% | NORMS
+% | ===========================================================================
+normdata = load(fullfile(studydir, 'STIMNORM.mat')); 
+
 % | ANALYSIS NAME
 % | ===========================================================================
 armethodlabels  = {'NoAR1' 'AR1' 'WLS'};
-covnames        = {'Signed_Valence' 'Valence_RT' 'Unsigned_Valence' 'Understanding' 'Understanding_RT'};
+covnames        = {'Signed_Valence' 'Valence_RT' 'Unsigned_Valence' 'Understanding' 'Understanding_RT' 'Polarity' 'AbsPolarity' 'AbsPolarity_x_Understanding' 'Consensus-Why' 'Consensus-How'};
 if ~isempty(pmidx)
     pmnames         = regexprep(covnames(pmidx), '_', '');
     pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
@@ -97,9 +105,9 @@ for s = 1:length(subdir)
         if isempty(images{r})
             error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); 
         end
-        b = get_behavior(behav{r}, rate);
+        b = get_behavior(behav{r}, rate, normdata.norm);
         b.data(:,3) = b.data(:,3) - adjons;
-        
+
         % | Columns for b.data
         % | =====================================================================
         %  1 - Trial #
@@ -111,9 +119,13 @@ for s = 1:length(subdir)
         %  7 - Unsigned Valence Rating 
         %  8 - Understanding Rating (1=Not at all, 9=Completely)
         %  9 - Understanding Rating RT
-        
+        % 10 - Polarity
+        % 11 - Polarity-Abs
+        % 12 - Polarity-Abs x Understanding
+        % 13 - Consensus-Why
+        % 14 - Consensus-How
         if ~isempty(pmidx)
-            allpm           = b.data(:,5:9);
+            allpm           = b.data(:,5:end);
             modelpm         = allpm(:,pmidx);
             modelpmnames    = pmnames; 
             novaridx = find(nanstd(modelpm)==0);
@@ -183,7 +195,7 @@ for s = 1:length(subdir)
             0 pmpad 0 pmpad 1 pmpad -1 0;
             1 pmpad -1 pmpad 0 pmpad 0 0; 
             1 pmpad 0 pmpad -1 pmpad 0 0;
-            0 pmpad 1 pmpad -1 pmpad 0 0    ]; 
+            0 pmpad 1 pmpad -1 pmpad 0 0    ];
     weights = [w1; w2]; 
     ncon    = size(weights,1);
     for c = 1:ncon
@@ -210,7 +222,7 @@ end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, rate)
+function b = get_behavior(in, rate, norm)
 % GET_BEHAVIOR
 %
 %   USAGE: b = get_behavior(in)
@@ -227,14 +239,19 @@ function b = get_behavior(in, rate)
 %          7 - Unsigned Valence Rating 
 %          8 - Understanding Rating (1=Not at all, 9=Completely)
 %          9 - Understanding Rating RT
-%
+%         10 - Polarity
+%         11 - Polarity-Abs
+%         12 - Polarity-Abs x Understanding
+%         13 - Consensus-Why
+%         14 - Consensus-How
+
 % RATINGS
 %   1 - How does the photograph make you feel? (1=Very Bad, 9=Very Good)
 %   2 - Do you understand what he or she is feeling? (1=Not at all, 9=Completely)
 %
 % CREATED: Bob Spunt, Ph.D. (bobspunt@gmail.com) - 2014.02.24
 % =========================================================================
-if nargin < 2, error('USAGE: b = get_behavior(in, rate)'); end
+if nargin < 3, error('USAGE: b = get_behavior(in, rate, norm)'); end
 if iscell(in), in = char(in); end
 if iscell(rate), rate = char(rate); end
 
@@ -244,14 +261,14 @@ d = load(in);
 b.subjectID     = d.subjectID;
 [~,b.stimulus]  = cellfun(@fileparts, d.slideName', 'unif', false);
 b.condlabels    = {'Human' 'Monkey' 'Dog' 'Scramble' 'Catch'};
-b.varlabels     = {'Trial' 'Cond' 'Onset' 'Duration' 'Signed_Valence' 'Valence_RT' 'Unsigned_Valence' 'Understanding' 'Understanding_RT'};
+b.varlabels     = {'Trial' 'Cond' 'Onset' 'Duration' 'Signed_Valence' 'Valence_RT' 'Unsigned_Valence' 'Understanding' 'Understanding_RT' 'Polarity' 'AbsPolarity' 'AbsPolarity_x_Understanding' 'Consensus-Why' 'Consensus-How'};
 data            = d.Seeker;
 b.percentcaught = 100*(sum(data(:,3)==1 & data(:,7)==1)/sum(data(:,3)==1));
 data(data(:,3)==1, 2) = 5; % catch trials 
 data(data(:,8)==0, 8) = 1.75; % duration
 stimidx = data(data(:,2) < 4, 4);
 b.data = data(:,[1 2 6 8]);
-b.data(:,5:8) = NaN;
+b.data(:,5:14) = NaN;
 
 % | read rating data
 % | ========================================================================
@@ -269,6 +286,14 @@ b.data(data(:,2)<4, 7) = abs(5 - valence(stimidx,2));
 understand      = ratedata(ratedata(:,2)==2, [1 3 4]);
 understand      = sortrows(understand, 1); 
 b.data(data(:,2)<4, 8:9) = understand(stimidx, 2:3); 
+
+% | read NORMS data
+% | ========================================================================
+norm(2:end,:)   = sortrows(norm(2:end,:), 1)
+normdata        = cell2mat(norm(2:end,3:end));
+b.data(data(:,2)<4, [10 13 14]) = normdata(stimidx,:);
+b.data(data(:,2)<4, 11) = abs(normdata(stimidx,1)); 
+b.data(:, 12) = b.data(:,11).*b.data(:,8);
 
 end    
 

@@ -15,29 +15,43 @@ defaults = {
            'studydir',    '/Users/bobspunt/Documents/fmri/dog', ...
            'studyname',   'dog',                                ...
            'nuisancepat', 'rp*.txt',                ...
-           'epipat',      'swbua*nii',                           ...
+           'epipat',      'lswbua*nii',                           ...
            'subid',       'RA*',                                ...
            'runid',       'EP*SURF2*',                          ...
            'behavid',     'surf2*mat',                          ...
            'rateid',      'rate*mat',                           ...
            'basename',    'SURF2_QWISE',                              ...
-           'tag',         's6w2rp',                               ...
+           'tag',         'ls6w2rp',                               ...
            'brainmask',   '',                                   ...
            'epifname',    [],                                   ...
            'model',       'QWISE',                                ...
            'HPF',         100,                                  ...
            'armethod',    2,                                    ...
            'junkerrors',  0,                                    ...
+           'junkfoils',   1,                                    ...
+           'modelcues',   1,                                    ...
            'fcontrast',   0,                                    ...
            'nskip',       4,                                    ...
            'runtest',     0,                                    ...
            'is4D',        1,                                    ...
            'TR',          1,                                    ...
+           'docontrast',  0,                                    ...
            'yesnokeys',   [1 2]                                 ...
              };
 vals = setargs(defaults, varargin);
 if nargin==0, mfile_showhelp; fprintf('\t= DEFAULT SETTINGS =\n'); disp(vals); return; end
 fprintf('\n\t= CURRENT SETTINGS =\n'); disp(vals); 
+
+% | CHECK INPUTS
+% | ===========================================================================
+if all([junkfoils ismember(3, covidx)])
+    printmsg('If you junk foils, you cannot include them as a covariate', 'msgtitle', 'ERROR');
+    return;
+end
+if all([junkerrors ismember(2, covidx)])
+    printmsg('If you junk errors, you cannot include them as a covariate', 'msgtitle', 'ERROR'); 
+    return;
+end
 
 % | PATHS
 % | ===========================================================================
@@ -69,9 +83,9 @@ if ~isempty(covidx)
 else
     pmstr = 'None';
 end
-analysisname  = sprintf('%s_%s_Pmodby_%s_%sERR_%s_%ds_%s', basename, tag, ...
-                        pmstr, labs{junkerrors + 1}, armethodlabels{armethod + 1}, HPF, bob_timestamp);
-printmsg(analysisname, 'msgtitle', 'Analysis Name');
+analysisname  = sprintf('%s_%s_Pmodby_%s_%sERR_%sFOIL_%sCUE_%s_%ds_%s', basename, tag, ...
+                        pmstr, labs{junkerrors + 1}, labs{junkfoils + 1}, labs{2 - modelcues}, armethodlabels{armethod + 1}, HPF, bob_timestamp);
+printmsg(analysisname, 'msgtitle', 'Analysis Name', 'msgwidth', 100);
 
 % | IMAGING PARAMETERS
 % | ========================================================================
@@ -124,8 +138,9 @@ for s = 1:length(subdir)
         % | Data for Current Run
         % | =====================================================================
         images{r}   = files([rundir{r} filesep epipat]);
+
         if isempty(images{r}), error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); end
-        b = get_behavior(behav{r}, rate, yesnokeys, junkerrors);
+        b = get_behavior(behav{r}, rate, yesnokeys, junkerrors, junkfoils);
         b.data(:,4) = b.data(:,4) - adjons;
         ncond = length(b.qwise.condlabels);
         if any(b.data(:,2)==7)
@@ -154,6 +169,11 @@ for s = 1:length(subdir)
             runs(r).conditions(c).name      = b.qwise.condlabels{c};
             runs(r).conditions(c).onsets    = b.data(b.qwise.condidx==c, 4);
             runs(r).conditions(c).durations = b.data(b.qwise.condidx==c, 5);
+        end
+        if modelcues
+            runs(r).conditions(ncond+1).name      = 'Question';
+            runs(r).conditions(ncond+1).onsets    = b.data(:,4) - 1.50; 
+            runs(r).conditions(ncond+1).durations = 0;
         end
 
         % | Floating Parametric Modulators
@@ -197,39 +217,42 @@ for s = 1:length(subdir)
     general_info.mt_res             = 16;
     general_info.mt_onset           = 8;
 
-    % | Contrasts
-    % | ========================================================================
-    % 1 - Why_Human
-    % 2 - Why_Primate
-    % 3 - Why_Dog
-    % 4 - How_Human
-    % 5 - How_Primate
-    % 6 - How_Dog
-    clab = b.qwise.condlabels; 
-    ncond = length(clab);
-    w0  = zeros(1, ncond);
-    why = cellstrfind(clab, 'WHY');
-    how = cellstrfind(clab, 'HOW');
-    weights = repmat(w0, length(why), 1);
-    weights(:,how) = -1/length(how);
-    weights(:,why) = eye(length(why));
-    conname = regexprep(clab(why), 'WHY-', '');
-    conname = strcat(conname, '_-_', 'HOW');
-    ncon    = size(weights,1);
-    for c = 1:ncon
-        contrasts(c).type       = 'T';
-        contrasts(c).weights    = weights(c,:);
-        contrasts(c).name       = conname{c};
+    if docontrast
+        % | Contrasts
+        % | ========================================================================
+        % 1 - Why_Human
+        % 2 - Why_Primate
+        % 3 - Why_Dog
+        % 4 - How_Human
+        % 5 - How_Primate
+        % 6 - How_Dog
+        clab = b.qwise.condlabels; 
+        ncond = length(clab);
+        w0  = zeros(1, ncond);
+        why = cellstrfind(clab, 'WHY');
+        how = cellstrfind(clab, 'HOW');
+        weights = repmat(w0, length(why), 1);
+        weights(:,how) = -1/length(how);
+        weights(:,why) = eye(length(why));
+        conname = regexprep(clab(why), 'WHY-', '');
+        conname = strcat(conname, '_-_', 'HOW');
+        ncon    = size(weights,1);
+        for c = 1:ncon
+            contrasts(c).type       = 'T';
+            contrasts(c).weights    = weights(c,:);
+            contrasts(c).name       = conname{c};
+        end
+        if fcontrast
+            contrasts(ncon+1).type      = 'F';
+            contrasts(ncon+1).name      = 'Omnibus';
+            contrasts(ncon+1).weights   = eye(ncond);
+        end
+        % | Make Job
+        allinput{s} = bspm_level1(images, general_info, runs, contrasts);
+    else
+        % | Make Job
+        allinput{s} = bspm_level1(images, general_info, runs);
     end
-    if fcontrast
-        contrasts(ncon+1).type      = 'F';
-        contrasts(ncon+1).name      = 'Omnibus';
-        contrasts(ncon+1).weights   = eye(ncond);
-    end
-
-    % | Make Job
-    % | ========================================================================
-    allinput{s} = bspm_level1(images, general_info, runs, contrasts);
 
     % | Cleanup Workspace
     % | ========================================================================
@@ -240,7 +263,7 @@ end
 % =========================================================================
 % * SUBFUNCTIONS
 % =========================================================================
-function b = get_behavior(in, rate, yesnokeys, junkerrors)
+function b = get_behavior(in, rate, yesnokeys, junkerrors, junkfoils)
     % GET_BEHAVIOR
     % 
     %   USAGE: b = get_behavior(in, rate, yesnokeys, junkerrors)
@@ -267,6 +290,7 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     if nargin < 2, error('USAGE: b = get_behavior(in, rate, yesnokeys, junkerrors)'); end
     if nargin < 3, yesnokeys = [1 2]; end
     if nargin < 4, junkerrors = 0; end
+    if nargin < 5, junkfoils = 0; end
     if iscell(in), in = char(in); end
     if iscell(rate), rate = char(rate); end
 
@@ -304,15 +328,16 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     data(nridx, 2)                   = 7; 
     data(nridx, 10)                  = 1.5;
     if junkerrors, data(data(:,11)==1, 2) = 7; end
+    if junkfoils, data(data(:,3)==2, 2) = 7; end
     if any(data(:,2)==7), b.condlabels{7}   = 'Junk'; end
     b.data                           = data(:,[1 2 3 8 10 11]);
     b.data(:,3)                      = b.data(:,3) - 1;
     b.data(:,7:11)                   = NaN;
-    
+    stimidx                          = data(:,4);
+    qidx                             = data(:,5);
+
     % | Question Wise
     % | ========================================================================
-   stimidx                          = data(:,4);
-    qidx                             = data(:,5);
     b.question = d.qstim(data(:,5));
     [~,tmp] = cellfileparts(d.slideName);
     tmp = cellfun(@(x) x(1:2), tmp, 'Unif', false);
@@ -324,13 +349,13 @@ function b = get_behavior(in, rate, yesnokeys, junkerrors)
     qtmp = regexprep(qtmp, ' ', '_');
     qtmp = regexprep(qtmp, 'Looking_At_The_Camera', 'Looking_at_Camera'); 
     ctmp = repmat({'WHY'}, size(qtmp));
-    ctmp(b.data(:,2)>3) = {'HOW'};
+    
+    ctmp(d.Seeker(:,2)>3) = {'HOW'};
     b.qwise.triallabels = strcat(ctmp, '-', qtmp, '_', tmp');
     [b.qwise.condlabels, ia, b.qwise.condidx] = unique(b.qwise.triallabels); 
     
     % | read rating data
     % | ========================================================================
-    
     r = load(rate); 
     ratedata        = r.Seeker;
     [~, ratestim, ext]   = cellfun(@fileparts, r.slideName', 'unif', false);

@@ -10,7 +10,6 @@ timeopt     = {lower(strtrim(datestr(now, 'HHMMpm'))) strtrim(datestr(now,'HHMMS
 if dateonly
 	str = upper(dayopt{1});
 else
-    
     str = sprintf('%s_%s', dayopt{1}, timeopt{1 + inclsecs});
 end
 

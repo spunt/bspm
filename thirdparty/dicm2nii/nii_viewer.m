@@ -129,24 +129,29 @@ function nii_viewer(fname, overlayName)
 % LUT. For example, if one likes to show blue vector lines, choose LUT "blue"
 % first, then change it to "lines".
 % 
-% There are two special LUT to display phase of complex image. The magnitude is
-% used as threshold. The LUT "phase" maps 0~2*pi to red-yellow. The "phase2"
-% maps 0~2pi to red-yellow-green-cyan-blue, and is convenient to display
-% activation of rotating wedge for retinotopy. To use this feature, one can save
-% an complex NIfTI storing the Fourier component at the stimulus frequency.
+% In case of complex image, most LUTs will display only the magnitude of the
+% data, except the following three phase LUTs, where the magnitude is used as
+% mask. Here is how the 3 phase LUTs encodes phase from 0 to 360 degree:
+%  phase:  red-yellow monotonically,
+%  phase3: red-yellow-green-yellow-red circlarly, 
+%  phase6: red-yellow-green/violet-blue-cyan, with sharp change at 180 degree. 
+% These LUTs are useful to visualize activation of periodic stimulus, such as
+% those by expanding/shriking ring or rotating wedge for retinotopy. To use this
+% feature, one can save an complex NIfTI storing the Fourier component at the
+% stimulus frequency.
 % 
-% Note that, in case of RGB NIfTI, the viewer will always display it as encoded
-% color regardless of the LUT option. The display min and max value also have no
-% effect on RGB image. 
+% Note that, for RGB NIfTI, the viewer always displays the data as in color
+% regardless of the LUT option. The display min and max value also have no
+% effect on RGB image.
 % 
-% The figure can be copied into clipboard (not available for Linux) or saved as
-% variety of image format. For high quality picture, one can increase the output
-% resolution from Help -> Preferences -> Resolution. Higher resolution will take
-% longer time to copy or save, and result in larger file. If needed, one can
-% change to white background for picture output. With white background, the
-% threshold for the background image needs to be carefully selected to avoid
-% strange effect with some background images. For this reason, white background
-% is intended only for picture output.
+% The viewer figure can be copied into clipboard (not available for Linux) or
+% saved as variety of image format. For high quality picture, one can increase
+% the output resolution from Help -> Preferences -> Resolution. Higher
+% resolution will take longer time to copy or save, and result in larger file.
+% If needed, one can change to white background for picture output. With white
+% background, the threshold for the background image needs to be carefully
+% selected to avoid strange effect with some background images. For this reason,
+% white background is intended only for picture output.
 % 
 % The selected NIfTI can also be saved as different format from File -> Save
 % NIfTI as. For example, a file can be saved as a different resolution. With a
@@ -204,7 +209,8 @@ function nii_viewer(fname, overlayName)
 % 160209 RGBA data supported; Background image can use lut "lines".
 % 160218 "lines": Fix non-isovoxel display; Same-dim background not required.
 % 160402 nii_xform_mat: make up R for possible Analyze file.
-% 160506 Two phase LUT to map complex img: useful for retinotopy.
+% 160506 phase LUT to map complex img: useful for retinotopy.
+% 160509 Have 3 phase LUTs; Implement 'Open in new window'.
 
 haveFig = nargin>1 && isstruct(overlayName); % internal call by 'open' or dnd
 if haveFig
@@ -213,6 +219,7 @@ if haveFig
     pf = get(hs.pref, 'UserData');
     pos = getpixelposition(fh);
     pos = pos(1:2); % location for new file
+    if isfield(hs, 'newWin'), haveFig = false; end
     clear hs; % delete hs after getting pos and pf
 else
     pf = getpref('nii_viewer_para');
@@ -257,7 +264,9 @@ p.lb = rg(1);
 p.ub = rg(2);
 p.lb_step = stepSize(rg(1));
 p.ub_step = stepSize(rg(2));
-if hs.q{1}.nii.hdr.intent_code == 1002 % Label
+if any(hs.q{1}.nii.hdr.datatype == [32 1792]) % complex
+    p.lut = 26; % phase
+elseif hs.q{1}.nii.hdr.intent_code == 1002 % Label
     p.lut = 24; % prism
 else
     p.lut = 1; % grayscale
@@ -379,7 +388,7 @@ hs.lut = uicontrol(ph, 'Style', 'popup', 'Position', [214 8 74 22], ...
     'String', {'grayscale' 'red' 'green' 'blue' 'violet' 'yellow' 'cyan' ...
     'red-yellow' 'blue-green' 'two-sided'  '<html><font color="red">lines' ...
     'parula' 'jet' 'hsv' 'hot' 'cool' 'spring' 'summer' 'autumn' 'winter' ...
-    'bone' 'copper' 'pink' 'prism' 'flag' 'phase' 'phase2'}, ...
+    'bone' 'copper' 'pink' 'prism' 'flag' 'phase' 'phase3' 'phase6'}, ...
     'BackgroundColor', 'w', 'Callback', cb('lut'), 'Value', p.lut, ...
     'TooltipString', 'Lookup table options for non-RGB data');
 
@@ -445,6 +454,7 @@ end
 %% menus
 h = uimenu(fh, 'Label', '&File');
 uimenu(h, 'Label', 'Open', 'Accelerator', 'O', 'UserData', pName, 'Callback', cb('open'));
+uimenu(h, 'Label', 'Open in new window', 'Callback', cb('open'));
 uimenu(h, 'Label', 'Apply mask', 'Callback', cb('mask'));
 uimenu(h, 'Label', 'Apply modulation', 'Callback', cb('mask'));
 uimenu(h, 'Label', 'Load custom LUT', 'Callback', cb('custom'));
@@ -594,7 +604,7 @@ switch cmd
                     else err = false; % passed all checks
                     end
                 end
-            elseif any(val == [26 27]) % error check for phase img
+            elseif any(val == 26:28) % error check for phase img
                 err = ~isfield(hs.q{i}, 'phase');
                 if err, warndlg('Seleced image is not complex data.'); end
             end
@@ -687,6 +697,7 @@ switch cmd
             '*.nii.gz; *.hdr.gz'], 'Select a NIfTI to view');
         if ~ischar(fname), return; end
         fname = fullfile(pName, fname);
+        if strcmp(get(h, 'Label'), 'Open in new window'), hs.newWin = true; end
         nii_viewer(fname, hs);
     case 'add'
         pName = get(hs.add, 'UserData');
@@ -1000,7 +1011,11 @@ key = evt.Key;
 ctl = evt.Modifier;
 if isempty(key) || any(strcmp(key, ctl)), return; end
 hs = guidata(h);
-if ~isempty(ctl) && (any(strcmp(ctl, 'control')) || any(strcmp(ctl, 'command')))    
+if ~isempty(ctl) && (any(strcmp(ctl, 'control')) || any(strcmp(ctl, 'command')))
+    if any(strcmp(key, {'a' 'o' 'r' 'q' 'w'})) % only 'a' wont pass to figure
+        if strcmp(key, 'a'), nii_viewer_cb(hs.add, [], 'add', hs.fig); end
+        return;
+    end
     d = abs(diff(get(hs.ax(2), 'XLim')));
     m = hs.dim(1) / d;
     factor = 1.1;
@@ -1138,7 +1153,7 @@ for i = 1:numel(p)
         img = bsxfun(@times, img, hs.q{i}.modulation);
     end
 
-    if lut == 26 || lut == 27 % borrow interp/smooth method for phase img
+    if any(lut == 26:28) % borrow interp/smooth method for phase img
         img(:,:,:,2) = hs.q{i}.phase(:,:,:,t);
         dim4 = dim4 + 1; % not elegant
     end
@@ -1200,7 +1215,7 @@ for i = 1:numel(p)
         
         if dim4 < 3 % not RGB
             rg = sort([p(i).lb p(i).ub]);
-            if lut == 26 || lut == 27
+            if any(lut == 26:28)
                 im = im(:,:,2) .* single(im(:,:,1)>min(abs(rg))); % mag as mask
                 rg = [0 1]; % disable later scaling
             end
@@ -1267,24 +1282,40 @@ for i = 1:numel(p)
                     im(:,:,3) = im(:,:,3) * 0.5;
                 case 26 % phase, like red_yellow
                     im(:,:,1) = 1; im(:,:,3) = 0;
-                case 27 % red-yellow-green-cyan-blue
+                case 27 % red-yellow-green-yellow-red
                     a = im(:,:,1);
                     b1 = a<=0.25;
                     b2 = a>0.25 & a<=0.5;
                     b3 = a>0.5 & a<=0.75;
                     b4 = a>0.75;
-                    a(b2)= (0.5-a(b2))*4; a(b1) = 1;
-                    a(b3 | b4) = 0;
+                    a(b2) = (0.5-a(b2))*4; a(b1) = 1;
+                    a(b3) = (a(b3)-0.5)*4; a(b4) = 1;
                     im(:,:,1) = a;
                     
                     a = im(:,:,2);
-                    a(b1)= a(b1)*4; a(b2) = 1;
-                    a(b3)= 1; a(b4) = (1-a(b4))*4;
+                    a(b1) = a(b1)*4; a(b2) = 1;
+                    a(b4) = (1-a(b4))*4; a(b3) = 1;
+                    im(:,:,2) = a;
+                    
+                    im(:,:,3) = 0;
+                case 28 % red-yellow-green/violet-blue-cyan
+                    a = im(:,:,1);
+                    b1 = a<=0.25;
+                    b2 = a>0.25 & a<=0.5;
+                    b3 = a>0.5 & a<=0.75;
+                    b4 = a>0.75;
+                    a(b2) = (0.5-a(b2))*4; a(b1) = 1;
+                    a(b3) = (0.75-a(b3))*4; a(b4) = 0;
+                    im(:,:,1) = a;
+                    
+                    a = im(:,:,2);
+                    a(b1) = a(b1)*4; a(b2) = 1;
+                    a(b3) = 0; a(b4) = (a(b4)-0.75)*4;
                     im(:,:,2) = a;
                     
                     a = im(:,:,3);
                     a(b1 | b2) = 0;
-                    a(b3) = (a(b3)-0.5)*4; a(b4) = 1;
+                    a(b3) = a(b3)*2; a(b4) = 1;
                     im(:,:,3) = a;
                 otherwise % parula(12), jet(13), hsv(14), bone(21), pink(23), custom
                     if lut <= 25
@@ -1300,7 +1331,7 @@ for i = 1:numel(p)
                         end
                         a = round(im(:,:,1) * size(map,1));
                     else % custom
-                        map = hs.custom{lut-27};
+                        map = hs.custom{lut-28};
                         a = round(im(:,:,1) * (size(map,1)-1)) + 1; % 1st is bkgrnd
                     end
                     
@@ -1409,7 +1440,9 @@ p(1).lb = rg(1);
 p(1).ub = rg(2);
 p(1).lb_step = stepSize(rg(1)); 
 p(1).ub_step = stepSize(rg(2));
-if q.nii.hdr.intent_code == 1002 % Label
+if any(q.nii.hdr.datatype == [32 1792]) % complex
+    p(1).lut = 26; % phase
+elseif q.nii.hdr.intent_code == 1002 % Label
     p(1).lut = 24; % prism
 else
     a = setdiff(2:7, [p.lut]); % use smallest unused lut in 2:7
@@ -1789,17 +1822,19 @@ elseif lut == 12 % parula not in old matlab, otherwise this can be omitted
 elseif lut < 26 % matlab LUT
     str = get(hs.lut, 'String');
     map = feval(str{lut}, 64);
-elseif lut == 27 % phase2: red-yellow-green-cyan-blue
-    a = map;
-    a(33:64, 1) = a(64:-2:1, 1); a(1:32, 1) = 1; 
-    a(:,2) = a(64:-1:1, 1);
-    a(:,3) = 0;
-    map(1:32,:) = a(1:2:64,:);
-    a = a(:, [3 1 2]);
-%     a = a(:, [3 2 1]); % sharp change at pi
-    map(33:64,:) = a(1:2:64,:);
+elseif lut == 27 % phase3: red-yellow-green-yellow-red
+    a = map(:,1);
+    map(1:32,3) = 0; map(1:16,1) = 1; map(17:32,2) = 1;
+    map(1:16,2) = a(1:4:64); map(17:32,1) = a(64:-4:1);
+    map(33:64,:) = map(32:-1:1,:);
+elseif lut == 28 % phase6: red-yellow-green/violet-blue-cyan
+    a = map(:,1);
+    map(1:32,3) = 0; map(1:16,1) = 1; map(17:32,2) = 1;
+    map(1:16,2) = a(1:4:64); map(17:32,1) = a(64:-4:1);
+    map(33:48,2) = 0; map(33:48,3) = 1; map(33:48,1) = a(64:-4:1);
+    map(49:64,1) = 0; map(49:64,3) = 1; map(49:64,2) = a(1:4:64);
 else % custom
-    map = hs.custom{lut-27};
+    map = hs.custom{lut-28};
 end
 
 %% Preference dialog
@@ -2223,8 +2258,8 @@ if lut == 11, map = lut2map(get(hs.lut, 'UserData'), hs);
 else map = lut2map(lut, hs);
 end
 rg = sort([p(i).lb p(i).ub]);
-if lut == 26 || lut == 27
-    labls = {'0' char(960) ['2' char(960)]};
+if any(lut == 26:28)
+    labls = [0 180 360];
 elseif lut~=10
     if rg(2)<0, rg = rg([2 1]); end
     mn = str2double(num2str(mean(rg), '%.4g'));

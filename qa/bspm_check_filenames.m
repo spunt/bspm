@@ -1,4 +1,4 @@
-function [flag, volinfo] = bspm_check_filenames(inname)
+function fn = bspm_check_filenames(inname)
 % BSPM_CHECK_FILENAMES
 % 
 %   USAGE outname = bspm_check_orientations(inname)
@@ -7,6 +7,7 @@ if nargin==0, mfile_showhelp; return; end
 if ischar(inname), inname = cellstr(inname); end
 inname              = regexprep(inname, ',\d+$', '');
 [pcim, ncim, ecim]  = cellfun(@fileparts, inname, 'unif', false);
+fn = []; 
 for i = 1:length(inname)
     
     % | If compressed, try to decompress

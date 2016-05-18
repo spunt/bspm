@@ -139,7 +139,7 @@ for s = 1:length(subdir)
         % | =====================================================================
         images{r}   = files([rundir{r} filesep epipat]);
         if isempty(images{r}), error('\nImage data not found! Failed search pattern:\n%s', [rundir{r} filesep epipat]); end
-        b = get_behavior(behav{r}, rate, yesnokeys, junkerrors);
+        b = get_behavior(behav{r}, rate, yesnokeys, junkerrors, junkfoils);
         b.data(:,4) = b.data(:,4) - adjons;
         
         % | Columns for b.data
