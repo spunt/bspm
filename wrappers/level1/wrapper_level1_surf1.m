@@ -175,6 +175,7 @@ for s = 1:length(subdir)
     general_info.nuisance_file      = '';
 %     general_info.nuisance_file      = nuisance;
     general_info.brainmask          = brainmask;
+    general_info.maskthresh         = 0.8; 
     general_info.hrf_derivs         = [0 0];
     general_info.mt_res             = 16; 
     general_info.mt_onset           = 1;

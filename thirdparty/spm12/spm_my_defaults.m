@@ -4,7 +4,7 @@ global defaults
 
 % Mask defaults
 %==========================================================================
-defaults.mask.thresh    = -Inf; % default is 0.8
+defaults.mask.thresh    = 0.8; % default is 0.8
 % change defaults.mask.thresh to -inf to turn off implicit masking (this is
 % very useful if you have one or two subjects who have a lot of signal
 % loss, since you can use an explicit mask and all voxels in the explicit
