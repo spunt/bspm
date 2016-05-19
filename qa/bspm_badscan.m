@@ -18,7 +18,8 @@ function tsinfo = bspm_badscan(epi, varargin)
 % 2012_06_04 -- Added to FUNC + Presented in SCAN Lab Workshop
 % 2013_03_08 -- Added option to MASK data prior to computing bad scans
 % ========================================================================%
-def = { 'dvars_thresh',     2.5,  ...
+DOONEOUTZSCORE = false; 
+def = { 'dvars_thresh',     3.0,  ...
         'framewise_thresh', 0.5,  ...
         'include_rp',       1,    ...
         'prefix',           'badscan', ...
@@ -29,7 +30,6 @@ if nargin==0, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(val
 % | PATH TO BRAMILA TOOLS
 bramiladir = fullfile(getenv('HOME'), 'Github', 'bspm', 'thirdparty', 'bramila');
 addpath(bramiladir)
-
 
 % | get data and apply implicit masking
 if ischar(epi), epi = cellstr(epi); end
@@ -57,7 +57,11 @@ fprintf('\n | - Identifying Scans with DVARS > %2.2f and framewise displacement 
 dvars       = bramila_dvars(cfg);
 
 % | get indices of bad timepoints
-zdvars          = oneoutzscore(dvars(2:end), 1);
+if DOONEOUTZSCORE
+    zdvars          = oneoutzscore(dvars(2:end), 1);
+else
+    zdvars          = zscore(dvars(2:end), 1);
+end
 badidx          = zeros(nvol, 2);
 badidx(2:end,1) = zdvars > dvars_thresh;
 badidx(:,2)     = framewise > framewise_thresh;

@@ -19,7 +19,7 @@ defaults.mask.thresh    = -Inf; % default is 0.8
 %==========================================================================
 defaults.stats.maxmem      = 2^33;  % maximum amount of RAM to use (2^33 = 8GB)
 defaults.stats.maxres      = 128;
-defaults.stats.resmem      = true;  % flag to store temporary files on disk (false) or in memory (true)
+defaults.stats.resmem      = false;  % flag to store temporary files on disk (false) or in memory (true)
 defaults.stats.fmri.ufp    = 0.001;  % Upper tail F-probability
 % change defaults.stats.fmri.ufp to relax the threshold for defining voxels
 % for variance estimation at the ReML stage. By default, SPM does the

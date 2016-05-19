@@ -23,13 +23,13 @@ function matlabbatch = bspm_fieldmap(mag, phase, epi, epi_rot, varargin)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
-if nargin<4, mfile_showhelp; return; end
 def = { 'ets',          [2.55 5.01], ...
         'writeunwarped', 0, ...
         'blip',         -1, ...
         'jacob',        0, ...
         'method',       'Mark3D'};
-bspm_setdefaults(def, varargin); 
+vals = setargs(def, varargin);
+if nargin<4, mfile_showhelp; disp(vals); return; end
 if ischar(phase), phase = cellstr(phase); end
 if ischar(mag), mag = cellstr(mag); end
 if ischar(epi), epi = cellstr(epi); end

@@ -2,11 +2,6 @@ function spm_my_defaults
 % SPM_MY_DEFAULTS
 global defaults
 
-% Filename prefix defaults
-%==========================================================================
-defaults.normalise.write.prefix = 'w';
-defaults.smooth.prefix          = 's';
-
 % Mask defaults
 %==========================================================================
 defaults.mask.thresh    = -Inf; % default is 0.8

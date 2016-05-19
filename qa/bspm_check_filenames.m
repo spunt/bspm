@@ -10,6 +10,10 @@ inname              = regexprep(inname, ',\d+$', '');
 fn = []; 
 for i = 1:length(inname)
     
+    if ~ismember(ecim{i}, {'.gz' '.nii' '.img'})
+        continue
+    end
+    
     % | If compressed, try to decompress
     if strcmp(ecim{i}, '.gz')
         try
@@ -17,7 +21,7 @@ for i = 1:length(inname)
         catch
             gunzip(inname{i});
         end
-        inname = cellstr(fullfile(pcim{i}, ncim{i}));  
+        inname{i} = cellstr(fullfile(pcim{i}, ncim{i}));  
     end
     
     % | Check to see if 4D
