@@ -7,7 +7,7 @@ function [dvars,img]=bramila_dvars(cfg)
 %   - Input:
 %   cfg is a struct with following parameters
 %       Possible input formats
-%       cfg.infile = 'path/to/a/nifti/file' - insert the full path to a nifti
+%       cfg.nii = 'path/to/a/nifti/file' - insert the full path to a nifti
 %           file with 4D fMRI data
 %       cfg.vol = vol - a matlab 4D volume with fMRI data, time on the
 %           4th dimension
@@ -25,18 +25,21 @@ function [dvars,img]=bramila_dvars(cfg)
 
 %% loading the data
 
-fprintf('Computing DVARS...');
+% fprintf('\n | - Computing DVARS');
 
-% load data
-if isfield(cfg,'vol') && ~isempty(cfg.vol)
+% the nii case
+reshape_vol=0;
+img=0;
+if(isfield(cfg,'nii'))
+    nii=cfg.nii;
+    nii=load_nii(cfg.nii);
+    img=double(nii.img);
+    reshape_vol=1;
+end
+
+if(isfield(cfg,'vol'))
     img=double(cfg.vol);
     reshape_vol=1;
-elseif isfield(cfg,'infile') && ~isempty(cfg.infile)
-    nii=load_nii(cfg.infile);
-    img=double(nii.img);
-    reshape_vol=1; 
-else
-    error('No input EPI data found!');
 end
 
 plotIt=0;
@@ -46,17 +49,7 @@ end
 
 % if we have a mask and if we have 4D data, then apply the mask
 hasmask=0;
-if (isfield(cfg,'analysis_mask') && size(img,4)>0)
-    mask=double(cfg.analysis_mask);
-    sz=size(img);
-    if(~any(size(mask) ==sz(1:3)))
-        error(['The specified mask has a different size than the fMRI data. Quitting.'])
-    end
-    for t=1:size(img,4)
-        img(:,:,:,t)=mask.*img(:,:,:,t);
-    end
-    hasmask=1;
-elseif (isfield(cfg,'mask') && size(img,4)>0)
+if(isfield(cfg,'mask') && size(img,4)>0)
     mask=double(cfg.mask);
     sz=size(img);
     if(~any(size(mask) ==sz(1:3)))
@@ -106,4 +99,8 @@ if(plotIt~=0)
     colormap(gray)
 end
 
-fprintf(' done\n');
+% fprintf(' done\n');
+
+
+
+

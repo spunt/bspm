@@ -19,7 +19,7 @@ function tsinfo = bspm_badscan(epi, varargin)
 % 2013_03_08 -- Added option to MASK data prior to computing bad scans
 % ========================================================================%
 DOONEOUTZSCORE = false; 
-def = { 'dvars_thresh',     3.0,  ...
+def = { 'dvars_thresh',     2.5,  ...
         'framewise_thresh', 0.5,  ...
         'include_rp',       1,    ...
         'prefix',           'badscan', ...
@@ -34,16 +34,19 @@ addpath(bramiladir)
 % | get data and apply implicit masking
 if ischar(epi), epi = cellstr(epi); end
 fprintf('\n | - Loading Data');
-cfg.plot            = 0;
+maskthresh  = 0.8; 
+[v,h]       = bnii_read(epi, 'reshape', 1);
+[nvox nvol] = size(v);
 if isempty(maskfile)
-    cfg.vol     = bspm_read_vol(epi, 'implicit');
+    v(v < repmat(mean(v)*maskthresh, nvox, 1)) = 0;
 else
-    cfg.vol     = bspm_read_vol(epi, 'mask', maskfile);
+    m = bspm_reslice(maskfile, strcat(epi, ',1'), 0, 1);
+    v(m(:)==0,:) = 0; 
 end
+cfg.vol     = reshape(v, h.dim(2:5));
 
 % | create output filename
 outfile     = sprintf('%s_dvars%dframewise%d_%s.txt', prefix, dvars_thresh*100, framewise_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
-nvol        = size(cfg.vol, 4);
 epidir      = fileparts(epi{1});
 
 % | motion parameters
@@ -53,8 +56,9 @@ framewise           = zeros(nvol,1);
 framewise(2:end)    = max(abs(diff(rp)), [], 2);
 
 % | use BRAMILA tools to compute dvars and framewise displacement
-fprintf('\n | - Identifying Scans with DVARS > %2.2f and framewise displacement > %2.2f', dvars_thresh, framewise_thresh);
-dvars       = bramila_dvars(cfg);
+fprintf('\n | - Identifying Scans with DVARS > %2.2f and framewise displacement > %2.2f\n', dvars_thresh, framewise_thresh);
+cfg.plot            = 0;
+dvars               = bramila_dvars(cfg);
 
 % | get indices of bad timepoints
 if DOONEOUTZSCORE
