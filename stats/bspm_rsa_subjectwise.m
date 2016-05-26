@@ -16,18 +16,22 @@ function [rho, fishz] = bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag)
 
 if nargin < 4, rdmflag = 0; end
 if nargin < 3, eigenplot = 1; end
-if nargin < 2, mask = bspm_greymask; end
+if nargin < 2, []; end
 if nargin < 1, mfile_showhelp; return; end
 
 % %% MASK
-% if iscell(mask), mask = char(mask); end
+if iscell(mask), mask = char(mask); end
 % mask = bspm_reslice(mask,maps{1},1,1);
 
 %% MAPS
 if ischar(maps), maps = cellstr(maps); end
 % all = bspm_read_vol(char(maps), 'reshape', 'implicitmask', 'mask', mask);
 all = bspm_read_vol(char(maps), 'reshape');
-% nmaps = length(maps);
+if and(~isempty(mask), exist(mask, 'file'))
+    m = bspm_reslice(mask, maps(1), 0, 1); 
+    all(~m, :) = []; 
+end
+nmaps = length(maps);
 % nvox = sum(mask(:) > 0);
 % all = zeros(nvox, nmaps);
 % for i = 1:nmaps

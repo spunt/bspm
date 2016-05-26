@@ -25,7 +25,7 @@ function varargout = bspm_plot_contrast(level1dirs, roifiles, conidx, varargin)
 def = { ...
 'rmvoxoutlier',         0               , ...
 'rmsuboutlier',         0               , ...
-'gridflag',             1               , ...
+'gridflag',             0               , ...
 'detachlegend',         1               , ...
 'savefig_combined',     0               , ...
 'savefig_separate',     0               , ...
@@ -33,6 +33,9 @@ def = { ...
 'row_labels',           ''              , ...
 'col_labels',           ''              , ...
 'groupspace',           .5              , ...
+'idxylab',              []              , ...
+'idxxlab',              []              , ...
+'idxleg',               []              , ...
 'tag',                  ''              , ...
 'xlab',                 ''              , ...
 'roinames',             ''              , ...
@@ -76,6 +79,10 @@ if all([length(row_labels)~=nrow nrow>1]), printmsg('# of row_labels must match 
 if all([length(col_labels)~=ncol ncol>1]), printmsg('# of col_labels must match # of rows in conidx'); return; end
 if length(roinames)~=nroi, printmsg('# of roinames must match # of rois'); return; end
 if prod(grid_size)~=nroi, printmsg('Grid size must match # of rois'); return; end
+if isempty(idxxlab), idxxlab = 1:nroi; end
+if isempty(idxylab), idxylab = 1:nroi; end
+if isempty(idxleg), idxleg = 1:nroi; end
+
 
 % | GET CONTRAST FILES
 % | ======================================================================================
@@ -111,15 +118,20 @@ if gridflag
 end
 for i = 1:nroi
  
-    cg      = row_labels; 
-    legname = col_labels;
-    cyl     = ylab;
-    cxl     = xlab; 
-    if gridflag
-        cyl = '';
-        if i < nroi, cxl = ''; end
-        if i==1, legname = ''; end
-    end
+    
+    cg      = row_labels;
+    cyl = '';
+    cxl = '';
+    legname = '';
+    if ismember(i, idxylab), cyl     = ylab; end
+    if ismember(i, idxxlab), cxl    = xlab; end
+    if ismember(i, idxleg), legname = col_labels; end
+
+%     if gridflag
+%         cyl = '';
+%         if i < nroi, cxl = ''; end
+%         if i==1, legname = ''; end
+%     end
 
     % | Plot
     if gridflag, axes('parent', hpan(i)); end
@@ -139,6 +151,8 @@ for i = 1:nroi
             'groupspace', groupspace, ...
             't', roinames{i}, ...
             'yticklength', 5);
+        
+        
 
 end
 

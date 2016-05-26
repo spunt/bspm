@@ -1,5 +1,5 @@
-function matlabbatch = bspm_level2_ff_twoway(condirpat, factors, varargin)
-% BSPM_LEVEL2_FF_TWOWAY
+function matlabbatch = bspm_level2_ff_oneway(condirpat, factors, varargin)
+% BSPM_LEVEL2_FF_ONEWAY
 %
 %   ARGUMENTS:
 %
@@ -12,6 +12,7 @@ function matlabbatch = bspm_level2_ff_twoway(condirpat, factors, varargin)
 % factors(1).name = 'WhyHow' 
 %       covariates: specified as follows: 
 %           covariates(n).name = 'Covariate Name';
+% job = bspm_level2_ff_oneway(condirpat, factors, 'pctgroup', pctgroup, 'conweights', conweights);
 %           covariates(n).values = [1...n]; 
 %
 
@@ -64,14 +65,7 @@ nfact   = length(factors);
 nsub    = length(cons)/ncell;
 I       = ones(ncon, 4);
 I(:,2)  = reshape(repmat(1:nsub,ncell,1), ncon, 1);
-I(:,3:4) = repmat(1:ncell, 2, nsub)';
-for i = 1:nfact
-   idx2con = factors(i).idx2con;
-   nlevel(i) = size(idx2con, 1);
-   for ii = 1:size(idx2con, 1)
-      I(ismember(I(:,2+i), idx2con(ii,:)), 2+i) = ii;  
-   end
-end
+I(:,3)  = repmat(1:ncell, 1, nsub)';
 
 % | NAN2ZERO (IF APPLICABLE)
 if nan2zero, bspm_batch_imcalc(cons, '', 'nan2zero'); end
@@ -84,9 +78,9 @@ if isempty(outdir)
     gadir           = fullfile(parentpath(cons), '_groupstats_', level1name);
     if isempty(pctgroup), pctgrouptag = 100; else pctgrouptag = pctgroup; end
     if tag
-        gasubdir    = fullfile(gadir, sprintf('FF_%s_%s_vs_%s_N%d_PCTIN%d_%s_%s', tag, factors.name, nsub, pctgrouptag, mtag, bspm_timestamp(1)));
+        gasubdir    = fullfile(gadir, sprintf('FF_%s_%s_N%d_PCTIN%d_%s_%s', tag, factors.name, nsub, pctgrouptag, mtag, bspm_timestamp(1)));
     else
-        gasubdir    = fullfile(gadir, sprintf('FF_%s_vs_%s_N%d_PCTIN%d_%s_%s', factors.name, nsub, pctgrouptag, mtag, bspm_timestamp(1)));
+        gasubdir    = fullfile(gadir, sprintf('FF_%s_N%d_PCTIN%d_%s_%s', factors.name, nsub, pctgrouptag, mtag, bspm_timestamp(1)));
     end
     outdir          = fullfile(gasubdir);
 
@@ -134,8 +128,10 @@ for i = 1:nfact
 end
 matlabbatch{1}.spm.stats.factorial_design.des.fblock.fsuball.specall.scans    = cellstr(cons);
 matlabbatch{1}.spm.stats.factorial_design.des.fblock.fsuball.specall.imatrix  = I;
+
 matlabbatch{1}.spm.stats.factorial_design.des.fblock.maininters{1}.fmain.fnum = 1;
-matlabbatch{1}.spm.stats.factorial_design.des.fblock.maininters{2}.inter.fnums = [2 3];
+matlabbatch{1}.spm.stats.factorial_design.des.fblock.maininters{1}.fmain.fnum = 2;
+% matlabbatch{1}.spm.stats.factorial_design.des.fblock.maininters{2}.inter.fnums = [2 3];
 
 % | MASKING & GLOBAL CALCULATIONS
 matlabbatch{1}.spm.stats.factorial_design.masking.tm.tm_none     = 1;

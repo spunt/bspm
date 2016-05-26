@@ -2,6 +2,8 @@ function fn = bspm_check_filenames(inname)
 % BSPM_CHECK_FILENAMES
 % 
 %   USAGE outname = bspm_check_orientations(inname)
+%       imname can be char or cell 
+%       output is a cell array
 %
 if nargin==0, mfile_showhelp; return; end
 if ischar(inname), inname = cellstr(inname); end
@@ -28,7 +30,7 @@ for i = 1:length(inname)
     nii     = nifti(inname{i}); 
     nvol    = size(nii.dat, 4); 
     append  = cellfun(@num2str, num2cell(1:nvol)', 'Unif', false);
-    fn      = [fn; strcat(inname{i}, {','}, append)]; 
+    fn      = [fn; strcat(inname{i}, {','}, append)];
 end
 end
 %  

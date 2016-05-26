@@ -18,6 +18,7 @@ function bspm_imcalc(in, outname, operation)
 %               'std'   - std across images
 %               'var'   - var across images
 %               'min'   - min across images
+%               'minmax'- min for pos image, max for neg image, e.g. conj
 %               'max'   - max across images
 %               'diff'  - contrast across images (2 only)
 %
@@ -62,6 +63,16 @@ nvol = length(hdr);
 tag = 0;
 if nvol > 1
     switch lower(operation)
+    case {'minmax'}
+            
+        outim = spm_read_vols(hdr);
+        
+        minim = min(outim, [], 4);
+        minim(minim<0) = 0;
+        maxim = max(outim, [], 4); 
+        maxim(maxim>0) = 0;
+        outim = minim + maxim; 
+  
     case {'colorcode'}
         operation  = 'i1'; 
         for i = 2:length(hdr), operation = [operation sprintf('+(i%d*%d)', i, i)]; end
@@ -97,10 +108,16 @@ if nvol > 1
         outhdr.descrip = [upper(operation) ' IMAGE'];
     end
     outhdr.fname = outname; 
-    spmimcalc(hdr, outhdr, operation, {dmtx});
+    
+    if ~exist('outim', 'var')
+        spmimcalc(hdr, outhdr, operation, {dmtx});
+    else
+        spm_write_vol(outhdr, outim);
+    end
     return
 else
     im = spm_read_vols(hdr);
+    
     switch lower(operation)
         case {'negative'}
             outim = -1*im;

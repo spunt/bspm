@@ -15,6 +15,7 @@ function [data, hdr, info] = bspm_read_vol(in, varargin)
 %       'maskthresh' - (default is any non-zero value, must be paied with
 %       value)
 %       'reslice' - (must pair with reference filename)
+%       'resliceinterp', interpolation, 0=Nearest Neighbor, 1=Trilinear(default)
 %       
 
 % ------------------------ Copyright (C) 2014 ------------------------
@@ -42,15 +43,19 @@ if optional
         maskthresh = varargin{argidx + 1};
         varargin(argidx:argidx+1) = []; 
     end
+    if ~ismember('resliceinterp', cellnum2str(varargin))
+        interp = 1; 
+    end
     varargin = lower(varargin);
     if ismember('reslice', varargin) 
         ref = varargin{find(ismember(varargin, 'reslice'))+1};
         if iscell(ref), ref = char(ref); end
         refhdr = spm_vol(ref); 
+        
         refmat = refhdr.mat; 
         refdim = refhdr.dim; 
         [x1,x2,x3]  = ndgrid(1:refdim(1),1:refdim(2),1:refdim(3));
-        d           = [1*[1 1 1]' [1 1 0]'];
+        d           = [interp*[1 1 1]' [1 1 0]'];
         data        = repmat(zeros(refdim), 1, 1, 1, nvol); 
         for i = 1:nvol
             C           = spm_bsplinc(hdr(i), d);
@@ -72,6 +77,7 @@ if optional
         end
     end
     if ismember('mask', varargin)
+        
         maskfile = varargin{find(ismember(varargin, 'mask'))+1};
         if iscell(maskfile), maskfile = char(maskfile); end
         if ismember('reslice', varargin) 
