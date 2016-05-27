@@ -35,3 +35,9 @@ if any(any(abs(diff(volinfo.mats,1,2))>1e-4))
     if verbose, disp('The images do not all have same orientation and/or voxel sizes.'); end
 end
 end
+function mfile_showhelp(varargin)
+    % MFILE_SHOWHELP
+    ST = dbstack('-completenames');
+    if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; end
+    eval(sprintf('help %s', ST(2).file));  
+end
