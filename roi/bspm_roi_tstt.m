@@ -1,7 +1,7 @@
-function varargout = bspm_roi_ostt(level1dirs, roifiles, conidx, varargin)
-% BSPM_ROI_OSTT Test level 1 contrasts
+function varargout = bspm_roi_tstt(level1dirs, roifiles, conidx, groupidx, varargin)
+% BSPM_ROI_TSTT Test level 1 contrasts
 %
-%  USAGE: bspm_roi_ostt(level1dirs, roifiles, conidx, varargin)
+%  USAGE: bspm_roi_ostt(level1dirs, roifiles, conidx, groupidx, varargin)
 % ________________________________________________________________________________________
 %  INPUTS
 %	level1dirs:  
@@ -17,15 +17,16 @@ def = { ...
 'contrasts',            []                      , ...
 'rmsuboutlier',         0                       , ...
 'roinames',             ''                      , ...
+'groupnames',           {'Group 1' 'Group 2'}   , ...
 'dofdr',                1                       , ...
 'condirpat',            ''                      , ...
 'tag',                  ''                      , ...
 'savetable',            1                       , ...
 'conpat',               'con*nii*'              , ...
-'templatefile'          ''  ...
+'templatefile'          ''                        ...
 	};
 vals = setargs(def, varargin);
-if nargin < 3, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
+if nargin < 4, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
 
 % | CHECK REQUIRED INPUTS
 % | ======================================================================================
@@ -79,62 +80,63 @@ for c = 1:ncontrast, brainname = [brainname; strcat(upper(roinames), {' | '}, co
 % | LOOP OVER ROIS
 % | ======================================================================================
 allrow = [];
-colsep = repmat({''}, nroi, 1);
+rowsep = repmat({''}, 1, 7);
 for i = 1:nroi
     cdata       = reshape(nanmean(CON(ROI(:,i)>0,:)), ncond, nlevel1)';
-    roirow      = [];
-    roirow{1}   = roinames{i};
+    roicell     = rowsep; 
+    roicell{1}  = roinames{i}; 
     for c = 1:size(contrasts,1)
         contrast     = contrasts(c,:);
         cmat         = repmat(contrast, size(cdata,1), 1);
-        contrastdata = cdata(:,abs(contrast)>0);
-        y = sum(contrastdata.*cmat(:,abs(contrast)>0), 2);
-        if rmsuboutlier, y = bob_outlier2nan(y, rmsuboutlier); end      
-        out(c)       = bob_ttest(y(~isnan(y)), 1, contrastnames{c});
-        roirow       = [roirow {''} num2cell([out(c).tstat out(c).P out(c).CI'])];
+        Y            = cdata(:,abs(contrast)>0);
+        Y            = sum(Y.*cmat(:,abs(contrast)>0), 2);
+        G1           = Y(groupidx==1,:);
+        G2           = Y(groupidx==2,:);
+        if rmsuboutlier
+            G1 = bob_outlier2nan(G1, rmsuboutlier);
+            G2 = bob_outlier2nan(G2, rmsuboutlier);
+        end
+        groupstr     = {sprintf('%s in %s', groupnames{1}, contrastnames{c}) sprintf('%s in %s', groupnames{2}, contrastnames{c})};
+        out(c)       = bob_ttest({G1 G2}, 3, groupstr);
+        crow         = [{''} contrastnames(c) {''} num2cell([out(c).tstat out(c).P out(c).CI'])];
+        roicell      = [roicell; crow];
     end
-    allrow = [allrow; roirow];
+    allrow = [allrow; rowsep; roicell];
 end
 if dofdr
-    pidx    = 4:5:(size(allrow,2)); 
-    pidx    = pidx(1:size(contrasts,1))
-    pval    = allrow(:,pidx);
-    pval    = cell2mat(pval);
-    fdrpval = pval;
-    for i = 1:size(contrasts,1)
-        [h, crit_p(i), fdrpval(:,i)] = fdr_bh(pval(:,i), .05, 'dep', 'yes');
+    for c = 1:length(contrastnames)
+        cidx = strcmpi(allrow(:,2), contrastnames{c});
+        cpval = cell2mat(allrow(cidx, 5));
+        [h, crit_p, fdrpval] = fdr_bh(cpval, .05, 'pdep', 'yes');
+        allrow(cidx, 4) = num2cell(fdrpval);
     end
-    allrow(:,pidx) = num2cell(fdrpval);
 end
 
 % | SAVE
 % | ======================================================================================
 if savetable
     if isempty(templatefile)
-        templatefile = fullfile(fileparts(mfilename('fullpath')), 'TEMPLATE_ROI_OSTT.xlsx');
+        templatefile = fullfile(fileparts(mfilename('fullpath')), 'TEMPLATE_ROI_TSTT.xlsx');
     else
         if iscell(templatefile), templatefile = char(templatefile); end
         if ~exist(templatefile, 'file')
             printmsg('Custom template not found on path! Using default...'); 
-            templatefile = fullfile(fileparts(mfilename('fullpath')), 'TEMPLATE_ROI_OSTT.xlsx');
+            templatefile = fullfile(fileparts(mfilename('fullpath')), 'TEMPLATE_ROI_TSTT.xlsx');
         end
     end
-    hdr                   = cell(4, size(allrow, 2)); 
-    hdr(2,3:5:end)        = contrastnames;
-    hdr{3, 1}             = 'ROI'; 
     if dofdr
-        vhdr = {'t-stat' 'pFDR' '95% CI' '' ''};
+        hdr2 = {'' 'Comparison' '' 't-stat' 'pFDR' '95% CI' ''};
     else
-        vhdr = {'t-stat' 'pFDR' '95% CI' '' ''};
+        hdr2 = {'' 'Comparison' '' 't-stat' 'pFDR' '95% CI' ''};
     end
-    vhdr                  = repmat(vhdr, 1, ncontrast); 
-    hdr(3,3:end)          = vhdr(1:end-1);
-    TABLE                 = [hdr; allrow]; 
-    outstr                = {sprintf('TABLE_ROI_OSTT_%s', tag) sprintf('_SubOut-%dSD', rmsuboutlier)};
+    hdr1        = cell(size(hdr2));
+    hdr1(1:4)   = {'ROI' '' '' sprintf('%s > %s', groupnames{1}, groupnames{2})};  
+    TABLE                 = [hdr1; hdr2; allrow];
+    TABLE(cellfun('isempty', TABLE)) = {''};
+    outstr                = {sprintf('TABLE_ROI_TSTT_%s', tag) sprintf('_SubOut-%dSD', rmsuboutlier)};
     outname               = strcat(outstr{find([1 rmsuboutlier])});
     outname               = regexprep(outname, '_$', '');
     outname               = fullfile(pwd, strcat(outname, '.xlsx'));
-    
     copyfile(templatefile, outname);
     xlwrite(outname, TABLE);
 end
