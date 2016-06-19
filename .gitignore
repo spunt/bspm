@@ -3,9 +3,10 @@
 ._*
 .Spotlight-V100
 .Trashes
+*.dcm
 ehthumbs.db
 Thumbs.db
 gh-pages/
 _archive_/
-imagedata/dicom_refs/
+imagedata/
 level2/to_update/

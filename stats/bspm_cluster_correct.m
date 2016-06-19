@@ -38,7 +38,7 @@ if nargin < 1
 end
 if nargin < 2, u = .001; end
 if nargin < 3, alpha = .05; end
-if nargin < 4, range = 5:200; end
+if nargin < 4, range = 1:1000; end
 if ischar(im), im = cellstr(im); end
 allim = im;
 
