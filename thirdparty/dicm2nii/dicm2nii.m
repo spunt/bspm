@@ -21,14 +21,14 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % The optional output is converted PatientName.
 % 
 % Typical examples:
-%  dicm2nii; % bring up user interface if there is no input argument
-%  dicm2nii('D:/myProj/zip/subj1.zip', 'D:/myProj/subj1/data'); % zip file
-%  dicm2nii('D:/myProj/subj1/dicom/', 'D:/myProj/subj1/data'); % folder
+%  DICM2NII; % bring up user interface if there is no input argument
+%  DICM2NII('D:/myProj/zip/subj1.zip', 'D:/myProj/subj1/data'); % zip file
+%  DICM2NII('D:/myProj/subj1/dicom/', 'D:/myProj/subj1/data'); % folder
 % 
 % Less useful examples:
-%  dicm2nii('D:/myProj/dicom/', 'D:/myProj/subj2/data', 'nii'); % no gz compress
-%  dicm2nii('D:/myProj/dicom/run2*', 'D:/myProj/subj/data'); % convert run2 only
-%  dicm2nii('D:/dicom/', 'D:/data', '3D.nii'); % SPM style files
+%  DICM2NII('D:/myProj/dicom/', 'D:/myProj/subj2/data', 'nii'); % no gz compress
+%  DICM2NII('D:/myProj/dicom/run2*', 'D:/myProj/subj/data'); % convert run2 only
+%  DICM2NII('D:/dicom/', 'D:/data', '3D.nii'); % SPM style files
 % 
 % If there is no input, or any of the first two input is empty, the graphic user
 % interface will appear.
@@ -70,7 +70,7 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % use this method to avoid mistake. Following shows how to convert this timing
 % into slice timing in ms and slice order for SPM:
 %   
-%  load('dcmHeaders.mat'); % or drag and drop the MAT file into Matlab
+%  load('dcmHeaders.mat'); % or drag and drop the MAT file into Command Window
 %  s = h.myFuncSeries; % field name is the same as nii file name
 %  spm_ms = (0.5 - s.SliceTiming) * s.RepetitionTime;
 %  [~, spm_order] = sort(-s.SliceTiming);
@@ -91,13 +91,21 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % indluded nii_viewer can show the extension by Window->Show NIfTI ext.
 % 
 % Starting from 20151120, the converter can optionally save a .json file for
-% each converted NIfTI. This can be turned on by running following line from
-% Command Window for a new session:
+% each converted NIfTI. This can be turned on by running following line at
+% Command Window:
 %  setpref('dicm2nii_gui_para', 'save_json', true);
-% It will stay on (saving json files) until a new session with
+% It will stay on (saving json files) until it is turned off by
 %  setpref('dicm2nii_gui_para', 'save_json', false);
 % For more information about the purpose of json file, check
 %  http://bids.neuroimaging.io/ 
+% 
+% By default, the converter will use parrallel pool for dicom header reading if
+% there are +2000 files. You can avoid parfor by following command:
+%  setpref('dicm2nii_gui_para', 'use_parfor', false); % true to enable
+% 
+% By default, the PatientName is stored in NIfTI hdr and ext. This can be turned
+% off by following command:
+%  setpref('dicm2nii_gui_para', 'save_PatientName', false);
 % 
 % Please note that some information, such as the slice order information, phase
 % encoding direction and DTI bvec are in image reference, rather than NIfTI
@@ -327,10 +335,17 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 160407 remove ang2vec: likely never used and may be wrong.
 % 160409 multi .m files: use sscanf/strfind/regexp, avoid str2double/strtok.
 % 160504 asc_header: ignore invalid CSASeriesHeaderInfo in B15 (thx LaureSA).
+% 160512 get_dti_para: fix bvec sign for GE cor/sag slices (thx paul for data).
+% 160514 csa2pos: make it safer so it won't err.
+% 160516 checkImagePosition: assign isTZ for missing files (thx TanH).
+% 160519 set nii.hdr.slice_duration for MB although it is useless.
+% 160601 Update ReadoutSeconds, and store it even if ~isDTI.
+% 160607 Avoid skipping series by ignoring empty-img dicom (thx QR).
+% 160610 Add pref save_patientName and use_parfor; simplify save_json flag.
 
 % TODO: need testing files to figure out following parameters:
 %    flag for MOCO series for GE/Philips
-%    GE non-axial slice bvec sign
+%    GE non-axial slice (phase: ROW) bvec sign
 %    Phase image flag for GE
 
 if nargout, varargout{1} = ''; end
@@ -373,6 +388,10 @@ if nargin<1 || isempty(src) || (nargin<2 || isempty(dataFolder))
     create_gui; % show GUI if input is not enough
     return;
 end
+
+savePtNm = getpref('dicm2nii_gui_para', 'save_patientName', true);
+saveJson = getpref('dicm2nii_gui_para', 'save_json', false);
+doParFor = getpref('dicm2nii_gui_para', 'use_parfor', true);
 
 tic;
 unzip_cmd = '';
@@ -455,20 +474,20 @@ if nFile<1, error(' No files found in the data source.'); end
 % first 3 fields are must, 4 or 5 must have one
 flds = {'Columns' 'Rows' 'BitsAllocated' 'SeriesInstanceUID' 'SeriesNumber' ...
     'ImageOrientationPatient' 'ImagePositionPatient' 'PixelSpacing' ...
+    'SliceThickness' 'SpacingBetweenSlices' ...
     'PixelRepresentation' 'BitsStored' 'HighBit' 'SamplesPerPixel' ...
     'PlanarConfiguration' 'EchoNumber' 'RescaleIntercept' 'RescaleSlope' ...
     'InstanceNumber' 'NumberOfFrames' 'B_value' 'DiffusionGradientDirection' ...
-    'RTIA_timer' 'RBMoCoTrans' 'RBMoCoRot' ...
-    'SliceThickness' 'SpacingBetweenSlices'};
+    'RTIA_timer' 'RBMoCoTrans' 'RBMoCoRot'};
 dict = dicm_dict('SIEMENS', flds); % dicm_hdr will update vendor if needed
 
 % read header for all files, use parpool if available and worthy
 fprintf('Validating %g files ...\n', nFile);
 hh = cell(1, nFile); errStr = cell(1, nFile);
-doPar = nFile>1000 && useParTool; % available and nFile>1000
+doParFor = doParFor && nFile>2000 && useParTool;
 for k = 1:nFile
     [hh{k}, errStr{k}, dict] = dicm_hdr(fnames{k}, dict);
-    if doPar && ~isempty(hh{k}) % parfor wont allow updating dict
+    if doParFor && ~isempty(hh{k}) % parfor wont allow updating dict
         parfor i = k+1:nFile
             [hh{i}, errStr{i}] = dicm_hdr(fnames{i}, dict); 
         end
@@ -482,7 +501,8 @@ errInfo = '';
 seriesUIDs = {};
 for k = 1:nFile
     s = hh{k};
-    if isempty(s) || any(~isfield(s, flds(1:3))) || ~any(isfield(s, flds(4:5)))
+    if isempty(s) || any(~isfield(s, flds(1:3))) || ~any(isfield(s, flds(4:5))) ...
+            || ~isfield(s, 'PixelData') || s.PixelData.Bytes<1
         if ~isempty(errStr{k}) % && isempty(strfind(errInfo, errStr{k}))
             errInfo = sprintf('%s\n%s\n', errInfo, errStr{k});
         end
@@ -725,7 +745,7 @@ for i = 1:nRun
     if ndims(img)>4 % err out, likely won't work for other series
         error('Image with 5 or more dim not supported: %s', s.NiftiName);
     end
-    img(:, :, :, 2:nFile) = 0; % pre-allocate
+    if nFile>1, img(:, :, :, nFile) = 0; end % pre-allocate
     for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
     if size(img,3)<2, img = permute(img, [1 2 4 3]); end % put frames into dim3
     
@@ -757,7 +777,7 @@ for i = 1:nRun
     fld = 'NumberOfTemporalPositions';
     if ~isfield(s, fld) && numel(dim)>3 && dim(4)>1, h{i}{1}.(fld) = dim(4); end
 
-    if any(~isfield(s, {'ImageOrientationPatient' 'ImagePositionPatient'}))
+    if any(~isfield(s, flds(6:8))) || ~any(isfield(s, flds(9:10)))
         h{i}{1} = csa2pos(h{i}{1}, dim(3));
     end
     
@@ -804,10 +824,10 @@ for i = 1:nRun
     % Compute bval & bvec in image reference for DTI series
     if s.isDTI, [h{i}, nii] = get_dti_para(h{i}, nii); end
     
-    [nii, h{i}{1}] = set_nii_header(nii, h{i}{1}); % set most nii header
+    [nii, h{i}{1}] = set_nii_header(nii, h{i}{1}, savePtNm); % set most nii hdr
     h{i}{1}.NiftiCreator = converter;
-    nii.ext = set_nii_ext(h{i}{1}); % NIfTI extension
-    try save_json(h{i}{1}, fname); catch, end
+    nii.ext = set_nii_ext(h{i}{1}, savePtNm); % NIfTI extension
+    if saveJson, try save_json(h{i}{1}, fname); catch, end; end
 
     % Save bval and bvec files after bvec perm/sign adjusted in set_nii_header
     if s.isDTI, save_dti_para(h{i}{1}, fname); end
@@ -880,7 +900,7 @@ else val = [];
 end
 
 %% Subfunction: Set most nii header and re-orient img
-function [nii, s] = set_nii_header(nii, s)
+function [nii, s] = set_nii_header(nii, s, save_pn)
 % Transformation matrix: most important feature for nii
 dim = nii.hdr.dim(2:4); % space dim, set by nii_tool according to img
 [ixyz, R, pixdim, xyz_unit] = xform_mat(s, dim);
@@ -972,7 +992,7 @@ else
     ind = strfind(seq, '\');
     if ~isempty(ind), seq = seq(ind(end)+1:end); end % like 'ep2d_bold'
 end
-nii.hdr.db_name = PatientName(s); % char[18], optional
+if save_pn, nii.hdr.db_name = PatientName(s); end % char[18], optional
 nii.hdr.intent_name = seq; % char[16], meaning of the data
 
 if ~isfield(s, 'AcquisitionDateTime') && isfield(s, 'AcquisitionTime')
@@ -1021,17 +1041,24 @@ if ~strcmp(tryGetField(s, 'MRAcquisitionType'), '3D') && ~isempty(iPhase)
         dwell = wfs ./ (434.215 * (double(epiFactor)+1)) * 1000;
     end
     if ~isempty(dwell)
-        if s.isDTI
-            % ppf = asc_header(s, 'sKSpace.ucPhasePartialFourier');
-            % lns = asc_header(s, 'sKSpace.lPhaseEncodingLines');
-            % pat = asc_header(s, 'sPat.ucPATMode');
-            % readout = dwell*pat * (lns * (log2(ppf)+4)/8 / pat - 1) / 1000;
-            readout = dwell * dim(iPhase) / 1000; % in sec
+        s.EffectiveEPIEchoSpacing = dwell;
+        % ppf = asc_header(s, 'sKSpace.ucPhasePartialFourier');
+        % lns = asc_header(s, 'sKSpace.lPhaseEncodingLines');
+        epiFactor = double(tryGetField(s, 'EPIFactor'));
+        if isempty(epiFactor)
+            epiFactor = asc_header(s, 'sFastImaging.lEPIFactor');
+        end
+        pat = tryGetField(s, 'ParallelReductionFactorInPlane'); % guessed
+        if isempty(pat), pat = asc_header(s, 'sPat.ucPATMode'); end
+        if isempty(pat), pat = 1; end
+        % http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/TOPUP/Faq
+        readout = dwell * pat * epiFactor / 1000; % multiply pat?
+        % readout = dwell * dim(iPhase) / 1000; % before 20160601
+        if ~isempty(readout), s.ReadoutSeconds = readout; end
+        if s.isDTI && ~isempty(readout)
             descrip = sprintf('readout=%.3g;%s', readout, descrip);
-            s.ReadoutSeconds = readout;
         else
             descrip = sprintf('dwell=%.3g;%s', dwell, descrip);
-            s.EffectiveEPIEchoSpacing = dwell;
         end
     end
 end
@@ -1125,7 +1152,7 @@ t1 = sort(t);
 dur = sum(diff(t1)) / (nSL-1);
 dif = sum(diff(t))  / (nSL-1);
 if dur==0 || (t1(end)>TA), sc = 0; % no useful info, or bad timing MB
-elseif t1(1) == t1(2), sc = 7; % timing available MB, made-up code 7
+elseif t1(1) == t1(2), sc = 7; t1 = unique(t1); % made-up code 7 for MB
 elseif abs(dif-dur)<1e-3, sc = 1; % ascending
 elseif abs(dif+dur)<1e-3, sc = 2; % descending
 elseif t(1)<t(3) % ascending interleaved
@@ -1225,20 +1252,19 @@ h{1}.bvec_original = bvec; % original from dicom
 % http://wiki.na-mic.org/Wiki/index.php/NAMIC_Wiki:DTI:DICOM_for_DWI_and_DTI
 [ixyz, R] = xform_mat(s, nii.hdr.dim(2:4)); % R takes care of slice dir
 if exist('imgRef', 'var') && imgRef % GE bvec already in image reference
-    % Following sign change is based on FSL result. non-axial slice not tested
     if strcmp(tryGetField(s, 'InPlanePhaseEncodingDirection'), 'ROW')
         bvec = bvec(:, [2 1 3]);
         bvec(:, 2) = -bvec(:, 2); % because of transpose?
+        if ixyz(3)<3
+            errorLog(sprintf(['%s: bvec sign for non-axial acquisition with' ...
+             ' ROW phase direction not tested.\n Please check ' ...
+             'the result and report problem to author.'], s.NiftiName));
+        end
     end
     flp = R(ixyz+[0 4 8]) < 0; % negative sign
-    % Is GE slice dir the opposite to LPS? Need to verify for SAG and COR slice
-    notLPS = [false false true]; % for SAG/COR/TRA slice
-    flp(3) = xor(flp(3), notLPS(ixyz(3))); % take care slice dir sign
+    flp(3) = ~flp(3); % GE slice dir opposite to LPS for all sag/cor/tra
+    if ixyz(3)==1, flp(1) = ~flp(1); end % Sag slice: don't know why
     for i = 1:3, if flp(i), bvec(:,i) = -bvec(:,i); end; end
-    if ixyz(3)<3
-        errorLog(sprintf(['%s: bvec sign for non-axial slices not tested.\n' ...
-         ' Please check the result and report problem to author.'], s.NiftiName));
-    end
 else % Siemens/Philips
     R = R(1:3, 1:3);
     R = bsxfun(@rdivide, R, sqrt(sum(R.^2))); % normalize
@@ -1611,7 +1637,10 @@ jSrc = javaObjectEDT('javax.swing.JTextField');
 hs.src = javacomponent(jSrc, [114 176 294 24], fh);
 hs.src.FocusLostCallback = cb('set_src');
 % hs.src.ActionPerformedCallback = cb('set_src'); % fire when pressing ENTER
-hs.src.ToolTipText = 'Source folder or file';
+hs.src.ToolTipText = ['<html>This is the source folder or file(s). You can<br>' ...
+    'Type the source folder name into the box, or<br>' ...
+    'Click Folder or File(s) button above to set the value, or<br>' ...
+    'Drag and drop a folder or file(s) into the box'];
 
 uicontrol('Style', 'Pushbutton', 'Position', [8 136 104 24], ...
     'FontSize', 9, 'String', 'Result folder', 'Background', clrButton, ...
@@ -1619,8 +1648,10 @@ uicontrol('Style', 'Pushbutton', 'Position', [8 136 104 24], ...
 jDst = javaObjectEDT('javax.swing.JTextField');
 hs.dst = javacomponent(jDst, [114 136 294 24], fh);
 hs.dst.FocusLostCallback = cb('set_dst');
-hs.dst.ToolTipText = ['Input folder name to save result files, or drag ' ...
-    'and drop a folder'];
+hs.dst.ToolTipText = ['<html>This is the result folder name. You can<br>' ...
+    'Type the folder name into the box, or<br>' ...
+    'Click Result folder button to set the value, or<br>' ...
+    'Drag and drop a folder into the box'];
 
 uitxt('Output format', [8 96 82 16]);
 hs.rstFmt = uicontrol('Style', 'popup', 'Background', 'white', ...
@@ -1919,38 +1950,59 @@ str = regexp(str, '\n% (\d{6}) ', 'tokens');
 if isempty(str), return; end
 dStr = str{end}{1};
 
-%% Get position info from Siemens CSA header
+%% Get position info from Siemens CSA ASCII header
 % The only case this is useful for now is for DTI_ColFA, where Siemens omit 
 % ImageOrientationPatient, ImagePositionPatient, PixelSpacing.
 % This shows how to get info from Siemens CSA header.
 function s = csa2pos(s, nSL)
-if ~isfield(s, 'CSASeriesHeaderInfo'); return; end
+ori = {'Sag' 'Cor' 'Tra'}; % 1/2/3
+sNormal = zeros(3,1);
+for i = 1:3
+    a = asc_header(s, ['sSliceArray.asSlice[0].sNormal.d' ori{i}]);
+    if ~isempty(a), sNormal(i) = a; end
+end
+if all(sNormal==0); return; end % likely no useful info, give up
+
+isMos = tryGetField(s, 'isMos', false);
+revNum = ~isempty(asc_header(s, 'sSliceArray.ucImageNumb'));
+[cosSL, iSL] = max(abs(sNormal));
+if isMos && (~isfield(s, 'CSAImageHeaderInfo') || ...
+        ~isfield(s.CSAImageHeaderInfo, 'SliceNormalVector'))
+    a = sNormal; if revNum, a = -a; end
+    s.CSAImageHeaderInfo.SliceNormalVector = a;
+end
+
+pos = zeros(3,2);
+sl = [0 nSL-1];
+for j = 1:2
+    key = sprintf('sSliceArray.asSlice[%g].sPosition.d', sl(j));
+    for i = 1:3
+        a = asc_header(s, [key ori{i}]);
+        if ~isempty(a), pos(i,j) = a; end
+    end
+end
+
+if ~isfield(s, 'SpacingBetweenSlices')
+    if all(pos(:,2)==0) % like Mprage: dThickness & sPosition for volume
+        a = asc_header(s, 'sSliceArray.asSlice[0].dThickness') ./ nSL;
+        if ~isempty(a), s.SpacingBetweenSlices = a; end
+    else
+        s.SpacingBetweenSlices = abs(diff(pos(iSL,:))) / (nSL-1) / cosSL;
+    end
+end
+
 if ~isfield(s, 'PixelSpacing')
     a = asc_header(s, 'sSliceArray.asSlice[0].dReadoutFOV');
     a = a ./ asc_header(s, 'sKSpace.lBaseResolution');
     interp = asc_header(s, 'sKSpace.uc2DInterpolation');
     if interp, a = a ./ 2; end
-    if ~isempty(a), s.PixelSpacing =  a * [1 1]'; end
+    if ~isempty(a), s.PixelSpacing = a * [1 1]'; end
 end
 
-revNum = ~isempty(asc_header(s, 'sSliceArray.ucImageNumb'));
-isMos = tryGetField(s, 'isMos', false);
-ori = {'Sag' 'Cor' 'Tra'}; % 1/2/3
-if ~isfield(s, 'ImageOrientationPatient')
-    R = zeros(3);
-    for i = 1:3
-        a = asc_header(s, ['sSliceArray.asSlice[0].sNormal.d' ori{i}]);
-        if ~isempty(a), R(i,3) = a; end
-    end
-    
-    % set SliceNormalVector for mosaic if it is missing
-    if isMos && ~isfield(s.CSAImageHeaderInfo, 'SliceNormalVector')
-        sNormal = R(:,3);
-        if revNum, sNormal = -sNormal; end
-        s.CSAImageHeaderInfo.SliceNormalVector = sNormal;
-    end
-
-    [~, iSL] = max(abs(R(:,3)));
+R(:,3) = sNormal; % ignore revNum for now
+if isfield(s, 'ImageOrientationPatient')
+    R(:, 1:2) = reshape(s.ImageOrientationPatient, 3, 2);
+else
     if iSL==3
         R(:,2) = [0 R(3,3) -R(2,3)] / sqrt(sum(R(2:3,3).^2));
         R(:,1) = cross(R(:,2), R(:,3));
@@ -1970,32 +2022,17 @@ if ~isfield(s, 'ImageOrientationPatient')
     s.ImageOrientationPatient = R(1:6)';
 end
 
-if ~isfield(s, 'ImagePositionPatient')
-    pos = zeros(3,2);
-    sl = [0 nSL-1];
-    for j = 1:2
-        key = sprintf('sSliceArray.asSlice[%g].sPosition.d', sl(j));
-        for i = 1:3
-            a = asc_header(s, [key ori{i}]);
-            if ~isempty(a), pos(i,j) = a; end
-        end
-    end
-    
-    R = reshape(s.ImageOrientationPatient, 3, 2);
-    R = R * diag(s.PixelSpacing);
+if ~isfield(s, 'ImagePositionPatient')    
     dim = double([s.Columns s.Rows]');
-    if all(pos(:,2) == 0) % Mprage: dThickness and sPosition are for volume
-        sNormal = zeros(3,1);
-        for i = 1:3
-            a = asc_header(s, ['sSliceArray.asSlice[0].sNormal.d' ori{i}]);
-            if ~isempty(a), sNormal(i) = a; end
-        end
-        v3 = asc_header(s, 'sSliceArray.asSlice[0].dThickness');
-        R = [R sNormal*v3/nSL];
-        x = [-dim/2*[1 1]; (1-nSL)/2*[1 -1]];
-        pos = R * x + pos(:,1) * [1 1];
-    else % likely mosaic
-        pos = pos - R * dim/2 * [1 1];
+    if all(pos(:,2) == 0) % pos(:,1) for volume center
+        if any(~isfield(s,{'PixelSpacing' 'SpacingBetweenSlices'})), return; end
+        R = R * diag([s.PixelSpacing; s.SpacingBetweenSlices]);
+        x = [-dim/2*[1 1]; (nSL-1)/2*[-1 1]];
+        pos = R * x + pos(:,1) * [1 1]; % volume center to slice 1&nSL position
+    else % this may be how Siemens sets unusual mosaic ImagePositionPatient 
+        if ~isfield(s, 'PixelSpacing'), return; end
+        R = R(:,1:2) * diag(s.PixelSpacing);
+        pos = pos - R * dim/2 * [1 1]; % slice centers to slice position
     end
     if revNum, pos = pos(:, [2 1]); end
     if isMos, pos(:,2) = pos(:,1); end % set LastFile same as first for mosaic
@@ -2049,7 +2086,7 @@ end
 % -0.25444411 0.52460458 -0.81243353 
 % ...
 % 0.9836791 0.17571079 0.038744]; % matrix rows separated by char(10) and/or ';'
-function ext = set_nii_ext(s)
+function ext = set_nii_ext(s, save_pn)
 flds = { % fields to put into nifti ext
   'NiftiCreator' 'SeriesNumber' 'SeriesDescription' 'ImageType' 'Modality' ...
   'AcquisitionDateTime' 'bval' 'bvec' 'ReadoutSeconds' 'SliceTiming' ...
@@ -2058,6 +2095,7 @@ flds = { % fields to put into nifti ext
   'PatientPosition' 'SliceThickness' 'FlipAngle' 'RBMoCoTrans' 'RBMoCoRot' ...
   'Manufacturer' 'SoftwareVersion' 'MRAcquisitionType' 'InstitutionName' ...
   'ScanningSequence' 'SequenceVariant' 'ScanOptions' 'SequenceName'};
+if ~save_pn, flds(strcmp(flds, 'PatientName')) = []; end
 
 ext.ecode = 6; % text ext
 ext.edata = '';
@@ -2169,10 +2207,10 @@ function [err, nSL, sliceN, isTZ] = checkImagePosition(ipp)
 a = diff(sort(ipp));
 del = sum(a)/numel(a) * 0.02; % allow 2% error: have seen error of 0.1/7
 nSL = sum(a > del) + 1;
-sliceN = []; err = '';
+err = ''; sliceN = []; isTZ = false;
 nVol = numel(ipp) / nSL;
 if mod(nVol,1), err = 'Missing file(s) detected'; return; end
-if nSL<2, isTZ = false; return; end
+if nSL<2, return; end
 
 isTZ = nVol>1 && all(abs(diff(ipp(1:nVol))) < del);
 if isTZ % Philips XYTZ
@@ -2191,23 +2229,6 @@ end
 
 %% Save JSON file, proposed by Chris G
 function save_json(s, fname)
-global dicm2nii_SAVE_JSON; % remove this in the future
-persistent save_json;
-if isempty(save_json)
-    if ~isempty(dicm2nii_SAVE_JSON)
-        save_json = logical(dicm2nii_SAVE_JSON(1));
-        setpref('dicm2nii_gui_para', 'save_json', save_json);
-    else
-        try 
-            save_json = getpref('dicm2nii_gui_para', 'save_json');
-        catch
-            save_json = false; % default
-            setpref('dicm2nii_gui_para', 'save_json', save_json);
-        end
-    end
-end
-if ~save_json, return; end
-   
 flds = {
   'NiftiCreator' 'SeriesNumber' 'SeriesDescription' 'ImageType' 'Modality' ...
   'AcquisitionDateTime' 'bval' 'bvec' 'ReadoutSeconds' 'SliceTiming' 'RepetitionTime' ...
@@ -2328,20 +2349,20 @@ warndlg(['Package updated successfully. Please restart ' mfile ...
 
 %% Subfunction: return NumberOfImagesInMosaic in Siemens mosaic, or 1.
 % If NumberOfImagesInMosaic in CSA is >1, it is mosaic, and we are done. If not
-% exist, it may still be mosaic due to Siemens bug seen in syngo MR 2004A 4VA25A
-% phase image. Then we check EchoColumnPosition in CSA, and if it is greater
-% than half of the slice dim, sSliceArray.lSize is used as nMos. If no CSA at
-% all, the better way may be to peek into img to get nMos. Then the first atempt
-% is to check whether there is padded zeros. If so we count zeros either at top
-% or bottom of the img to decide real slice dim. In case there is no paddes
-% zeros, we use the single zero lines along phase dir seen in most (not all)
-% mosaic. If the lines are equally spaced, and nMos is divisible by mosaic dim,
-% we accept nMos. Otherwise, we fall back to NumberOfPhaseEncodingSteps, which
-% is used by dcm2nii, but is not accurate for most mosaic due to partial fourier
-% or less 100% phase fov.
+% exists, it may still be mosaic due to Siemens bug seen in syngo MR 2004A
+% 4VA25A phase image. Then we check EchoColumnPosition in CSA, and if it is
+% greater than half of the slice dim, sSliceArray.lSize is used as nMos. If no
+% CSA at all, the better way may be to peek into img to get nMos. Then the first
+% atempt is to check whether there is padded zeros. If so we count zeros either
+% at top or bottom of the img to decide real slice dim. In case there is no
+% padded zeros, we use the single zero lines along phase dir seen in most (not
+% all) mosaic. If the lines are equally spaced, and nMos is divisible by mosaic
+% dim, we accept nMos. Otherwise, we fall back to NumberOfPhaseEncodingSteps,
+% which is used by dcm2nii, but is not accurate for most mosaic due to partial
+% fourier or less 100% phase fov.
 function nMos = nMosaic(s)
 nMos = csa_header(s, 'NumberOfImagesInMosaic');
-if ~isempty(nMos), return; end % is mosaic: saw 0 for GLM Design file
+if ~isempty(nMos), return; end % seen 0 for GLM Design file and others
 
 % The next fix detects mosaic which is not labeled as MOSAIC in ImageType, nor
 % NumberOfImagesInMosaic exists. This is seen in syngo MR 2004A 4VA25A phase
@@ -2402,7 +2423,7 @@ if ~done
 end
 
 nMos = nMos * nMos;
-img = mos2vol(uint8(img), nMos); % find padded zeros: not critical
+img = mos2vol(uint8(img), nMos); % find padded zeros: needed for STC
 while 1
     a = img(:,:,nMos);
     if any(a(:) ~= 0), break; end

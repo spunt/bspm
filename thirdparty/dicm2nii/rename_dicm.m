@@ -1,7 +1,7 @@
 function rename_dicm(files, fmt)
 % Rename dicom files so the names are human readable.
 % 
-% rename_dicm(files, outputNameFormat)
+% RENAME_DICM(files, outputNameFormat)
 % 
 % The first input is the dicom file(s) or a folder containing dicom files.
 % The second input is the format for the result file names. Support format

@@ -1,45 +1,45 @@
 function varargout = nii_tool(cmd, varargin)
 % Basic function to create, load and save NIfTI file.
 % 
-% rst = nii_tool(cmd, para);
+% rst = NII_TOOL(cmd, para);
 % 
 % To list all command, type
-%  nii_tool ?
+%  NII_TOOL ?
 % 
 % To get help information for each command, include '?' in cmd, for example:
-%  nii_tool init?
-%  nii_tool('init?')
+%  NII_TOOL init?
+%  NII_TOOL('init?')
 % 
 % Here is a list of all command:
 % 
-% nii_tool('default', 'version', 1, 'rgb_dim', 1);
-% nii = nii_tool('init', img);
-% nii = nii_tool('update', nii);
-% nii_tool('save', nii, filename, force_3D);
-% hdr = nii_tool('hdr', filename);
-% img = nii_tool('img', filename_or_hdr);
-% ext = nii_tool('ext', filename_or_hdr);
-% nii = nii_tool('load', filename_or_hdr);
-% nii = nii_tool('cat3D', filenames);
-% nii_tool('RGBStyle', 'afni');
+% NII_TOOL('default', 'version', 1, 'rgb_dim', 1);
+% nii = NII_TOOL('init', img);
+% nii = NII_TOOL('update', nii);
+% NII_TOOL('save', nii, filename, force_3D);
+% hdr = NII_TOOL('hdr', filename);
+% img = NII_TOOL('img', filename_or_hdr);
+% ext = NII_TOOL('ext', filename_or_hdr);
+% nii = NII_TOOL('load', filename_or_hdr);
+% nii = NII_TOOL('cat3D', filenames);
+% NII_TOOL('RGBStyle', 'afni');
 % 
 % Detail for each command is described below.
 % 
-% oldVal = nii_tool('default', 'version', 1, 'rgb_dim', 1);
-% oldVal = nii_tool('default', struct('version', 1, 'rgb_dim', 1));
+% oldVal = NII_TOOL('default', 'version', 1, 'rgb_dim', 1);
+% oldVal = NII_TOOL('default', struct('version', 1, 'rgb_dim', 1));
 % 
 % - Set/query default NIfTI version and/or rgb_dim. To check the setting, run
-% nii_tool('default') without other input. The input for 'default' command can
+% NII_TOOL('default') without other input. The input for 'default' command can
 % be either a struct with fields of 'version' and/or 'rgb_dim', or
-% parameter/value pairs. See nii_tool('RGBstyle') for meaning of rgb_dim.
+% parameter/value pairs. See NII_TOOL('RGBstyle') for meaning of rgb_dim.
 % 
 % Note that the setting will be saved for future use. If one wants to change the
 % settting temporarily, it is better to return the oldVal, and to restore it
 % after done:
 % 
-%  oldVal = nii_tool('default', 'version', 2); % set version 2 as default
+%  oldVal = NII_TOOL('default', 'version', 2); % set version 2 as default
 %  % 'init' and 'save' NIfTI using above version
-%  nii_tool('default', oldVal); % restore default setting
+%  NII_TOOL('default', oldVal); % restore default setting
 % 
 % The default version setting affects 'init' command only. If you 'load' a NIfTI
 % file, modify it, and then 'save' it, the version will be the same as the
@@ -48,7 +48,7 @@ function varargout = nii_tool(cmd, varargin)
 % correctly, regardless of version setting.
 % 
 % 
-% nii = nii_tool('init', img, RGB_dim);
+% nii = NII_TOOL('init', img, RGB_dim);
 % 
 % - Initialize nii struct based on img, normally 3D or 4D array. Most fields in
 % the returned nii.hdr contain default values, and need to be updated based on
@@ -60,7 +60,7 @@ function varargout = nii_tool(cmd, varargin)
 % double floating numbers. Single/double complex and logical array are also
 % supported.
 % 
-% nii_tool returns img with the same data type as it is stored, while numeric
+% NII_TOOL returns img with the same data type as it is stored, while numeric
 % values in hdr are in double regardless the data type in the file.
 % 
 % The optional third input is needed only if img contains RGB/RGBA data. It
@@ -70,13 +70,13 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % Another way to signify RGB/RGBA data is to permute color dim to 8th-dim of img
 % (RGB_dim of 8 can be omitted then). Since NIfTI img can have up to 7 dim,
-% nii_tool chooses to store RGB/RGBA in 8th dim. Although this looks lengthy
-% (4th to 7th dim are often all ones), nii_tool can deal with up to 7 dim
+% NII_TOOL chooses to store RGB/RGBA in 8th dim. Although this looks lengthy
+% (4th to 7th dim are often all ones), NII_TOOL can deal with up to 7 dim
 % without causing any confusion. This is why the returned nii.img always stores
 % RGB in 8th dim.
 % 
 % 
-% nii = nii_tool('update', nii);
+% nii = NII_TOOL('update', nii);
 % 
 % - Update nii.hdr according to nii.img. This is useful if one changes nii.img
 % type or dimension. The 'save' command calls this internally, so it is not
@@ -85,22 +85,22 @@ function varargout = nii_tool(cmd, varargin)
 % nii.hdr.dim correct.
 % 
 % 
-% hdr = nii_tool('hdr', filename);
+% hdr = NII_TOOL('hdr', filename);
 % 
 % - Return hdr struct of the provided NIfTI file. This is useful to check NIfTI
 % hdr, and it is much faster than 'load', especially for .gz file. 
 % 
 % 
-% img = nii_tool('img', filename_or_hdr);
+% img = NII_TOOL('img', filename_or_hdr);
 % 
 % - Return image data in a NIfTI file. The second input can be NIfTI file name,
-% or hdr struct returned by nii_tool('hdr', filename).
+% or hdr struct returned by NII_TOOL('hdr', filename).
 % 
 % 
-% ext = nii_tool('ext', filename_or_hdr);
+% ext = NII_TOOL('ext', filename_or_hdr);
 % 
 % - Return NIfTI extension in a NIfTI file. The second input can be NIfTI file
-% name, or hdr struct returned by nii_tool('hdr', filename). The returned ext
+% name, or hdr struct returned by NII_TOOL('hdr', filename). The returned ext
 % will have field 'edata_decoded' if 'ecode' is of known type, such as dicom
 % (2), text (4 or 6) or Matlab (40).
 % 
@@ -115,23 +115,23 @@ function varargout = nii_tool(cmd, varargin)
 %  nii.ext.ecode = 40; % 40 for Matlab extension
 %  nii.ext.edata = myEdata; % myEdata must be uint8 array
 % 
-% nii_tool will take care of rest when you 'save' nii to a file.
+% NII_TOOL will take care of rest when you 'save' nii to a file.
 % 
 % In case a NIfTI ext causes problem (for example, some FSL builds have problem
 % in reading NIfTI img with ecode>30), one can remove the ext easily:
 % 
-%  nii = nii_tool('load', 'file_with_ext.nii'); % load the file with ext
+%  nii = NII_TOOL('load', 'file_with_ext.nii'); % load the file with ext
 %  nii.ext = []; % or nii = rmfield(nii, 'ext'); % remove ext
-%  nii_tool('save', nii, 'file_without_ext.nii'); % save it
+%  NII_TOOL('save', nii, 'file_without_ext.nii'); % save it
 %
 % 
-% nii = nii_tool('load', filename_or_hdr);
+% nii = NII_TOOL('load', filename_or_hdr);
 % 
 % - Load NIfTI file into nii struct. The returned struct includes NIfTI 'hdr'
 % and 'img', as well as 'ext' if the file contains NIfTI extension.
 % 
 % 
-% nii_tool('save', nii, filename, force_3D);
+% NII_TOOL('save', nii, filename, force_3D);
 % 
 % - Save struct nii into filename. The format of the file is determined by the
 % file extension, such as .img, .nii, .img.gz, .nii.gz etc. If filename is not
@@ -146,21 +146,21 @@ function varargout = nii_tool(cmd, varargin)
 % by 'load' a 4D file, then 'save' it as 3D files. The 3D file names will have
 % 5-digit like '_00001' appended to indicate volume index.
 % 
-% The NIfTI version can be set by nii_tool('default'). One can override the
+% The NIfTI version can be set by NII_TOOL('default'). One can override the
 % default version by specifying it in nii.hdr.version. To convert between
 % versions, load a NIfTI file, specify new version, and save it. For example:
 % 
-%  nii = nii_tool('load', 'file_nifti1.nii'); % load version 1 file
+%  nii = NII_TOOL('load', 'file_nifti1.nii'); % load version 1 file
 %  nii.hdr.version = 2; % force to NIfTI-2
-%  nii_tool('save', nii, 'file_nifti2.nii'); % save as version 2 file
+%  NII_TOOL('save', nii, 'file_nifti2.nii'); % save as version 2 file
 % 
 % Following example shows how to change data type of a nii file:
-%  nii = nii_tool('load', 'file_int16.nii'); % load int16 type file
+%  nii = NII_TOOL('load', 'file_int16.nii'); % load int16 type file
 %  nii.img = single(nii.img); % change data type to single/float32
-%  nii_tool('save', nii, 'file_float.nii'); % nii_tool will take care of hdr
+%  NII_TOOL('save', nii, 'file_float.nii'); % NII_TOOL will take care of hdr
 % 
 % 
-% nii = nii_tool('cat3D', files);
+% nii = NII_TOOL('cat3D', files);
 % 
 % - Concatenate SPM 3D files into a 4D dataset. The input 'files' can be cellstr
 % with file names, or char with wildcards (* or ?). If it is cellstr, the volume
@@ -173,25 +173,25 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % Following example shows how to convert a series of 3D files into a 4D file:
 % 
-%  nii = nii_tool('cat3D', './data/fSubj2-0003*.nii'); % load files for series 3 
-%  nii_tool('save', nii, './data/fSubj2-0003_4D.nii'); % save as a 4D file
+%  nii = NII_TOOL('cat3D', './data/fSubj2-0003*.nii'); % load files for series 3 
+%  NII_TOOL('save', nii, './data/fSubj2-0003_4D.nii'); % save as a 4D file
 % 
 % 
-% oldStyle = nii_tool('RGBStyle', 'afni');
+% oldStyle = NII_TOOL('RGBStyle', 'afni');
 % 
 % - Set/query the method to save RGB or RGBA NIfTI file. The default method can
-% be set by nii_tool('default', 'rgb_dim', dimN), where dimN can be 1, 3 or 4,
+% be set by NII_TOOL('default', 'rgb_dim', dimN), where dimN can be 1, 3 or 4,
 % or 'afni', 'mricron' or 'fsl', as explained below.
 % 
 % The default is 'afni' style (or 1), which is defined by NIfTI standard, but is
 % not well supported by fslview till v5.0.8 or mricron till v20140804.
 % 
-% If the second input is set to 'mricron' (or 3), nii_tool will save file using
+% If the second input is set to 'mricron' (or 3), NII_TOOL will save file using
 % the old RGB fashion (dim 3 for RGB). This works for mricron v20140804 or
 % earlier. nii_viewer.m tool and the later mricron work for both rgb_dim of 1
 % and 3.
 % 
-% If the second input is set to 'fsl' (or 4), nii_tool will save RGB or RGBA
+% If the second input is set to 'fsl' (or 4), NII_TOOL will save RGB or RGBA
 % layer into 4th dimension, and the file is not encoded as RGB data, but as
 % normal NIfTI. This violates the NIfTI rule, but it seems it is the only way
 % to work for fslview (at least till fsl v5.0.8).
@@ -202,22 +202,22 @@ function varargout = nii_tool(cmd, varargin)
 % The GUI mehtod to convert between different RGB style can be found in
 % nii_viewer. Following shows how to convert other style into fsl style:
 % 
-%  nii = nii_tool('load', 'non_fsl_style.nii'); % load RGB file
-%  nii_tool('RGBStyle', 'fsl'); % switch to fsl style for later save
-%  nii_tool('save', nii, 'fslRGB.nii'); % fsl can read it as RGB
+%  nii = NII_TOOL('load', 'non_fsl_style.nii'); % load RGB file
+%  NII_TOOL('RGBStyle', 'fsl'); % switch to fsl style for later save
+%  NII_TOOL('save', nii, 'fslRGB.nii'); % fsl can read it as RGB
 % 
 % Note that, if one wants to convert fsl style (non-RGB file by NIfTI standard)
 % to other styles, an extra step is needed to change the RGB dim from 4th to 8th
 % dim before 'save':
 % 
-%  nii = nii_tool('load', 'fslStyleFile.nii'); % it is normal NIfTI
+%  nii = NII_TOOL('load', 'fslStyleFile.nii'); % it is normal NIfTI
 %  nii.img = permute(nii.img, [1:3 5:8 4]); % force it to be RGB data
-%  nii_tool('RGBStyle', 'afni'); % switch to NIfTI RGB style
-%  nii_tool('save', nii, 'afni_RGB.nii'); % now AFNI can read it as RGB
+%  NII_TOOL('RGBStyle', 'afni'); % switch to NIfTI RGB style
+%  NII_TOOL('save', nii, 'afni_RGB.nii'); % now AFNI can read it as RGB
 % 
-% Also note that the setting by nii_tool('RGBStyle') is effective only for
+% Also note that the setting by NII_TOOL('RGBStyle') is effective only for
 % current Matlab session. If one clears all or starts a new Matlab session, the
-% default style by nii_tool('default') will take effect.
+% default style by NII_TOOL('default') will take effect.
 %  
 % See also NII_VIEWER, NII_XFORM, DICM2NII
 
@@ -245,6 +245,7 @@ function varargout = nii_tool(cmd, varargin)
 % 160110 Use matlab pref method to replace para file.
 % 160120 check_gzip: use "" for included pigz; ignore dd error if err is false.
 % 160326 fix setpref for older Octave: set each parameter separately.
+% 160531 fopen uses 'W' for 'w': performance benefit according to Yair.
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C), [C, para] = niiHeader; end
@@ -378,11 +379,11 @@ elseif strcmpi(cmd, 'save')
         % version 1 will take only the first 4
         nii.hdr.magic = sprintf('n+%g%s', niiVer, char([0 13 10 26 10]));
         nii.hdr.vox_offset = nii.hdr.sizeof_hdr + 4 + esize;
-        fid = fopen([fname fext], 'w');
+        fid = fopen([fname fext], 'W');
     else
         nii.hdr.magic = sprintf('ni%g%s', niiVer, char([0 13 10 26 10]));
         nii.hdr.vox_offset = 0;
-        fid = fopen([fname '.hdr'], 'w');
+        fid = fopen([fname '.hdr'], 'W');
     end
     
     % Write nii hdr
@@ -411,7 +412,7 @@ elseif strcmpi(cmd, 'save')
     
     if ~isNii
         fclose(fid); % done with .hdr
-        fid = fopen([fname '.img'], 'w');
+        fid = fopen([fname '.img'], 'W');
     end
 
     % Write nii image
@@ -884,11 +885,12 @@ hdr.file_name = fullfile(pth, [nam ext]); % fname with full path
 %% subfunction: read ext, and decode it if known ecode
 function ext = read_ext(fid, hdr)
 ext = []; % to avoid error, such as no ext but hdr.extension(1) was set
-fseek(fid, hdr.sizeof_hdr+4, 'bof'); % +4 skip hdr.extension
 nEnd = hdr.vox_offset;
 if nEnd == 0 % .hdr file
-    nEnd = getfield(dir(fopen(fid)), 'bytes'); % total bytes of the .hdr file
+    fseek(fid, 0, 'eof');
+    nEnd = ftell(fid); % total bytes of the .hdr file
 end
+fseek(fid, hdr.sizeof_hdr+4, 'bof'); % +4 skip hdr.extension
 i = 1; % nExt. It would be nice if hdr.extension(2) stores nExt
 while ftell(fid) < nEnd
     esize = fread(fid, 1, 'int32'); % multiple of 16

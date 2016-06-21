@@ -1,7 +1,7 @@
 function dict = dicm_dict(vendor, flds)
 % Return dicom dictionary for specified vendor.
 % 
-% dict = dicm_hdr(vendor, dicmFields);
+% dict = DICM_DICT(vendor, dicmFields);
 % 
 % The vendor is used to assign those vendor-specific private tags for SIEMENS,
 % GE and Philips. Other vendors can be added easily into the file.

@@ -1,5 +1,5 @@
 function varargout = nii_xform(src, target, rst, intrp, missVal)
-% Transform a NIfTI into different resolution, or into a space of a template.
+% Transform a NIfTI into different resolution, or into a template space.
 % 
 %  NII_XFORM('sourceNiiName', 'templateNiiName', 'resultNiiName')
 %  NII_XFORM('sourceNiiName', [1 1 1], 'resultNiiName')
@@ -52,8 +52,9 @@ function varargout = nii_xform(src, target, rst, intrp, missVal)
 % By Xiangrui Li (xiangrui.li@gmail.com)
 % History(yymmdd):
 % 151024 Write it.
+% 160531 Remove narginchk so work for early matlab.
 
-narginchk(2, 5);
+if nargin<2 || nargin>5, help('nii_xform'); error('Wrong number of input.'); end
 if nargin<3, rst = []; end
 if nargin<4 || isempty(intrp), intrp = 'linear'; end
 if nargin<5 || isempty(missVal), missVal = nan; end
@@ -61,10 +62,8 @@ intrp = lower(intrp);
     
 nii = nii_tool('load', src);
 if iscell(target) % transformation and template file names
-    fid = fopen(target{2});
-    if fid<0, error('Transformation file not found.'); end
-    R = str2num(fread(fid, '*char')'); %#ok
-    fclose(fid);
+    R = load(target{2}, '-ascii');
+    if ~isequal(size(R), [4 4]), error('Invalid transformation file.'); end
     
     hdr = nii_tool('hdr', target{1});
     if hdr.sform_code>0, R0 = [hdr.srow_x; hdr.srow_y; hdr.srow_z; 0 0 0 1];
@@ -84,13 +83,14 @@ if iscell(target) % transformation and template file names
     % diag-major, and can be negative for major axes (e.g. cor/sag slices).
     
     % Following works for tested FSL .mat files: Any better way?
+    % R0: target;   R1: source;  R: xform;  result is also R
     R = R0 / diag([hdr.pixdim(2:4) 1]) * R * diag([nii.hdr.pixdim(2:4) 1]);
     [~, i1] = max(abs(R1(1:3,1:3)));
     [~, i0] = max(abs(R(1:3,1:3)));
     flp = sign(R(i0+[0 4 8])) ~= sign(R1(i1+[0 4 8]));
     if any(flp)
         rotM = diag([1-flp*2 1]);
-        rotM(1:3,4) = (nii.hdr.dim(2:4)-1).* flp;
+        rotM(1:3,4) = (nii.hdr.dim(2:4)-1) .* flp;
         R = R / rotM;
     end
 elseif ischar(target) % template file name
@@ -165,10 +165,10 @@ function R = quat2R(hdr)
 b = hdr.quatern_b;
 c = hdr.quatern_c;
 d = hdr.quatern_d;
-a = sqrt(1-b^2-c^2-d^2);
-R = [1-2*(c^2+d^2)  2*(b*c-d*a)     2*(b*d+c*a);
-     2*(b*c+d*a)    1-2*(b^2+d^2)   2*(c*d-b*a);
-     2*(b*d-c*a )   2*(c*d+b*a)     1-2*(b^2+c^2)];
+a = sqrt(1-b*b-c*c-d*d);
+R = [1-2*(c*c+d*d)  2*(b*c-d*a)     2*(b*d+c*a);
+     2*(b*c+d*a)    1-2*(b*b+d*d)   2*(c*d-b*a);
+     2*(b*d-c*a )   2*(c*d+b*a)     1-2*(b*b+c*c)];
 R = R * diag(hdr.pixdim(2:4));
-if hdr.pixdim(1)<0, R(:,3)= -R(:,3); end
+if hdr.pixdim(1)<0, R(:,3) = -R(:,3); end % qfac
 R = [R [hdr.qoffset_x hdr.qoffset_y hdr.qoffset_z]'; 0 0 0 1];

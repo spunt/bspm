@@ -1,7 +1,7 @@
 function img = dicm_img(s, xpose)
 % Read image of a dicom file.
 % 
-% img = dicm_img(metaStructOrFilename, xpose);
+% img = DICM_IMG(metaStructOrFilename, xpose);
 % 
 % The mandatory first input is the dicom file name, or the struct returned by
 % dicm_hdr. The output keeps the data type in dicom file.
@@ -33,16 +33,20 @@ function img = dicm_img(s, xpose)
 % 150404 Add 'if' block for numeric s.PixelData (BVfile). 
 % 160114 cast s.PixelData.Bytes to double (thx DavidR). 
 % 160127 support big endian files. 
+% 160521 support dicom wiht BitsStored~=HighBit+1 (tkx RayL).
 
 persistent flds dict;
-if isempty(flds)
-    flds = {'Columns' 'Rows' 'BitsAllocated'};
-    dict = dicm_dict('', [flds 'SamplesPerPixel' 'PixelRepresentation' ...
-                     'PlanarConfiguration' 'BitsStored' 'HighBit']);
-end
+if isempty(flds), flds = {'Columns' 'Rows' 'BitsAllocated'}; end
 if isstruct(s) && ~all(isfield(s, [flds 'PixelData'])), s = s.Filename; end
-if ischar(s), [s, err] = dicm_hdr(s, dict); end % input is file name
-if isempty(s), error(err); end
+if ischar(s) % input is file name
+    if isempty(dict)
+        dict = dicm_dict('', [flds 'SamplesPerPixel' 'PixelRepresentation' ...
+                     'PlanarConfiguration' 'BitsStored' 'HighBit']);
+    end
+    [s, err] = dicm_hdr(s, dict); 
+    if isempty(s), error(err); end
+end
+
 if isfield(s, 'SamplesPerPixel'), spp = double(s.SamplesPerPixel);
 else spp = 1;
 end
@@ -52,9 +56,6 @@ if isnumeric(s.PixelData) % data already in hdr
     return;
 end
 
-if all(isfield(s, {'BitsStored' 'HighBit'})) && s.BitsStored ~= s.HighBit+1
-    error('Please report to author: HighBit+1 ~= BitsStored, %s', s.Filename);
-end
 if ~isfield(s.PixelData, 'Format')
     fmt = sprintf('*uint%g', s.BitsAllocated);
 else
@@ -80,12 +81,19 @@ if ~isfield(s, 'TransferSyntaxUID') || ... % files other than dicom
         strcmp(s.TransferSyntaxUID, '1.2.840.10008.1.2')
     n = double(s.PixelData.Bytes) / (double(s.BitsAllocated) / 8);
     img = fread(fid, n, fmt);
+    
+    if all(isfield(s, {'BitsStored' 'HighBit'})) && ...
+            (s.BitsStored ~= s.HighBit+1) && (s.BitsStored ~= s.BitsAllocated)
+        img = bitshift(img, s.BitsStored-s.HighBit-1);
+    end
+    
     dim = double([s.Columns s.Rows]);
+    nFrame = n/spp/dim(1)/dim(2);
     if ~isfield(s, 'PlanarConfiguration') || s.PlanarConfiguration==0
-        img = reshape(img, [spp dim n/spp/dim(1)/dim(2)]);
+        img = reshape(img, [spp dim nFrame]);
         img = permute(img, [2 3 1 4]);
     else
-        img = reshape(img, [dim spp n/spp/dim(1)/dim(2)]);
+        img = reshape(img, [dim spp nFrame]);
     end
     if xpose, img = permute(img, [2 1 3 4]); end
     if isfield(s, 'TransferSyntaxUID') && ...

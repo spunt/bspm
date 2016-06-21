@@ -1,7 +1,7 @@
 function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % Return header of a dicom file in a struct.
 % 
-% [s, err] = dicm_hdr(dicomFileName, dict, iFrames);
+% [s, err] = DICM_HDR(dicomFileName, dict, iFrames);
 % 
 % The mandatory 1st input is the dicom file name. 
 % 
@@ -55,8 +55,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 141128 Minor tweaks (len-1 in read_csa) for Octave 3.8.1.
 % 150114 Siemens CSA str is not always len=1. Fix it (runs slower).
 % 150128 Use memory gunzip for GE ProtocolDataBlock (0.5 vs 43 ms).
-% 150222 philips_par: fix slice dir in R using 'image offcentre';
-%        Avoid repeatedly reading .REC .BRIK file for hdr. 
+% 150222 Avoid repeatedly reading .REC .BRIK file for hdr. 
 % 150227 Avoid error due to empty file (thx Kushal).
 % 150316 Avoid error due to empty item dat for search method (thx VG).
 % 150324 philips_par/afni_head: make up SeriesInstanceUID for dicm2nii.
@@ -76,6 +75,8 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 160414 Skip GEIIS SQ: not dicom compliant.
 % 160418 Add search_MF_val(); need FrameStart in PerFrameSQ.
 % 160422 Performance: avoid nestedFunc (big), use uint8, avoid typecast (minor).
+% 160527 philips_par: center of slice 1 for slice dir; (dim-1)/2 for vol center.
+% 160608 read_sq: n=nEnd (j>2) with PerFrameSQ (needed if length is not inf).
 
 persistent dict_full;
 s = []; info = '';
@@ -97,10 +98,10 @@ if nargin<3, iFrames = []; end
 p.iFrames = iFrames;
 fid = fopen(fname);
 if fid<0, info = ['File not exists: ' fname]; return; end
-cln = onCleanup(@() fclose(fid)); % auto close when done or error
+closeFile = onCleanup(@() fclose(fid)); % auto close when done or error
 fseek(fid, 0, 1); fSize = ftell(fid); fseek(fid, 0, -1);
-b8 = fread(fid, 130000, '*uint8')'; % enough for most dicom
-if numel(b8)<140 % 132 + one empty tag, ignore truncated
+b8 = fread(fid, 130000, 'uint8=>uint8')'; % enough for most dicom
+if fSize<140 % 132 + one empty tag, ignore truncated
     info = ['Invalid file: ' fname];
     return;
 end
@@ -109,7 +110,7 @@ iTagStart = 132; % start of first tag
 isDicm = isequal(b8(129:132), 'DICM');
 if ~isDicm % truncated dicom: is first group 2 or 8? not safe
     group = ch2int16(b8(1:2), 0);
-    isDicm = group==2 || group==8; % truncated dicm always implicit LE
+    isDicm = group==2 || group==8; % truncated dicm always LE
     iTagStart = 0;
 end
 if ~isDicm % may be PAR/HEAD/BV file
@@ -224,7 +225,7 @@ if toSearch % search each tag if header is short and not many tags asked
             vr = p.dict.vr{k};
         end
         [n, nvr] = val_len(vr, b8(i+(0:5)), hasVR, swap); i = i+nvr;
-        if n==0, continue; end
+        if n==0, continue; end % dont assign empty tag
 
         [dat, info] = read_val(b8(i+(0:n-1)), vr, swap);
         if ~isempty(info), toSearch = false; break; end % re-do in regular way
@@ -292,7 +293,7 @@ end % main func
 
 %% subfunction: read dicom item. Called by dicm_hdr and read_sq
 function [dat, name, info, i, tag] = read_item(b8, i, p)
-dat = []; name = nan; info = ''; vr = 'CS'; % vr may used if implicit
+dat = []; name = nan; info = ''; vr = 'CS'; % vr may be used if implicit
 
 group = b8(i+(0:1)); i=i+2;
 swap = p.be && ~isequal(group, [2 0]); % good news: no 0x0200 group
@@ -361,9 +362,9 @@ while i<nEnd % loop through multi Item under the SQ
     n = min(i+n, nEnd);
     j = j + 1;
     
-    % This if block deals with partial PerFrameSQ: j and i jump for a frame. 
+    % This 'if' block deals with partial PerFrameSQ: j and i jump to a frame. 
     % The 1/2/nf frame scheme will have problem in case that tag1 in 1st frame
-    % is not the first tag in other frames. Then the info before tag1 in other
+    % is not the first tag in other frames. Then the tags before tag1 in other
     % frames will be treated as for previous.
     if isPerFrameSQ
         if ischar(p.iFrames) % 'all' frames
@@ -401,6 +402,7 @@ while i<nEnd % loop through multi Item under the SQ
             iItem = iItem + 1;
             j = iFrame(iItem);
             i = ind(j); % start of tag1 for asked frame
+            n = nEnd; % use very end of the sq
         end
     end
     
@@ -486,7 +488,7 @@ function fmt = vr2fmt(vr)
     end
 end
 
-%% subfunction: return nFrames
+%% subfunction: get nFrames into p.nFrames
 function p = get_nFrames(s, p)
 if isfield(s, 'NumberOfFrames')
     p.nFrames = s.NumberOfFrames; % useful for PerFrameSQ
@@ -768,11 +770,7 @@ s.MRAcquisitionType = par_key('Scan mode', 0);
 s.ScanningSequence = par_key('Technique', 0); % ScanningTechnique
 typ = par_key('Series Type', 0); typ(isspace(typ)) = '';
 s.ImageType = ['PhilipsPAR\' typ '\' s.ScanningSequence];
-% foo = par_key('Scan resolution'); % before reconstruction
-% s.AcquisitionMatrix = [foo(1) 0 0 foo(2)]'; % depend on slice ori
 s.RepetitionTime = par_key('Repetition time');
-% FOV = par_key('FOV'); % (ap,fh,rl) [mm] 
-% FOV = FOV([3 1 2]); % x y z
 s.WaterFatShift = par_key('Water Fat shift');
 rotAngle = par_key('Angulation midslice'); % (ap,fh,rl) deg
 rotAngle = rotAngle([3 1 2]);
@@ -929,45 +927,40 @@ getTableVal('slice orientation', 'SliceOrientation'); % 1/2/3 for TRA/SAG/COR
 iOri = mod(s.SliceOrientation+1, 3) + 1; % [1 2 3] to [3 1 2]
 if iOri == 1 % Sag
     s.SliceOrientation = 'SAGITTAL';
-    ixyz = [2 3 1];
-    R(:,[1 3]) = -R(:,[1 3]); % change col sign according to iOri
+    R(:,[1 3]) = -R(:,[1 3]);
+    R = R(:, [2 3 1]);
 elseif iOri == 2 % Cor
     s.SliceOrientation = 'CORONAL';
-    ixyz = [1 3 2];
     R(:,3) = -R(:,3);
+    R = R(:, [1 3 2]);
 else % Tra
     s.SliceOrientation = 'TRANSVERSAL';
-    ixyz = [1 2 3];
 end
-% bad precision for some PAR, 'pixel spacing' and 'slice gap', but it is wrong
-% to use FOV, maybe due to partial Fourier?
+
+% 'pixel spacing' 'pixel spacing' and 'slice gap' have poor precision for v<=4?
+% It may be wrong to use FOV, maybe due to partial Fourier?
 getTableVal('pixel spacing', 'PixelSpacing');
 s.PixelSpacing = s.PixelSpacing(:);
 getTableVal('slice gap', 'SpacingBetweenSlices');
-
 s.SpacingBetweenSlices = s.SpacingBetweenSlices + s.SliceThickness;
-% s.PixelSpacing = FOV(ixyz(1:2)) ./ [s.Columns s.Rows]';
-% s.SpacingBetweenSlices = FOV(ixyz(3)) ./ nSL;
 
 if exist('iPhase', 'var')
     foo = 'COL';
-    if iPhase == ixyz(1), foo = 'ROW'; end
+    if iPhase == (iOri==1)+1, foo = 'ROW'; end
     s.InPlanePhaseEncodingDirection = foo;
 end
 
-R = R(:, ixyz); % dicom rotation matrix
 s.ImageOrientationPatient = R(1:6)';
 R = R * diag([s.PixelSpacing; s.SpacingBetweenSlices]);
 R = [R posMid; 0 0 0 1]; % 4th col is mid slice center position
-% x = ([s.Columns s.Rows nSL] -1) / 2; % some V4.2 seem to use this
-x = [s.Columns s.Rows nSL-1] / 2; % ijk of mid slice center 
 
-c0 = R(iOri,3:4) * [-x(3) 1]'; % 1st slice center loc based on current slice dir
-if sign(R(iOri,3)) ~= sign(posMid(iOri)-c0)
+getTableVal('image offcentre', 'SliceLocation');
+s.SliceLocation = s.SliceLocation(iOri); % center loc for 1st slice
+if sign(R(iOri,3)) ~= sign(posMid(iOri)-s.SliceLocation)
     R(:,3) = -R(:,3);
 end
 
-R(:,4) = R * [-x 1]'; % dicom xform matrix
+R(:,4) = R * [-([s.Columns s.Rows nSL]-1)/2 1]'; % vol center to corner of 1st
 y = R * [0 0 nSL-1 1]'; % last slice position
 s.ImagePositionPatient = R(1:3,4);
 s.LastFile.ImagePositionPatient = y(1:3);
