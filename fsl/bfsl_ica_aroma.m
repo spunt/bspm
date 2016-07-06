@@ -25,7 +25,7 @@ if nargin < 3, outdir = fileparts(infile); end
 
 % | - Configure Path
 gitdir      = fullfile(getenv('HOME'), 'Github')
-aromadir    = fullfile(gitdir, 'thirdparty', 'ICA-AROMA');  
+aromadir    = fullfile(gitdir, 'thirdparty-matlab', 'ICA-AROMA');  
 icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
 if ~exist(icaaroma, 'file')
     fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); 
