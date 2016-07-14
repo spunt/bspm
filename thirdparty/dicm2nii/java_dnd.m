@@ -12,19 +12,20 @@ classdef (CaseInsensitiveProperties) java_dnd < handle
 %       java_dnd        - Constructs the java_dnd object.
 %
 %   See also:
-%       uicontrol, javaObjectEDT.    
+%       uicontrol, javaObjectEDT.
 %
 %   dndcontrol Written by: Maarten van der Seijs, 2015.
 %   Version: 1.0, 13 October 2015.
 %   Modified by Xiangrui Li for nii_viewer and dicm2nii:
 %    1. Combine two callback into one
 %    2. Allow extra input arguments
-%    3. Remove initJava, and do it automatically
+%    3. Remove initJava, and do it automatically with dynamic and static path
 %    4. Remove demo etc to make it simple
 %    5. Rename file to avoid problem in case original dndcontrol on path
-
+%    6. Return evt.DropAction to detect ControlDown for pc and mac (160623)
+    
     properties (Hidden)
-        dropTarget;                
+        dropTarget;
     end
     
     properties (Dependent)
@@ -33,34 +34,44 @@ classdef (CaseInsensitiveProperties) java_dnd < handle
     end
     
     properties
-        DropFcn;        
+        DropFcn;
     end
-       
+    
     methods
         function obj = java_dnd(Parent, DropFcn)
-        %java_dnd Drag & Drop control constructor.
-        %   obj = java_dnd(javaobj) contstructs a java_dnd object for 
-        %   the given parent control javaobj. The parent control should be a 
-        %   subclass of java.awt.Component, such as most Java Swing widgets.
-        %
-        %   obj = java_dnd(javaobj,DropFcn) sets the callback functions for
-        %   dropping of files and text.
+            %java_dnd Drag & Drop control constructor.
+            %   obj = java_dnd(javaobj) contstructs a java_dnd object for
+            %   the given parent control javaobj. The parent control should be a
+            %   subclass of java.awt.Component, such as most Java Swing widgets.
+            %
+            %   obj = java_dnd(javaobj,DropFcn) sets the callback functions for
+            %   dropping of files and text.
             
             if (exist('MLDropTarget','class') ~= 8)
-                classpath = fileparts(mfilename('fullpath'));                
-                javaclasspath(classpath);                
-            end 
-             
-            % Construct DropTarget            
+                classpath = fileparts(mfilename('fullpath'));
+                javaclasspath(classpath); % dynamic for this session
+                fid = fopen(fullfile(prefdir, 'javaclasspath.txt'), 'a+');
+                if fid>0 % static path for later sessions: work for 2013+?
+                    cln = onCleanup(@() fclose(fid));
+                    fseek(fid, 0, 'bof');
+                    pth = fread(fid, inf, '*char')';
+                    if isempty(strfind(pth, classpath)) % avoid multiple write 
+                        fseek(fid, 0, 'bof');
+                        fprintf(fid, '%s\n', classpath);
+                    end
+                end
+            end
+            
+            % Construct DropTarget
             obj.dropTarget = handle(javaObjectEDT('MLDropTarget'),'CallbackProperties');
             set(obj.dropTarget,'DropCallback',{@java_dnd.DndCallback,obj});
             set(obj.dropTarget,'DragEnterCallback',{@java_dnd.DndCallback,obj});
             
             % Set DropTarget to Parent
             if nargin >=1, Parent.setDropTarget(obj.dropTarget); end
-            
+                        
             % Set callback functions
-            if nargin >=2, obj.DropFcn = DropFcn; end 
+            if nargin >=2, obj.DropFcn = DropFcn; end
         end
         
         function set.Parent(obj, Parent)
@@ -85,15 +96,15 @@ classdef (CaseInsensitiveProperties) java_dnd < handle
     methods (Static, Hidden = true)
         %% Callback functions
         function DndCallback(jSource, jEvent, obj)
-            
-            if jEvent.isa('java.awt.dnd.DropTargetDropEvent') % Drop event     
+            if jEvent.isa('java.awt.dnd.DropTargetDropEvent') % Drop event
                 try
                     dropType = jSource.getDropType();
                     if dropType<1 || dropType>2 % No success.
-                        jEvent.dropComplete(true);  
+                        jEvent.dropComplete(true);
                         return;
                     end
-                    
+                    evt.DropAction = jEvent.getDropAction;
+
                     if dropType==1 % String dropped.
                         evt.DropType = 'string';
                         evt.Data = char(jSource.getTransferData());
@@ -109,17 +120,16 @@ classdef (CaseInsensitiveProperties) java_dnd < handle
                     end
                     
                     % Set dropComplete
-                    jEvent.dropComplete(true);  
+                    jEvent.dropComplete(true);
                 catch ME
                     % Set dropComplete
-                    jEvent.dropComplete(true);  
+                    jEvent.dropComplete(true);
                     rethrow(ME)
-                end                              
+                end
                 
-            elseif jEvent.isa('java.awt.dnd.DropTargetDragEvent') % Drag event                               
-                 action = java.awt.dnd.DnDConstants.ACTION_COPY;
-                 jEvent.acceptDrag(action);
-            end            
+            elseif jEvent.isa('java.awt.dnd.DropTargetDragEvent') % Drag event
+                jEvent.acceptDrag(1); % ACTION_COPY
+            end
         end
     end
 end

@@ -94,7 +94,7 @@ nVol = single(nii.hdr.dim(5));
 nFFT = 2^ceil(log2(nVol+40)); % arbituary extra padding to reduce edge problem
 F = (0:nFFT/2) / nFFT; % freq in unit of points: last is Nyquist
 F = [F -F(end-1:-1:2)] * 2*pi; % symmetric around Nyquist, except 1st 0
-F = permute(exp(F*sqrt(-1)), [1 3 4 2]); % [1 1 1 nFFT]
+F = permute(exp(F * 1i), [1 3 4 2]); % [1 1 1 nFFT]
 ramp = single(permute(linspace(1, 0, nFFT-nVol), [1 3 4 2])); % [1 1 1 nRamp]
 t = single(t);
 

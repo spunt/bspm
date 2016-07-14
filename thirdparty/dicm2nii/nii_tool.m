@@ -246,9 +246,16 @@ function varargout = nii_tool(cmd, varargin)
 % 160120 check_gzip: use "" for included pigz; ignore dd error if err is false.
 % 160326 fix setpref for older Octave: set each parameter separately.
 % 160531 fopen uses 'W' for 'w': performance benefit according to Yair.
+% 160701 subFuncHelp: bug fix for mfile case.
 
 persistent C para; % C columns: name, length, format, value, offset
-if isempty(C), [C, para] = niiHeader; end
+if isempty(C)
+    [C, para] = niiHeader;
+    if exist('OCTAVE_VERSION', 'builtin')
+        warning('off', 'Octave:fopen-mode'); % avoid 'W' warning
+        more off;
+    end
+end
 
 if ~ischar(cmd)
     error('Provide a string command as the first input for nii_tool');
@@ -1097,6 +1104,7 @@ if isempty(ind), disp(str); return; end % no topicChar found. Show all help text
 
 fakeChar = repmat(char(1), 1, numel(topicChar));
 str = strrep(str, topicChar, fakeChar); % will restore later
+str = strrep(str, upper(mfile), mfile);
 
 % format for reliable syntax and paragraph detection (order is important):
 cr1 = [cr ' ']; % cr with a space
