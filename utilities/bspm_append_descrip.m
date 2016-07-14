@@ -15,7 +15,7 @@ function bspm_append_descrip(in, deletepat)
 %	$Revision Date: Aug_20_2014
 defaultpat = {'spm_spm:beta \(\d\d\d\d\)\s-\sSn\(\d\)'
 '*.+$'
-'^SPM\{T_\[\d+\]\}\s-\scontrast\s\d+:'
+'^SPM\{T_\[\d+\.\d\]\}\s-\scontrast\s\d+:'
 '^Contrast\s\d+:'
 '-\sAll\sSessions'};
 if nargin<1, mfile_showhelp; return; end
