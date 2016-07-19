@@ -14,7 +14,7 @@ function bspm_append_descrip(in, deletepat)
 %
 %	$Revision Date: Aug_20_2014
 defaultpat = {'spm_spm:beta \(\d\d\d\d\)\s-\sSn\(\d\)'
-'*.+$'
+'\*.*$'
 '^SPM\{T_\[\d+\.\d\]\}\s-\scontrast\s\d+:'
 '^Contrast\s\d+:'
 '-\sAll\sSessions'};
@@ -28,7 +28,6 @@ deletepat = [defaultpat; deletepat];
 nimg = length(in);
 hdr = spm_vol(char(in));
 des = {hdr.descrip}';
-img = spm_read_vols(hdr);
 outname = des; 
 for i = 1:length(deletepat), outname = strtrim(regexprep(outname, deletepat{i}, '')); end
 out = fullfile(pth, strcat(fname, '_', outname, fext));
