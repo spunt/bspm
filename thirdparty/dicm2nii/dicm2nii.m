@@ -90,22 +90,18 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % ext.edata_decoded contains all above mentioned information, and more. The
 % indluded nii_viewer can show the extension by Window->Show NIfTI ext.
 % 
-% Starting from 20151120, the converter can optionally save a .json file for
-% each converted NIfTI. This can be turned on by running following line at
-% Command Window:
-%  setpref('dicm2nii_gui_para', 'save_json', true);
-% It will stay on (saving json files) until it is turned off by
-%  setpref('dicm2nii_gui_para', 'save_json', false);
-% For more information about the purpose of json file, check
+% Several preference can be set from dicm2nii GUI. The preference change will
+% take effect until it is changed next time. 
+% 
+% One of preference is to save a .json file for each converted NIfTI.For more
+% information about the purpose of json file, check
 %  http://bids.neuroimaging.io/ 
 % 
 % By default, the converter will use parrallel pool for dicom header reading if
-% there are +2000 files. You can avoid parfor by following command:
-%  setpref('dicm2nii_gui_para', 'use_parfor', false); % true to enable
+% there are +2000 files. User can turn this off from GUI.
 % 
 % By default, the PatientName is stored in NIfTI hdr and ext. This can be turned
-% off by following command:
-%  setpref('dicm2nii_gui_para', 'save_PatientName', false);
+% off from GUI.
 % 
 % Please note that some information, such as the slice order information, phase
 % encoding direction and DTI bvec are in image reference, rather than NIfTI
@@ -342,6 +338,12 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 % 160601 Update ReadoutSeconds, and store it even if ~isDTI.
 % 160607 Avoid skipping series by ignoring empty-img dicom (thx QR).
 % 160610 Add pref save_patientName and use_parfor; simplify save_json flag.
+% 160807 Store InversionTime for nii ext and json.
+% 160826 Add pref use_seriesUID to take care of missed-up SeriesIntanceUID.
+% 160829 fix problem with large SeriesNumber; only 3 dicm fields are must. 
+% 160901 Put pref onto GUI. 
+% 160920 Convert series with variable Rescale slope/inter.
+% 160921 Quick bug fix introduced on 160920: slope/inter applied for 2nd+ files.
 
 % TODO: need testing files to figure out following parameters:
 %    flag for MOCO series for GE/Philips
@@ -389,12 +391,15 @@ if nargin<1 || isempty(src) || (nargin<2 || isempty(dataFolder))
     return;
 end
 
-savePtNm = getpref('dicm2nii_gui_para', 'save_patientName', true);
-saveJson = getpref('dicm2nii_gui_para', 'save_json', false);
-doParFor = getpref('dicm2nii_gui_para', 'use_parfor', true);
+pf.save_patientName = getpref('dicm2nii_gui_para', 'save_patientName', true);
+pf.save_json = getpref('dicm2nii_gui_para', 'save_json', false);
+pf.use_parfor = getpref('dicm2nii_gui_para', 'use_parfor', true);
+pf.use_seriesUID = getpref('dicm2nii_gui_para', 'use_seriesUID', true);
+pf.lefthand = getpref('dicm2nii_gui_para', 'lefthand', true);
 
 tic;
 unzip_cmd = '';
+if iscellstr(src) && numel(src)==1, src = src{1}; end
 if isnumeric(src)
     error('Invalid dicom source.');    
 elseif iscellstr(src) % multiple files
@@ -471,7 +476,7 @@ nFile = numel(fnames);
 if nFile<1, error(' No files found in the data source.'); end
 
 %% Check each file, store partial header in cell array hh
-% first 3 fields are must, 4 or 5 must have one
+% first 3 fields are must. First 10 indexed in code
 flds = {'Columns' 'Rows' 'BitsAllocated' 'SeriesInstanceUID' 'SeriesNumber' ...
     'ImageOrientationPatient' 'ImagePositionPatient' 'PixelSpacing' ...
     'SliceThickness' 'SpacingBetweenSlices' ...
@@ -484,7 +489,7 @@ dict = dicm_dict('SIEMENS', flds); % dicm_hdr will update vendor if needed
 % read header for all files, use parpool if available and worthy
 fprintf('Validating %g files ...\n', nFile);
 hh = cell(1, nFile); errStr = cell(1, nFile);
-doParFor = doParFor && nFile>2000 && useParTool;
+doParFor = pf.use_parfor && nFile>2000 && useParTool;
 for k = 1:nFile
     [hh{k}, errStr{k}, dict] = dicm_hdr(fnames{k}, dict);
     if doParFor && ~isempty(hh{k}) % parfor wont allow updating dict
@@ -501,21 +506,27 @@ errInfo = '';
 seriesUIDs = {};
 for k = 1:nFile
     s = hh{k};
-    if isempty(s) || any(~isfield(s, flds(1:3))) || ~any(isfield(s, flds(4:5))) ...
-            || ~isfield(s, 'PixelData') || s.PixelData.Bytes<1
+    if isempty(s) || any(~isfield(s, flds(1:3))) || ~isfield(s, 'PixelData') ...
+            || (isstruct(s.PixelData) && s.PixelData.Bytes<1)
         if ~isempty(errStr{k}) % && isempty(strfind(errInfo, errStr{k}))
             errInfo = sprintf('%s\n%s\n', errInfo, errStr{k});
         end
         continue; % skip the file
     end
 
-    if ~isfield(s, 'SeriesInstanceUID')
-        s.SeriesInstanceUID = num2str(s.SeriesNumber); % make up UID
+    if isfield(s, flds{4}) && (pf.use_seriesUID || ~isfield(s, 'SeriesNumber'))
+        sUID = s.SeriesInstanceUID;
+    else
+        if isfield(s, 'SeriesNumber'), sN = s.SeriesNumber; 
+        else sN = fix(toc*1e6);
+        end
+        sUID = num2str(sN); % make up UID
     end
-    m = find(strcmp(s.SeriesInstanceUID, seriesUIDs));
+    
+    m = find(strcmp(sUID, seriesUIDs));
     if isempty(m)
         m = numel(seriesUIDs)+1;
-        seriesUIDs{m} = s.SeriesInstanceUID;
+        seriesUIDs{m} = sUID;
     end
     
     % EchoNumber is needed for Siemens fieldmap mag series
@@ -554,7 +565,7 @@ for i = 1:nRun
     if ~isfield(s, 'Manufacturer'), s.Manufacturer = 'Unknown'; end
     subjs{i} = PatientName(s);
     vendor{i} = s.Manufacturer;
-    sNs(i) = tryGetField(s, 'SeriesNumber', 1);
+    sNs(i) = tryGetField(s, 'SeriesNumber', fix(toc*1e6));
     studyIDs{i} = tryGetField(s, 'StudyID', '1');
     series = sprintf('Subject %s, %s (Series %g)', subjs{i}, ProtocolName(s), sNs(i));
     s = multiFrameFields(s); % no-op if non multi-frame
@@ -577,8 +588,12 @@ for i = 1:nRun
             % At least some GE ImageOrientationPatient can have diff of 1e-6
             val2 = tryGetField(h{i}{j}, fldsCk{k});
             if isempty(val2) || any(abs(val1 - val2) > 1e-4)
-                errorLog(['Inconsistent ''' fldsCk{k} ''' for ' series '. Series skipped.']);
-                keep(i) = 0;
+                if any(strcmp(fldsCk{k}, {'RescaleIntercept' 'RescaleSlope'}))
+                    h{i}{1}.ApplyRescale = true;
+                else
+                    errorLog(['Inconsistent ''' fldsCk{k} ''' for ' series '. Series skipped.']);
+                    keep(i) = 0;
+                end
                 break;
             end
         end
@@ -704,7 +719,7 @@ for i = 1:nRun
     rNames{i} = sprintf('%s_s%03.0f', a, sN);
 end
 if any(cellfun(@numel, rNames)>namelengthmax)
-    rNames = genvarname(rNames); %#ok also guarantee unique names
+    rNames = genvarname(rNames); %#ok also make unique after shortening
 end 
 
 vendor = strtok(unique(vendor));
@@ -713,17 +728,19 @@ if nargout>1, varargout{2} = {}; end % will remove in the future
 
 % After following sort, we need to compare only neighboring names. Remove
 % _s007 if there is no conflict. Have to ignore letter case for Windows & MAC
-fnames = rNames; % copy it, keep letter cases
+fnames = rNames; % copy it, reserve letter cases
 [rNames, iRuns] = sort(lower(fnames));
+j_s = nan(nRun, 1); % in case of long SeriesNumber _s003 will be long
+for i = 1:nRun, a = strfind(rNames{i}, '_s'); j_s(i) = a(end)-1; end
 for i = 1:nRun
-    a = rNames{i}(1:end-5); % remove _s003
+    a = rNames{i}(1:j_s(i)); % remove _s003
     % no conflict with both previous and next name
     if nRun==1 || ... % only one run
-         (i==1    && ~strcmpi(a, rNames{2}(1:end-5))) || ... % first
-         (i==nRun && ~strcmpi(a, rNames{i-1}(1:end-5))) || ... % last
-         (i>1 && i<nRun && ~strcmpi(a, rNames{i-1}(1:end-5)) ...
-                        && ~strcmpi(a, rNames{i+1}(1:end-5))); % middle ones
-        fnames{iRuns(i)}(end+(-4:0)) = [];
+         (i==1    && ~strcmpi(a, rNames{2}(1:j_s(2)))) || ... % first
+         (i==nRun && ~strcmpi(a, rNames{i-1}(1:j_s(i-1)))) || ... % last
+         (i>1 && i<nRun && ~strcmpi(a, rNames{i-1}(1:j_s(i-1))) ...
+                        && ~strcmpi(a, rNames{i+1}(1:j_s(i+1)))); % middle ones
+        fnames{iRuns(i)}(j_s(i)+1:end) = [];
     end
 end
 fmtStr = sprintf(' %%-%gs %%gx%%gx%%gx%%g\n', max(cellfun(@numel, fnames))+6);
@@ -741,12 +758,24 @@ for i = 1:nRun
         h{i}{1}.LastFile = h{i}{nFile}; % store partial last header into 1st
     end
     
-    img = dicm_img(s, 0); % initialize data type and img size. No transpose
-    if ndims(img)>4 % err out, likely won't work for other series
-        error('Image with 5 or more dim not supported: %s', s.NiftiName);
+    for j = 1:nFile
+        if j==1
+            img = dicm_img(s, 0); % initialize img with dicm data type
+            if ndims(img)>4 % err out, likely won't work for other series
+                error('Image with 5 or more dim not supported: %s', s.NiftiName);
+            end
+            applyRescale = tryGetField(s, 'ApplyRescale', false);
+            if applyRescale, img = single(img); end
+        else
+            if j==2, img(:,:,:,nFile) = 0; end % pre-allocate for speed
+            img(:,:,:,j) = dicm_img(h{i}{j}, 0);
+        end
+        if applyRescale
+            slope = tryGetField(h{i}{j}, 'RescaleSlope', 1);
+            inter = tryGetField(h{i}{j}, 'RescaleIntercept', 0);
+            img(:,:,:,j) = img(:,:,:,j) * slope + inter;
+        end
     end
-    if nFile>1, img(:, :, :, nFile) = 0; end % pre-allocate
-    for j = 2:nFile, img(:,:,:,j) = dicm_img(h{i}{j}, 0); end
     if size(img,3)<2, img = permute(img, [1 2 4 3]); end % put frames into dim3
     
     if tryGetField(s, 'SamplesPerPixel', 1) > 1 % color image
@@ -824,10 +853,10 @@ for i = 1:nRun
     % Compute bval & bvec in image reference for DTI series
     if s.isDTI, [h{i}, nii] = get_dti_para(h{i}, nii); end
     
-    [nii, h{i}{1}] = set_nii_header(nii, h{i}{1}, savePtNm); % set most nii hdr
+    [nii, h{i}{1}] = set_nii_header(nii, h{i}{1}, pf); % set most nii hdr
     h{i}{1}.NiftiCreator = converter;
-    nii.ext = set_nii_ext(h{i}{1}, savePtNm); % NIfTI extension
-    if saveJson, try save_json(h{i}{1}, fname); catch, end; end
+    nii.ext = set_nii_ext(h{i}{1}, pf); % NIfTI extension
+    if pf.save_json, try save_json(h{i}{1}, fname); catch, end; end
 
     % Save bval and bvec files after bvec perm/sign adjusted in set_nii_header
     if s.isDTI, save_dti_para(h{i}{1}, fname); end
@@ -900,7 +929,7 @@ else val = [];
 end
 
 %% Subfunction: Set most nii header and re-orient img
-function [nii, s] = set_nii_header(nii, s, save_pn)
+function [nii, s] = set_nii_header(nii, s, pf)
 % Transformation matrix: most important feature for nii
 dim = nii.hdr.dim(2:4); % space dim, set by nii_tool according to img
 [ixyz, R, pixdim, xyz_unit] = xform_mat(s, dim);
@@ -940,7 +969,9 @@ nii.hdr.pixdim(2:4) = pixdim; % voxel zize
 ind4 = ixyz + [0 4 8]; % index in 4xN matrix
 flp = R(ind4)<0; % flip an axis if true
 d = det(R(1:3,1:3)) * prod(1-flp*2); % det after all 3 axis positive
-if d>0, flp(1) = ~flp(1); end % flip/unflip 1st axis to make det<0
+if d>0 && pf.lefthand || (d<0 && ~pf.lefthand)
+    flp(1) = ~flp(1); % left or right storage
+end
 rotM = diag([1-flp*2 1]); % 1 or -1 on diagnal
 rotM(1:3, 4) = (dim-1) .* flp; % 0 or dim-1
 R = R / rotM; % xform matrix after flip
@@ -969,7 +1000,7 @@ if abs(sum(R(:,iSL).^2) - pixdim(iSL)^2) < 0.01 % no shear at slice direction
     nii.hdr.qoffset_z = R(3,4);
 
     R = R(1:3, 1:3); % for quaternion
-    R = bsxfun(@rdivide, R, sqrt(sum(R.^2))); % normalize
+    R = bsxfun(@rdivide, R, sqrt(sum(R .* R))); % normalize
     [q, nii.hdr.pixdim(1)] = dcm2quat(R); % 3x3 dir cos matrix to quaternion
     nii.hdr.quatern_b = q(2);
     nii.hdr.quatern_c = q(3);
@@ -992,7 +1023,7 @@ else
     ind = strfind(seq, '\');
     if ~isempty(ind), seq = seq(ind(end)+1:end); end % like 'ep2d_bold'
 end
-if save_pn, nii.hdr.db_name = PatientName(s); end % char[18], optional
+if pf.save_patientName, nii.hdr.db_name = PatientName(s); end % char[18]
 nii.hdr.intent_name = seq; % char[16], meaning of the data
 
 if ~isfield(s, 'AcquisitionDateTime') && isfield(s, 'AcquisitionTime')
@@ -1077,7 +1108,8 @@ end
 nii.hdr.descrip = descrip; % char[80], drop from end if exceed
 
 % data slope and intercept: apply to img if no rounding error 
-if any(isfield(s, {'RescaleSlope' 'RescaleIntercept'}))
+if any(isfield(s, {'RescaleSlope' 'RescaleIntercept'})) && ...
+        ~tryGetField(s, 'ApplyRescale', false) % already applied
     slope = tryGetField(s, 'RescaleSlope', 1); 
     inter = tryGetField(s, 'RescaleIntercept', 0); 
     val = sort(double([max(nii.img(:)) min(nii.img(:))]) * slope + inter);
@@ -1267,7 +1299,7 @@ if exist('imgRef', 'var') && imgRef % GE bvec already in image reference
     for i = 1:3, if flp(i), bvec(:,i) = -bvec(:,i); end; end
 else % Siemens/Philips
     R = R(1:3, 1:3);
-    R = bsxfun(@rdivide, R, sqrt(sum(R.^2))); % normalize
+    R = bsxfun(@rdivide, R, sqrt(sum(R.*R))); % normalize
     bvec = bvec * R; % dicom plane to image plane
 end
 
@@ -1512,6 +1544,8 @@ switch cmd
         n = numel(src);
         if n > 1 % +1 files
             src = strcat(folder, sprintf(' {%g files}', n));
+        else
+            src = src{1};
         end
         hs.src.Text = src;
     case 'set_src'
@@ -1610,71 +1644,107 @@ fh = figure('dicm' * 256.^(0:3)'); % arbitury integer
 if strcmp('dicm2nii_fig', get(fh, 'Tag')), return; end
 
 scrSz = get(0, 'ScreenSize');
+fSz = 9 + isunix * 2;
 clr = [1 1 1]*206/256;
 clrButton = [1 1 1]*216/256;
 cb = @(cmd) {@gui_callback cmd fh}; % callback shortcut
-uitxt = @(txt,pos) uicontrol('Style', 'text', 'Position', pos, 'FontSize', 9, ...
+uitxt = @(txt,pos) uicontrol('Style', 'text', 'Position', pos, ...
+    'FontSize', fSz, ...
     'HorizontalAlignment', 'left', 'String', txt, 'BackgroundColor', clr);
+getpf = @(p,dft)getpref('dicm2nii_gui_para', p, dft);
+chkbox = @(parent,val,str,cbk,tip) uicontrol(parent, 'Style', 'checkbox', ...
+    'FontSize', fSz, 'HorizontalAlignment', 'left', 'BackgroundColor', clr, ...
+    'Value', val, 'String', str, 'Callback', cbk, 'TooltipString', tip);
 
 set(fh, 'Toolbar', 'none', 'Menubar', 'none', 'Resize', 'off', 'Color', clr, ...
-    'Tag', 'dicm2nii_fig', 'Position', [200 scrSz(4)-500 420 256], ...
+    'Tag', 'dicm2nii_fig', 'Position', [200 scrSz(4)-600 420 300], ...
     'Name', 'dicm2nii - DICOM to NIfTI Converter', 'NumberTitle', 'off');
 
-uitxt('Browse source', [8 218 88 16]);
-uicontrol('Style', 'Pushbutton', 'Position', [98 214 48 24], ...
-    'FontSize', 9, 'String', 'Folder', 'Background', clrButton, ...
+uitxt('Browse source', [8 274 88 16]);
+uicontrol('Style', 'Pushbutton', 'Position', [98 270 48 24], ...
+    'FontSize', fSz, 'String', 'Folder', 'Background', clrButton, ...
     'TooltipString', ['Browse source folder (can have subfolders) containing' ...
     ' convertible files'], 'Callback', cb('srcDir'));
-uitxt('or', [148 218 20 16]);
-uicontrol('Style', 'Pushbutton', 'Position', [166 214 48 24], 'FontSize', 9, ...
+uitxt('or', [148 274 20 16]);
+uicontrol('Style', 'Pushbutton', 'Position', [166 270 48 24], 'FontSize', fSz, ...
     'String', 'File(s)', 'Background', clrButton, 'Callback', cb('srcFile'), ...
     'TooltipString', ['Browse convertible file(s), such as dicom, Philips PAR,' ...
     ' AFNI HEAD, BrainVoyager files, or a zip file containing those files']);
-uitxt('or drag&drop source folder/file(s)', [216 218 200 16]);
+uitxt('or drag&drop source folder/file(s)', [216 274 200 16]);
 
-uitxt('Source folder/files', [8 180 106 16]);
+uitxt('Source folder/files', [8 238 110 16]);
 jSrc = javaObjectEDT('javax.swing.JTextField');
-hs.src = javacomponent(jSrc, [114 176 294 24], fh);
+hs.src = javacomponent(jSrc, [114 234 294 24], fh);
 hs.src.FocusLostCallback = cb('set_src');
+hs.src.Text = getpf('src', pwd);
 % hs.src.ActionPerformedCallback = cb('set_src'); % fire when pressing ENTER
 hs.src.ToolTipText = ['<html>This is the source folder or file(s). You can<br>' ...
     'Type the source folder name into the box, or<br>' ...
     'Click Folder or File(s) button above to set the value, or<br>' ...
     'Drag and drop a folder or file(s) into the box'];
 
-uicontrol('Style', 'Pushbutton', 'Position', [8 136 104 24], ...
-    'FontSize', 9, 'String', 'Result folder', 'Background', clrButton, ...
+uicontrol('Style', 'Pushbutton', 'Position', [8 198 104 24], ...
+    'FontSize', fSz, 'String', 'Result folder', 'Background', clrButton, ...
     'TooltipString', 'Browse result folder', 'Callback', cb('dstDialog'));
 jDst = javaObjectEDT('javax.swing.JTextField');
-hs.dst = javacomponent(jDst, [114 136 294 24], fh);
+hs.dst = javacomponent(jDst, [114 198 294 24], fh);
 hs.dst.FocusLostCallback = cb('set_dst');
+hs.dst.Text = getpf('dst', pwd);
 hs.dst.ToolTipText = ['<html>This is the result folder name. You can<br>' ...
     'Type the folder name into the box, or<br>' ...
     'Click Result folder button to set the value, or<br>' ...
     'Drag and drop a folder into the box'];
 
-uitxt('Output format', [8 96 82 16]);
-hs.rstFmt = uicontrol('Style', 'popup', 'Background', 'white', ...
-    'Value', 1, 'Position', [92 92 92 24], 'String', ' .nii| .hdr/.img', ...
+uitxt('Output format', [8 166 82 16]);
+hs.rstFmt = uicontrol('Style', 'popup', 'Background', 'white', 'FontSize', fSz, ...
+    'Value', getpf('rstFmt',1), 'Position', [92 162 80 24], 'String', ' .nii| .hdr/.img', ...
     'TooltipString', 'Choose output file format');
 
-hs.gzip = uicontrol('Style', 'checkbox', 'Position', [220 96 82 18], ...
-    'HorizontalAlignment', 'left', 'String', 'Compress', 'FontSize', 9, ...
-    'Background', clr, 'TooltipString', 'Compress into .gz files');
+hs.gzip = chkbox(fh, getpf('gzip',true), 'Compress', '', 'Compress into .gz files');
+sz = get(hs.gzip, 'Extent'); set(hs.gzip, 'Position', [220 166 sz(3)+16 sz(4)]);
 
-hs.rst3D = uicontrol('Style', 'checkbox', 'Position', [330 96 68 18], ...
-    'HorizontalAlignment', 'left', 'String', 'SPM 3D', 'FontSize', 9, ...
-    'Background', clr, 'Callback', cb('SPMStyle'), ...
-    'TooltipString', 'Save one file for each volume (SPM style)');
+hs.rst3D = chkbox(fh, getpf('rst3D',false), 'SPM 3D', cb('SPMStyle'), ...
+    'Save one file for each volume (SPM style)');
+sz = get(hs.rst3D, 'Extent'); set(hs.rst3D, 'Position', [330 166 sz(3)+16 sz(4)]);
            
-hs.convert = uicontrol('Style', 'pushbutton', 'Position', [104 30 200 30], ...
-    'FontSize', 9, 'String', 'Start conversion', ...
+hs.convert = uicontrol('Style', 'pushbutton', 'Position', [104 8 200 30], ...
+    'FontSize', fSz, 'String', 'Start conversion', ...
     'Background', clrButton, 'Callback', cb('do_convert'), ...
     'TooltipString', 'Dicom source and Result folder needed before start');
 
 hs.about = uicontrol('Style', 'popup', ...
     'String', 'About|License|Help text|Check update|A paper about conversion', ...
-    'Position', [348 14 64 20], 'Callback', cb('about'));
+    'Position', [342 12 72 20], 'Callback', cb('about'));
+
+ph = uipanel(fh, 'Units', 'Pixels', 'Position', [4 50 410 102], 'FontSize', fSz, ...
+    'BackgroundColor', clr, 'Title', 'Preferences (normally no change needed)');
+setpf = @(p)['setpref(''dicm2nii_gui_para'',''' p ''',get(gcbo,''Value''));'];
+
+p = 'lefthand';
+h = chkbox(ph, getpf(p,true), 'Left-hand storage', setpf(p), ...
+    'Left hand storage works well for FSL, and likely doesn''t matter for others');
+sz = get(h, 'Extent'); set(h, 'Position', [4 60 sz(3)+16 sz(4)]);
+
+p = 'save_patientName';
+h = chkbox(ph, getpf(p,true), 'Store PatientName', setpf(p), ...
+    'Store PatientName in NIfTI hdr, ext and json');
+sz = get(h, 'Extent'); set(h, 'Position', [180 60 sz(3)+16 sz(4)]);
+
+p = 'use_parfor';
+h = chkbox(ph, getpf(p,true), 'Use parfor if needed', setpf(p), ...
+    'Converter will start parallel tool if necessary');
+sz = get(h, 'Extent'); set(h, 'Position', [4 36 sz(3)+16 sz(4)]);
+
+p = 'use_seriesUID';
+h = chkbox(ph, getpf(p,true), 'Use SeriesInstanceUID if exists', setpf(p), ...
+    'Only uncheck this if SeriesInstanceUID is messed up by some third party archive software');
+sz = get(h, 'Extent'); set(h, 'Position', [180 36 sz(3)+16 sz(4)]);
+
+p = 'save_json';
+h = chkbox(ph, getpf(p,false), 'Save json file', setpf(p), ...
+    'Save json file for BIDS (http://bids.neuroimaging.io/)');
+sz = get(h, 'Extent'); set(h, 'Position', [4 12 sz(3)+16 sz(4)]);
+
 hs.fig = fh;
 guidata(fh, hs); % store handles
 set(fh, 'HandleVisibility', 'callback'); % protect from command line
@@ -1686,25 +1756,6 @@ catch me
     fprintf(2, '%s\n', me.message);
 end
 
-pf = getpref('dicm2nii_gui_para');
-if isempty(pf)
-    pf = struct('rstFmt', 1, 'rst3D', 0, 'gzip', 1, ...
-        'src', pwd, 'dst', pwd, 'save_json', false);
-    setpref('dicm2nii_gui_para', fieldnames(pf), struct2cell(pf));
-end
-fn = fieldnames(pf);
-for i = 1:numel(fn)
-    tag = fn{i};
-    if ~isfield(hs, tag)
-        continue;  % avoid error
-    elseif strcmp(tag, 'src') || strcmp(tag, 'dst')
-        hs.(tag).Text = pf.(tag);
-    elseif strcmpi(get(hs.(tag), 'Style'), 'edit')
-        set(hs.(tag), 'String', pf.(tag));
-    else 
-        set(hs.(tag), 'Value', pf.(tag));
-    end
-end
 gui_callback([], [], 'set_src', fh);
 
 %% subfunction: return phase positive and phase axis (1/2) in image reference
@@ -2086,16 +2137,16 @@ end
 % -0.25444411 0.52460458 -0.81243353 
 % ...
 % 0.9836791 0.17571079 0.038744]; % matrix rows separated by char(10) and/or ';'
-function ext = set_nii_ext(s, save_pn)
+function ext = set_nii_ext(s, pf)
 flds = { % fields to put into nifti ext
   'NiftiCreator' 'SeriesNumber' 'SeriesDescription' 'ImageType' 'Modality' ...
   'AcquisitionDateTime' 'bval' 'bvec' 'ReadoutSeconds' 'SliceTiming' ...
-  'UnwarpDirection' 'EffectiveEPIEchoSpacing' 'EchoTime' 'deltaTE' ...
+  'UnwarpDirection' 'EffectiveEPIEchoSpacing' 'EchoTime' 'deltaTE' 'InversionTime' ...
   'PatientName' 'PatientSex' 'PatientAge' 'PatientSize' 'PatientWeight' ...
   'PatientPosition' 'SliceThickness' 'FlipAngle' 'RBMoCoTrans' 'RBMoCoRot' ...
   'Manufacturer' 'SoftwareVersion' 'MRAcquisitionType' 'InstitutionName' ...
   'ScanningSequence' 'SequenceVariant' 'ScanOptions' 'SequenceName'};
-if ~save_pn, flds(strcmp(flds, 'PatientName')) = []; end
+if ~pf.save_patientName, flds(strcmp(flds, 'PatientName')) = []; end
 
 ext.ecode = 6; % text ext
 ext.edata = '';
@@ -2228,11 +2279,12 @@ if nVol>1
 end
 
 %% Save JSON file, proposed by Chris G
+% matlab.internal.webservices.toJSON(s)
 function save_json(s, fname)
 flds = {
   'NiftiCreator' 'SeriesNumber' 'SeriesDescription' 'ImageType' 'Modality' ...
   'AcquisitionDateTime' 'bval' 'bvec' 'ReadoutSeconds' 'SliceTiming' 'RepetitionTime' ...
-  'UnwarpDirection' 'EffectiveEPIEchoSpacing' 'EchoTime' 'SecondEchoTime' ...
+  'UnwarpDirection' 'EffectiveEPIEchoSpacing' 'EchoTime' 'SecondEchoTime' 'InversionTime' ...
   'PatientName' 'PatientSex' 'PatientAge' 'PatientSize' 'PatientWeight' ...
   'PatientPosition' 'SliceThickness' 'FlipAngle' 'RBMoCoTrans' 'RBMoCoRot' ...
   'Manufacturer' 'SoftwareVersion' 'MRAcquisitionType' 'InstitutionName' ...
@@ -2247,7 +2299,7 @@ for i = 1:nFields
     val = s.(nam);
     
     % this if-elseif block takes care of name/val change
-    if strcmp(nam, 'RepetitionTime')
+    if any(strcmp(nam, {'RepetitionTime' 'InversionTime'}))
         val = val / 1000; % in sec now
     elseif strcmp(nam, 'UnwarpDirection')
         nam = 'PhaseEncodingDirection';

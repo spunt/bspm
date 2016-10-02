@@ -77,6 +77,8 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 160422 Performance: avoid nestedFunc (big), use uint8, avoid typecast (minor).
 % 160527 philips_par: center of slice 1 for slice dir; (dim-1)/2 for vol center.
 % 160608 read_sq: n=nEnd (j>2) with PerFrameSQ (needed if length is not inf).
+% 160825 can read dcm without PixelData, by faking p.iPixelData=fSize+1.
+% 160829 no make-up SeriesNumber/InstanceUID in afni_head/philips_par/bv_file.
 
 persistent dict_full;
 s = []; info = '';
@@ -100,11 +102,11 @@ fid = fopen(fname);
 if fid<0, info = ['File not exists: ' fname]; return; end
 closeFile = onCleanup(@() fclose(fid)); % auto close when done or error
 fseek(fid, 0, 1); fSize = ftell(fid); fseek(fid, 0, -1);
-b8 = fread(fid, 130000, 'uint8=>uint8')'; % enough for most dicom
 if fSize<140 % 132 + one empty tag, ignore truncated
     info = ['Invalid file: ' fname];
     return;
 end
+b8 = fread(fid, 130000, 'uint8=>uint8')'; % enough for most dicom
 
 iTagStart = 132; % start of first tag
 isDicm = isequal(b8(129:132), 'DICM');
@@ -168,9 +170,8 @@ for nb = [0 2e6 20e6 fSize] % if not enough, read more till all read
     end
     if found, break; end
     if feof(fid)
-        if isempty(i), info = ['No PixelData in ' fname]; return; 
-        else break;
-        end
+        if isempty(i), p.iPixelData = fSize+1; end % fake it: no PixelData
+        break;
     end
 end
 
@@ -181,7 +182,7 @@ nTag = numel(p.dict.tag); % always search if only one tag: can find it in any SQ
 toSearch = nTag<2 || (nTag<30 && ~any(strcmp(p.dict.vr, 'SQ')) && p.iPixelData<1e6);
 if toSearch % search each tag if header is short and not many tags asked
     if ~isempty(tsUID), s.TransferSyntaxUID = tsUID; end % hope it is 1st tag
-    ib = p.iPixelData; % will be updated each loop
+    ib = p.iPixelData-1; % will be updated each loop
     if ~isempty(p.dict.vendor)
         tg = char([8 0 112 0]); % Manufacturer
         if p.be, tg = tg([2 1 4 3]); end
@@ -206,7 +207,7 @@ if toSearch % search each tag if header is short and not many tags asked
         i = strfind(char(b8(1:ib)), tg);
         i = i(mod(i,2)==1);
         if isempty(i), continue; % no this tag, next
-        elseif numel(i)>1 % +1 tags found, add vr to reduce if expl
+        elseif numel(i)>1 % +1 tags found, add vr to try again if expl
             if hasVR
                 tg = [tg p.dict.vr{k}]; %#ok
                 i = strfind(char(b8(1:ib)), tg);
@@ -243,7 +244,7 @@ while ~toSearch
         if strcmp(name, 'PixelData') % iPixelData might be in img
             p.iPixelData = iPre + p.expl*4 + 7; % overwrite previous
             p.bytes = ch2int32(b8(p.iPixelData+(-3:0)), p.be);
-        else
+        elseif p.iPixelData < fSize % has PixelData
             info = ['End of file reached: likely error: ' s.Filename];  
         end
         break; % done or give up
@@ -262,8 +263,10 @@ while ~toSearch
     end
 end
 
-s.PixelData.Start = p.iPixelData;
-s.PixelData.Bytes = p.bytes;
+if p.iPixelData < fSize+1
+    s.PixelData.Start = p.iPixelData;
+    s.PixelData.Bytes = p.bytes;
+end
 
 if isfield(s, 'CSAImageHeaderInfo') % Siemens CSA image header
     s.CSAImageHeaderInfo = read_csa(s.CSAImageHeaderInfo);
@@ -613,11 +616,10 @@ function s1 = search_MF_val(s, s1, iFrame)
 %  s = dicm_hdr('multiFrameFile.dcm'); % read only 1,2 and last frame by default
 %  s1 = struct('ImagePositionPatient', nan(3, s.NumberOfFrames)); % define size
 %  s1 = search_MF_val(s, s1, 1:s.NumberOfFrames); % get values
-%  This is MUCH faster than asking all frames by dicm_hdr, and avoid to get into
-%  annoying SQ levels under PerFrameFuntionalGroupSequence.
-% In case a tag is not found in PerFrameSQ, the code will search SharedSQ and
-% common tags, and will ignore the 3th arg and fake the same value for all
-% frames.
+% This is MUCH faster than asking all frames by dicm_hdr, and avoid to get into
+% annoying SQ levels under PerFrameFuntionalGroupSequence. In case a tag is not
+% found in PerFrameSQ, the code will search SharedSQ and common tags, and will
+% ignore the 3th arg and fake the same value for all frames.
 
 if ~isfield(s, 'PerFrameFunctionalGroupsSequence'), return; end
 expl = false;
@@ -661,7 +663,7 @@ for i = 1:numel(flds)
             [n, nvr] = val_len(vr, uint8(b0(k+(0:5))), isEX, isBE); k = k + nvr;
             a = read_val(uint8(b0(k+(0:n-1))), vr, isBE);
             if ischar(a), a = {a}; end
-            s1.(flds{i}) = repmat(a, 1, nf); % all frames share the same value
+            s1.(flds{i}) = repmat(a, 1, nf); % all frames have the same value
         end
         continue;
     end
@@ -752,8 +754,6 @@ foo = par_key('Examination date/time', 0);
 foo = foo(isstrprop(foo, 'digit'));
 s.AcquisitionDateTime = foo;
 s.SeriesNumber = par_key('Acquisition nr');
-s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
-    datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
 % s.ReconstructionNumberMR = par_key('Reconstruction nr');
 % s.MRSeriesScanDuration = par_key('Scan Duration');
 s.NumberOfEchoes = par_key('Max. number of echoes');
@@ -996,8 +996,6 @@ end
 
 %% subfunction: read AFNI HEAD file, return struct like that from dicm_hdr.
 function [s, err] = afni_head(fname)
-persistent SN;
-if isempty(SN), SN = 1; end
 err = '';
 if numel(fname)>5 && strcmp(fname(end+(-4:0)), '.BRIK')
     fname(end+(-4:0)) = '.HEAD';
@@ -1015,9 +1013,6 @@ if isempty(i), s = []; err = 'Not brik header file'; return; end
 [~, foo] = fileparts(fname);
 % s.IsAFNIHEAD = true;
 s.ProtocolName = foo;
-s.SeriesNumber = SN; SN = SN+1; % make it unique for multilple files
-s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
-    datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
 s.ImageType = ['AFNIHEAD\' afni_key('TYPESTRING')];
 
 foo = afni_key('BYTEORDER_STRING');
@@ -1160,8 +1155,8 @@ if ~isempty(bv.Trf)
     end
 end
 
-persistent SN subj folder % folder is used to update subj
-if isempty(SN), SN = 1; subj = ''; folder = ''; end
+persistent subj folder % folder is used to update subj
+if isempty(subj), subj = ''; folder = ''; end
 s.Filename = bv.FilenameOnDisk;
 fType = bv.filetype;
 s.ImageType = ['BrainVoyagerFile\' fType];
@@ -1312,11 +1307,8 @@ s.LastFile.ImagePositionPatient = pos(:,2);
 try %#ok
     [~, nam] = fileparts(bv.FirstDataSourceFile);
     serN = sscanf(nam, [subj '-%f'], 1);
-    if ~isempty(serN), SN = serN; end
+    if ~isempty(serN), s.SeriesNumber = serN; end
 end
-s.SeriesNumber = SN; SN = SN+1; % make it unique for multilple files
-s.SeriesInstanceUID = sprintf('%g.%s.%09.0f', s.SeriesNumber, ...
-    datestr(now, 'yymmdd.HHMMSS.fff'), rand*1e9);
 c = class(s.PixelData);
 if strcmp(c, 'double') %#ok
     s.BitsAllocated = 64;

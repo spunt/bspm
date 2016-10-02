@@ -1,4 +1,4 @@
-function matlabbatch = wrapper_level1_lois(covidx, varargin)
+function allinput = wrapper_level1_lois(covidx, varargin)
 % matlabbatch = wrapper_level1_lois(covidx, varargin)
 %
 % To show default settings, run without any arguments.
@@ -13,22 +13,24 @@ function matlabbatch = wrapper_level1_lois(covidx, varargin)
 % | SET DEFAULTS AND PARSE VARARGIN
 % | ===========================================================================
 defaults = {
-            'studydir',         '/Users/bobspunt/Drive/Writing/Empirical/ASD/data',            ...
+          'studydir',    '/Users/bobspunt/Drive/Writing/Empirical/ASD/data', ...
             'HPF',              128,                    ...
             'armethod',         2,                      ... 
-            'nuisancepat',      'aroma_bad*txt',        ...
-            'epipat',           'lisw*nii',             ...
+            'nuisancepat',      'w3bu_bad*txt',        ...
+            'maskthresh',  0.40,                                               ...
+            'epipat',           'w3*nii',             ...
             'subid',            'RA*',                  ...
             'runid',            'EP*LOI*',              ...
             'behavid',          'lois_*mat',            ...
-            'basename',         'LOI_lis8w3',           ...
-            'brainmask',        bspm_brainmask,         ...
+            'basename',         'LOI_SOCNS_s0w3',           ...
+            'brainmask',        bspm_greymask,         ...
             'model',            '2x3',                  ...
-            'fcontrast',        1,                      ...
-            'pmcontrast',       1,                      ...
+            'fcontrast',        0,                      ...
+            'pmcontrast',       0,                      ...
             'nskip',            2,                      ...
             'TR',               2.5,                    ...
             'runtest',          0,                      ...
+            'doallcon',         0,                      ...
             'is4D',             1,                      ...
             'multisession',     1                       ...
              };
@@ -122,20 +124,46 @@ for s = 1:length(subdir)
     end
 
     % | General Information
-    general_info.analysis           = analysisdir; 
-    general_info.is4D               = is4D; 
+    % | ========================================================================
+    general_info.analysis           = analysisdir;
+    general_info.is4D               = is4D;
     general_info.TR                 = TR;
     general_info.hpf                = HPF;
     general_info.autocorrelation    = armethod;
     general_info.nuisance_file      = nuisance;
     general_info.brainmask          = brainmask;
+    general_info.maskthresh         = maskthresh;
     general_info.hrf_derivs         = [0 0];
-    general_info.mt_res             = 16; 
-    general_info.mt_onset           = 1;
+    general_info.mt_res             = 16;
+    general_info.mt_onset           = 8;
 
-    % | Contrasts Weights
-    ncond   = length(b.condlabels);
-    npm     = length(pmnames); 
+    % | Contrasts
+    % | ========================================================================
+    contrasts = get_contrasts(b, pmnames, fcontrast, doallcon); 
+
+    % | Make Job
+    % | ========================================================================
+    allinput{s} = bspm_level1(images, general_info, runs, contrasts);
+
+    % | Cleanup Workspace
+    % | ========================================================================
+    clear general_info runs contrasts b modelpm modelpmnames
+
+end
+idx = cellfun('length', allinput)==0; 
+allinput(idx) = []; 
+fprintf('\n\nJOBS NOT BUILT FOR:\n');
+disp(subdir(idx)); 
+
+end
+% =========================================================================
+% * SUBFUNCTIONS
+% =========================================================================
+function contrasts = get_contrasts(b, pmnames, fcontrast, doallcon)
+
+ncond   = length(b.condlabels);
+npm     = length(pmnames); 
+if doallcon
     tmp     = eye(ncond+npm);
     w1      = tmp(1:ncond,:);
     w2      =   [
@@ -165,34 +193,34 @@ for s = 1:length(subdir)
         wpm(strcmp(pmnames, 'NoResponse'),:) = []; 
         weights = [weights; wpm]; 
     end
-    ncon    = size(weights,1);
-    % | T-Contrast
-    for c = 1:ncon
-        contrasts(c).type       = 'T';
-        contrasts(c).weights    = weights(c,:);
-        contrasts(c).name       = bspm_conweights2names(weights(c,:), b.condlabels);
-    end
-    
-    % | F-Contrast
-    if fcontrast
-        contrasts(ncon+1).type      = 'F';
-        contrasts(ncon+1).name      = 'Omnibus';
-        contrasts(ncon+1).weights   = eye(length(b.condlabels));
-    end
 
-    % | Make Job
-    % | ========================================================================
-    matlabbatch = [matlabbatch bspm_level1(images, general_info, runs, contrasts)]; 
+else
 
-    % | Cleanup Workspace
-    % | ========================================================================
-    clear general_info runs contrasts b modelpm modelpmnames
+    weights = [0  1  1  0 -1 -1; 
+               1 0 0 -1 0 0; 
+               0 1 0 0 -1 0; 
+               0 0 1 0 0 -1]; 
+    wpos      = weights;
+    wpos(weights<0) = 0;
+    wscale = sum(wpos, 2);
+    weights = weights./repmat(wscale, 1, size(weights, 2));
+end
+
+ncon    = size(weights,1);
+% | T-Contrast
+for c = 1:ncon
+    contrasts(c).type       = 'T';
+    contrasts(c).weights    = weights(c,:);
+    contrasts(c).name       = bspm_conweights2names(weights(c,:), b.condlabels);
+end
+% | F-Contrast
+if fcontrast
+    contrasts(ncon+1).type      = 'F';
+    contrasts(ncon+1).name      = 'Omnibus';
+    contrasts(ncon+1).weights   = eye(length(b.condlabels));
+end
 
 end
-end
-% =========================================================================
-% * SUBFUNCTIONS
-% =========================================================================
 function b = get_behavior(in, opt)
 % GET_BEHAVIOR
 %

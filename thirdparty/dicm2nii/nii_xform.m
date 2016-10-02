@@ -11,7 +11,7 @@ function varargout = nii_xform(src, target, rst, intrp, missVal)
 % or has the same dimension and resolution as the provided template NIfTI file.
 % 
 % Input (first two mandatory):
-%  1. source file name to be transformed (nii, hdr or compressed versions).
+%  1. source file name (nii, hdr or gz versions) or nii struct to be transformed.
 %  2. The second input determines how to transform the source file:
 %    (1) If it is a vector of length 3, [2 2 2] for example, it will be treated
 %         as requested resolution in millimeter. The result will be in the same
@@ -20,7 +20,7 @@ function varargout = nii_xform(src, target, rst, intrp, missVal)
 %        (only hdr will be used). The result will have the same dimension and
 %        resolution as the template. The source file and the template must have
 %        at least one common coordinate system, otherwise the transformation
-%        doesn't make sense, and it will error out. With different coordinate
+%        doesn't make sense, and it will err out. With different coordinate
 %        systems, a transformation matrix to align the two dataset is needed,
 %        which is the next case.
 %    (3) If the input is a cellstr containing two file names, it will be
@@ -53,6 +53,7 @@ function varargout = nii_xform(src, target, rst, intrp, missVal)
 % History(yymmdd):
 % 151024 Write it.
 % 160531 Remove narginchk so work for early matlab.
+% 160907 allow src to be nii struct.
 
 if nargin<2 || nargin>5, help('nii_xform'); error('Wrong number of input.'); end
 if nargin<3, rst = []; end
@@ -60,7 +61,10 @@ if nargin<4 || isempty(intrp), intrp = 'linear'; end
 if nargin<5 || isempty(missVal), missVal = nan; end
 intrp = lower(intrp);
     
-nii = nii_tool('load', src);
+if isstruct(src), nii = src;
+else nii = nii_tool('load', src);
+end
+
 if iscell(target) % transformation and template file names
     R = load(target{2}, '-ascii');
     if ~isequal(size(R), [4 4]), error('Invalid transformation file.'); end

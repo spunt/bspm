@@ -66,6 +66,8 @@ if isstruct(Z)
     Z          = Z(:,Vm);
 end
 
+
+
 % Threshold the statistical field 
 %--------------------------------------------------------------------------
 XYZ      = XYZ(:,Z >= ui);

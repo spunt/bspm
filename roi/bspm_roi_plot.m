@@ -24,6 +24,7 @@ function varargout = bspm_roi_plot(level1dirs, roifiles, conidx, varargin)
 %	Email:     spunt@caltech.edu
 % ________________________________________________________________________________________
 def = { ...
+'noplot',               0               , ...
 'axgap_h',              .08             , ...
 'axgap_v',              .12            , ...
 'basefontsize',         10              , ...
@@ -111,6 +112,11 @@ for i = 1:nroi
     if rmsuboutlier, roidata{i} = bob_outlier2nan(roidata{i}, rmsuboutlier); end
 end
 
+if noplot
+   varargout{1} = roidata;
+   return; 
+end
+
 % | UMMMMMMM.... PLOT!
 % | ======================================================================================
 if gridflag
@@ -153,7 +159,7 @@ for i = 1:nroi
             't', roinames{i}, ...
             'yticklength', 5);
         
-        
+   set(gca, 'tag', 'theplot'); 
 
 end
 

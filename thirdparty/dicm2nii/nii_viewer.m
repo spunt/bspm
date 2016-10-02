@@ -10,7 +10,7 @@ function nii_viewer(fname, overlayName)
 % Here are some features and usage.
 % 
 % The basic use is to open a NIfTI file to view. When a NIfTI (background) is
-% open, the display always uses the image plane close to xyz axes (voxel space)
+% open, the display always uses thef image plane close to xyz axes (voxel space)
 % even for oblique acquisition. The possible confusion comes if the acquisition
 % was tilted with a large angle, and then the orientation labeling will be less
 % accurate. The benefit is that no interpolation is needed for the background
@@ -226,6 +226,11 @@ function nii_viewer(fname, overlayName)
 % 160701 Implement hist for current volume; hs.value show top overlay first.
 % 160703 bug fix for 'Add aligned' complex img: set q.phase after re-orient.
 % 160710 Implement 'Create ROI file'; Time coure is for sphere, not cube.
+% 160713 javaDropFnc for Linux: Robot key press replaces mouse click;
+%        Implement 'Set crosshair at' 'Smoothed maximum'.
+% 160715 lut2img: bug fix for custom LUT; custom LUT uses rg [0 255]; add gap=0.
+% 160721 Implement 'Set crosshair at' 'a point with value of'.
+% 160730 Allow to load single volume for large dataset.
 %%
 
 pf = getpref('nii_viewer_para');
@@ -328,9 +333,9 @@ hs.focus = uicontrol(hs.panel, 'Style', 'text'); % dummy uicontrol for focus
 % file list by JIDE CheckBoxList: check/selection independent
 mdl = handle(javax.swing.DefaultListModel, 'CallbackProperties'); % dynamic item
 mdl.add(0, niiName);
-mdl.IntervalAddedCallback   = cb('width');
+% mdl.IntervalAddedCallback = cb('width'); % seems not needed
 mdl.IntervalRemovedCallback = cb('width');
-mdl.ContentsChangedCallback = cb('width');
+mdl.ContentsChangedCallback = cb('width'); % add '(mask)' etc
 h = handle(com.jidesoft.swing.CheckBoxList(mdl), 'CallbackProperties');
 h.setFont(java.awt.Font('Tahoma', 0, 11));
 % h.ClickInCheckBoxOnly = true; % it's default
@@ -366,7 +371,7 @@ hs.overlay(2) = uicontrol(ph, 'Style', 'pushbutton', 'FontSize', 7, ...
     'TooltipString', 'Move selected image one level up');
 
 hs.value = uicontrol(ph, 'Style', 'text', 'Position', [208 38 pos(3)-208 20], ...
-    'BackgroundColor', clr, 'FontSize', 8, ...
+    'BackgroundColor', clr, 'FontSize', 8+(~ispc && ~ismac), ...
     'TooltipString', '(i,j,k)=(x,y,z): top ... bottom');
 
 % IJK java spinners
@@ -519,10 +524,12 @@ h = uimenu(h_view, 'Label', 'Set crosshair at');
 uimenu(h, 'Label', 'center of view', 'Callback', cb('viewCenter'));
 uimenu(h, 'Label', 'center of image', 'Callback', cb('center'));
 uimenu(h, 'Label', 'COG of image', 'Callback', cb('cog'));
-uimenu(h, 'Label', 'a point [x y z]', 'Callback', cb('toXYZ'));
+uimenu(h, 'Label', 'Smoothed maximum', 'Callback', cb('maximum'));
+uimenu(h, 'Label', 'a point [x y z] ...', 'Callback', cb('toXYZ'));
+uimenu(h, 'Label', 'a point with value of ...', 'Callback', cb('toValue'));
 uimenu(h_view, 'Label', 'Crosshair color', 'Callback', cb('color'));
 h = uimenu(h_view, 'Label', 'Crosshair gap');
-for i = [1 2 3 4 5 6 8 10 20 40]
+for i = [0 1 2 3 4 5 6 8 10 20 40]
     str = num2str(i); if i==6, str = [str ' (default)']; end %#ok
     uimenu(h, 'Label', str, 'Callback', cb('gap'));
 end
@@ -570,6 +577,7 @@ catch
     warning('off', 'MATLAB:HandleGraphics:ObsoletedProperty:JavaFrame');
     jFrame = fh.JavaFrame.getAxisComponent;
 end
+
 try java_dnd(jFrame, {@javaDropFcn fh}); catch me, disp(me.message); end
 
 set(fh, 'ResizeFcn', cb('resize'), ... % 'SizeChangedFcn' for later matlab
@@ -654,7 +662,7 @@ switch cmd
     case 'resize'
         if isempty(hs), return; end
         cb = fh.ResizeFcn;
-        fh.ResizeFcn = ''; drawnow; % avoid weird effect
+        fh.ResizeFcn = []; drawnow; % avoid weird effect
         clnObj = onCleanup(@() set(fh, 'ResizeFcn', cb)); % restore func
         
         posP = getpixelposition(hs.panel); % get old height in pixels
@@ -728,7 +736,8 @@ switch cmd
         end
     case 'add'
         pName = get(hs.add, 'UserData');
-        if ~isempty(strfind(get(h, 'Label'), 'aligned'))
+        label = get(h, 'Label');
+        if strcmp(label, 'Add aligned overlay')
             [fname, pName] = uigetfile([pName '/*.nii; *.hdr;*.nii.gz;' ...
                 '*.hdr.gz'], 'Select overlay NIfTI');
             if ~ischar(fname), return; end
@@ -977,19 +986,46 @@ switch cmd
         end
         c = round(hs.q{hs.iback}.R \ [c(:); 1]) + 1;
         for i = 1:3, hs.ijk(i).setValue(c(i)); end
+    case 'toValue'
+        def = getappdata(h, 'Value');
+        if isempty(def), def = 1; end
+        def = num2str(def);
+        str = 'Input the voxel value';
+        while 1
+            a = inputdlg(str, 'Crosshair to a value', 1, {def});
+            if isempty(a), return; end
+            val = sscanf(a{1}, '%g');
+            if ~isnan(val), break; end
+        end
+        setappdata(h, 'Value', val);
+        jf = hs.files.getSelectedIndex+1;
+        img = hs.q{jf}.nii.img(:,:,:,hs.volume.getValue);
+        c = find(img(:)==val, 1);
+        if isempty(c)
+            nam = strtok(hs.files.getModel.get(jf-1), '(');
+            errordlg(sprintf('No value of %g found in %s', val, nam));
+            return;
+        end
+        dim = size(img); dim(numel(dim)+1:3) = 1;
+        [c(1), c(2), c(3)] = ind2sub(dim, c); % ijk+1
+        c = round(hs.q{hs.iback}.R \ (hs.q{jf}.R * [c(:)-1; 1])) + 1;
+        for i = 1:3, hs.ijk(i).setValue(c(i)); end
     case 'cog'
         jf = hs.files.getSelectedIndex+1;
         img = hs.q{jf}.nii.img(:,:,:,hs.volume.getValue);
+        c = img_cog(img);
+        c = round(hs.q{hs.iback}.R \ (hs.q{jf}.R * [c-1; 1])) + 1;
+        for i = 1:3, hs.ijk(i).setValue(c(i)); end
+    case 'maximum'
+        jf = hs.files.getSelectedIndex+1;
+        img = hs.q{jf}.nii.img(:,:,:,hs.volume.getValue);
+        img = smooth23(img, 'gaussian', 5);
         img(isnan(img)) = 0;
-        img = double(abs(img));
-        gs = sum(img(:));
-        c = ones(3,1);
-        for i = 1:3
-            if size(img,i)==1, continue; end
-            a = shiftdim(img, i-1);
-            a = sum(sum(a,3),2);
-            c(i) = (1:size(img,i)) * a / gs;
-        end
+        img = abs(img);
+        [~, I] = max(img(:));
+        dim = size(img); dim(end+1:3) = 1;
+        c = zeros(3, 1);
+        [c(1), c(2), c(3)] = ind2sub(dim, I);
         c = round(hs.q{hs.iback}.R \ (hs.q{jf}.R * [c-1; 1])) + 1;
         for i = 1:3, hs.ijk(i).setValue(c(i)); end
     case 'custom' % add custom lut
@@ -1065,10 +1101,13 @@ switch cmd
         fh1 = figure(mod(fh.Number,10)+i);
         set(fh1, 'NumberTitle', 'off', 'Name', nam);
         [y, x] = hist(img, edges);
-        bar(x, y/nv*n, 'hist'); % normalized to 1 if flat hist
-        xlabel('Voxel values'); ylabel('Normalized frequency');
-%         bar(x, y/nv/(x(2)-x(1)), 'hist'); % probability density
-%         xlabel('Voxel values'); ylabel('Probability density');
+        if n>5
+            bar(x, y/nv*n, 'hist'); % normalized to 1 if flat hist
+            xlabel('Voxel values'); ylabel('Normalized frequency');
+        else
+            bar(x, y/nv/(x(2)-x(1)), 'hist'); % probability density
+            xlabel('Voxel values'); ylabel('Probability density');
+        end
         title('Histogram between min and max values');
     case 'width' % adjust hs.scroll width
         hs.files.updateUI;
@@ -1118,6 +1157,7 @@ axis(hs.ax(3), [lim(1,:) lim(2,:)]);
 
 %% KeyPressFcn for figure
 function KeyPressFcn(fh, evt)
+set(fh, 'UserData', evt.Modifier); % for javaDropFnc
 if any(strcmp(evt.Key, evt.Modifier)), return; end % only modifier
 hs = guidata(fh);
 if ~isempty(intersect({'control' 'command'}, evt.Modifier))
@@ -1185,6 +1225,8 @@ switch evt.Key
         nii_viewer_cb(h, [], 'cross', hs.fig);
     case 'f1'
         doc nii_viewer;
+    case 'tab' % prevent tab from cycling uicontrol
+        java_robot(fh, 'click');
 end
 
 %% Drop callback: drop as background, Ctrl-drop as overlay
@@ -1192,19 +1234,12 @@ function javaDropFcn(~, evt, fh)
 try
     figure(fh);
     if ispc || ismac % DropAction==2 if no Modifier pressed
-        ctlDn = evt.DropAction==1;
-    else % for linux, DropAction==1 if no Modifier pressed
-        % robot click to set figure SelectionType
-        hs = guidata(fh);
-        hsI = hs.scroll.UserData(1).hsI;
-        cb = get(hsI(1), 'ButtonDownFcn');
-        set(hsI, 'ButtonDownFcn', []);
-        robot = java.awt.Robot;
-        btn1 = java.awt.event.InputEvent.BUTTON1_MASK;
-        drawnow; 
-        robot.mousePress(btn1); robot.delay(20); robot.mouseRelease(btn1);
-        set(hsI, 'ButtonDownFcn', cb);
-        drawnow; ctlDn = strcmpi(fh.SelectionType, 'alt');
+        ctlDn = evt.DropAction==1; % java.awt.dnd.DnDConstants.ACTION_COPY
+    else % for linux, DropAction==1 if no Modifier pressed or control pressed
+        % java_robot(fh, 'key');
+        java_robot(fh, {'key' 'click'});
+        ctlDn = strcmp(get(fh, 'SelectionType'), 'alt') || ...
+                any(strcmpi(fh.UserData, 'control'));
     end
 
     if strcmp(evt.DropType, 'file'), fname = evt.Data{1};
@@ -1348,7 +1383,7 @@ end
 function addOverlay(fname, fh, mtx, mtxFile)
 hs = guidata(fh);
 frm = hs.form_code;
-aligned = nargin>2 && ~isempty(mtx);
+aligned = nargin>2 && isequal(size(mtx), [4 4]);
 R_back = hs.q{hs.iback}.R;
 if aligned % aligned mtx: do it in special way
     [q, ~, rg, dim] = read_nii(fname, frm, 0); % no re-orient
@@ -1388,6 +1423,28 @@ else
          'Transform Inconsistent');
     end
 end
+
+singleVol = 0;
+nv = size(q.nii.img, 4);
+if nv>1 && numel(q.nii.img)>1e7 % load all or a single volume
+    str = ['Input ''all'' or a number from 1 to ' num2str(nv)];
+    while 1
+        a = inputdlg(str, 'Volumes to load', 1, {'all'});
+        if isempty(a), return; end
+        a = strtrim(a{1});
+        if ~isstrprop(a, 'digit'), break; end
+        a = str2num(a);
+        if isequal(a,1:nv) || (numel(a)==1 && a>=1 && a<=nv && mod(a,1)==0)
+            break; 
+        end
+    end
+    if isnumeric(a) && numel(a)==1
+    	singleVol = a;
+        q.nii.img = q.nii.img(:,:,:,a);
+        rg = get_range(single(q.nii.img(:,:,:,1)));
+    end
+end
+
 ii = [1 6 11 13:15]; % diag and offset: avoid huge ratio due to small value
 if ~isequal(hs.dim, dim) || any(abs(R_back(ii)./q.R(ii)-1) > 0.01)
     q.R0 = R_back;
@@ -1444,6 +1501,7 @@ p(1).volume = 1; % first volume
 [pName, niiName, ext] = fileparts(p(1).fname);
 if strcmpi(ext, '.gz'), [~, niiName] = fileparts(niiName); end
 if aligned, niiName = [niiName '(aligned)']; end
+if singleVol, niiName = [niiName '(' num2str(singleVol) ')']; end
 
 try
     mdl = hs.files.getModel;
@@ -2548,6 +2606,8 @@ function [im, alfa] = lut2img(im, lut, rg, lutStr)
 if any(lut == 26:28)
     im = im(:,:,2) .* single(im(:,:,1)>min(abs(rg))); % mag as mask
     rg = [0 1]; % disable later scaling
+elseif isnumeric(lutStr) % custom LUT
+    rg = [0 255]; % this seems right for aal and brodmann
 end
 if rg(2)<0 % asking for negative data
     rg = -rg([2 1]);
@@ -2614,7 +2674,7 @@ switch lut
         im(:,:,3) = im(:,:,3) * 0.5;
     case 26 % phase, like red_yellow
         im(:,:,1) = 1; im(:,:,3) = 0;
-    case 27 % red-yellow-green-yellow-red
+    case 27 % phase3, red-yellow-green-yellow-red
         a = im(:,:,1);
         b1 = a<=0.25;
         b2 = a>0.25 & a<=0.5;
@@ -2632,7 +2692,7 @@ switch lut
         im(:,:,2) = a;
         
         im(:,:,3) = 0;
-    case 28 % red-yellow-green/violet-blue-cyan
+    case 28 % phase6, red-yellow-green/violet-blue-cyan
         a = im(:,:,1);
         b1 = a<=0.25;
         b2 = a>0.25 & a<=0.5;
@@ -2674,7 +2734,8 @@ switch lut
             end
             a = round(im(:,:,1) * size(map,1));
         else % custom
-            a = round(im(:,:,1) * (size(lutStr,1)-1)) + 1; % 1st is bkgrnd
+            map = lutStr; % LUT for custom actually
+            a = round(im(:,:,1) * (size(map,1)-1)) + 1; % 1st is bkgrnd
         end
         
         for j = 1:size(a,1)
@@ -2692,9 +2753,45 @@ d = [i(:) j(:) k(:)]'-1; d(4,:) = 1; % ijk in 4 by nVox
 R = [hdr.srow_x; hdr.srow_y; hdr.srow_z; 0 0 0 1]; % suppose sform
 d = R * d; % xyz in 4 by nVox
 
-d = bsxfun(@minus, d(1:3,:), c(:)); % dist in x y z direction from c
-d = sum(d .* d); % dist squared, 1 by nVox
+d = bsxfun(@minus, d(1:3,:), c(:)); % dist in x y z direction from center
+d = sum(d .* d); % dist to center squared, 1 by nVox
 
 b = d <= r*r; % within sphere
 b = reshape(b, dim);
+
+%% Return center of gravity of an image
+function c = img_cog(img)
+img(isnan(img)) = 0;
+img = double(abs(img));
+gs = sum(img(:));
+c = ones(3,1);
+for i = 1:3
+    if size(img,i)==1, continue; end
+    a = shiftdim(img, i-1);
+    a = sum(sum(a,3),2);
+    c(i) = (1:size(img,i)) * a / gs;
+end
+
+%% java robot key press and/or click at hs.ax(4)
+function java_robot(fh, key)
+oldState = pause('on');
+rob = java.awt.Robot();
+if any(strcmp(key, 'key'))
+    dummy = java.awt.event.KeyEvent.VK_SHIFT; % a key with no effect on fig
+    drawnow; rob.keyPress(dummy); rob.delay(20); rob.keyRelease(dummy);
+    pause(0.05); drawnow; % fire KeyPressFnc to set fh.UserData
+end
+if any(strcmp(key, 'click'))
+    mousexy = get(0, 'PointerLocation'); % for later restore
+    posF = getpixelposition(fh);
+    hs = guidata(fh);
+    posA = getpixelposition(hs.ax(4), true); % relative to figure
+    c = posF(1:2) + posA(1:2) + posA(3:4)/2; % ax(4) center xy
+    res = screen_pixels;
+    btn1 = java.awt.event.InputEvent.BUTTON1_MASK; % 16
+    rob.mouseMove(c(1), res(2)-c(2));
+    rob.mousePress(btn1); pause(0.05); drawnow; rob.mouseRelease(btn1);
+    set(0, 'PointerLocation', mousexy); % restore mouse location
+end
+pause(oldState);
 %%

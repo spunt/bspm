@@ -1154,5 +1154,4 @@ end
 
 % if we reach here, no subcmd found in syntax
 fprintf(2, ' Unknown command for %s: %s\n', mfile, subcmd);
-
 %%
