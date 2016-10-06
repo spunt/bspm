@@ -1,6 +1,8 @@
 function matlabbatch = bspm_dartel_norm_anat(images, flowfields, template, voxsize)
 % BSPM_DARTEL_NORM_ANAT
 %
+%  matlabbatch = bspm_dartel_norm_anat(images, flowfields, template, voxsize)
+%
 %   ARGUMENTS:
 %       images = anatomical files to norm (one per sub)
 %       flowfields = flowfields (i.e. u_rc1*) (same length/order as images)

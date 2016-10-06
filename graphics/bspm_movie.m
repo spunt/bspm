@@ -18,6 +18,7 @@ function bspm_movie(in, dim, rate, slice)
 if nargin < 3, rate = 10; end
 if nargin < 2, dim = 1; end
 if nargin < 1, mfile_showhelp; return; end
+in      = bspm_check_filenames(in); 
 if iscell(in), in = char(in); end
 h       = spm_vol(in);
 nvol    = length(h);

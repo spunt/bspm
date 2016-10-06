@@ -1,5 +1,7 @@
 function matlabbatch = bspm_dartel_norm_func(images, flowfields, template, voxsize, fwhm)
 % BSPM_DARTEL_NORM_FUNC
+% 
+% matlabbatch = bspm_dartel_norm_func(images, flowfields, template, voxsize, fwhm)
 %
 %   ARGUMENTS:
 %       images = array of cell arrays containing epi files to norm (length = nsubs)

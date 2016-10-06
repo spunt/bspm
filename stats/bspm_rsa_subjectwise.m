@@ -1,10 +1,5 @@
 function [rho, fishz] = bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag)
-% 
-% 
-% USAGE: bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag)
-%
-%  ARGUMENTS
-%
+% [rho, fishz] = bspm_rsa_subjectwise(maps, mask, eigenplot, rdmflag)
 %
 
 % ----------------------------- Copyright (C) 2014 -----------------------------

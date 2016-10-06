@@ -1,8 +1,8 @@
 home; clear all
 
 % | options
-runit.omitvols      = 0; 
-runit.slicetime     = 0;
+runit.omitvols      = 1; 
+runit.slicetime     = 1;
 opt.slice_times     = 0; % 1 do slice-timing using actual times, 0 will do using order
 opt.coreg_epi2t1    = 0; % 0 will coreg t1 to mean EPI; 1 will coreg all EPI to t1
 runit.segment       = 1;
@@ -15,7 +15,7 @@ if ~exist(path.qa, 'dir'), mkdir(path.qa); end
 
 % | patterns for finding relevant files/folders (relative to subject dir)
 pattern = struct( ...
-    'subdir',   'RA*',          ...
+    'subdir',   'RA0935*',          ...
     'epidir',   'EP*',          ...
     't1dir',    'GR*T1*',       ...
     'fmdir',    'GR*Field*',    ...
@@ -41,7 +41,7 @@ if ~isempty(omitpat), subdirs(cellstrfind(subdirs, omitpat)) = []; end
 
 % | Omit Initial Volumes
 if runit.omitvols
-    omitpat = {'fad*_00001.nii' 'fad*_00002*nii'};
+    omitpat = {'fad*_00001.nii' 'fad*_00002.nii'};
     bspm_omit_vols(fullfile(path.study, pattern.subdir, 'raw', pattern.epidir), omitpat);
 end
 
