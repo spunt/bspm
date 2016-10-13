@@ -79,6 +79,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 160608 read_sq: n=nEnd (j>2) with PerFrameSQ (needed if length is not inf).
 % 160825 can read dcm without PixelData, by faking p.iPixelData=fSize+1.
 % 160829 no make-up SeriesNumber/InstanceUID in afni_head/philips_par/bv_file.
+% 160928 philips_par: fix para table ind; treat type 17 as phase img. Thx SS.
 
 persistent dict_full;
 s = []; info = '';
@@ -821,7 +822,7 @@ keyInLabel = @(key)strcmp(colLabel, key);
 colIndex = @(key)iColumn(keyInLabel(key));
 
 i1 = strfind(str, '= IMAGE INFORMATION ='); i1 = i1(end);
-ind = strfind(str(i1:end), char(10)) + i1 + 1; % start of a line
+ind = strfind(str(i1:end), char(10)) + i1; % start of a line
 for i = 1:9
     foo = sscanf(str(ind(i):end), '%g', 1);
     if ~isempty(foo), break; end % get the first number
@@ -862,11 +863,13 @@ if any(diff(sl,2)>0), s.SliceNumber = sl; end % slice order in REC file
 imgType = para(iVol, colIndex('image_type_mr')); % 0 mag; 3, phase?
 if any(diff(imgType) ~= 0) % more than 1 type of image
     s.ComplexImageComponent = 'MIXED';
-    s.VolumeIsPhase = (imgType==3); % one for each vol
+    s.VolumeIsPhase = (imgType==3 | imgType==17); % one for each vol
     s.LastFile.RescaleIntercept = para(end, colIndex('rescale intercept'));
     s.LastFile.RescaleSlope = para(end, colIndex('rescale slope'));
-elseif imgType(1)==0, s.ComplexImageComponent = 'MAGNITUDE';
-elseif imgType(1)==3, s.ComplexImageComponent = 'PHASE';
+elseif imgType(1)==0 || imgType(1)==16
+    s.ComplexImageComponent = 'MAGNITUDE';
+elseif imgType(1)==3 || imgType(1)==17
+    s.ComplexImageComponent = 'PHASE';
 end
 
 % These columns should be the same for nifti-convertible images: 

@@ -1,4 +1,4 @@
-function varargout = dicm2nii(src, dataFolder, varargin)
+function varargout = dicm2nii(src, niiFolder, fmt)
 % Convert dicom and more into nii or img/hdr files. 
 % 
 % DICM2NII(dcmSource, niiFolder, outFormat)
@@ -17,8 +17,6 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 %      5 or '3D.nii.gz'     for 3D nii compressed.
 %      6 or '3D.hdr'        for 3D hdr/img pair uncompressed (SPM8).
 %      7 or '3D.hdr.gz'     for 3D hdr/img pair compressed.
-% 
-% The optional output is converted PatientName.
 % 
 % Typical examples:
 %  DICM2NII; % bring up user interface if there is no input argument
@@ -351,23 +349,21 @@ function varargout = dicm2nii(src, dataFolder, varargin)
 %    Phase image flag for GE
 
 if nargout, varargout{1} = ''; end
-if nargin==3 && ischar(varargin{1}) && strcmp(varargin{1}, 'func_handle')
-    if strcmp(dataFolder, 'all') % for command line test
+if nargin==3 && ischar(fmt) && strcmp(fmt, 'func_handle')
+    if strcmp(niiFolder, 'all') % for command line test
         fcns = localfunctions; % only for Matlab since 2013b
         for i = 1:numel(fcns)
             nam = func2str(fcns{i});
             assignin('base', nam, eval(['@' nam]));
         end
     else
-        varargout{1} = eval(['@' dataFolder]);
+        varargout{1} = eval(['@' niiFolder]);
     end
     return;
 end
 
 %% Deal with output format first, and error out if invalid
-if nargin<3 || isempty(varargin{1}), fmt = 1; % default .nii.gz
-else fmt = varargin{1};
-end
+if nargin<3 || isempty(fmt), fmt = 1; end % default .nii.gz
 
 if (isnumeric(fmt) && any(fmt==[0 1 4 5])) || ...
       (ischar(fmt) && ~isempty(regexpi(fmt, 'nii')))
@@ -386,7 +382,7 @@ end
 rst3D = (isnumeric(fmt) && fmt>3) || (ischar(fmt) && ~isempty(regexpi(fmt, '3D')));
 
 %% Deal with data source
-if nargin<1 || isempty(src) || (nargin<2 || isempty(dataFolder))
+if nargin<1 || isempty(src) || (nargin<2 || isempty(niiFolder))
     create_gui; % show GUI if input is not enough
     return;
 end
@@ -431,11 +427,11 @@ else
 end
 dcmFolder = fullfile(getfield(what(dcmFolder), 'path'));
 
-%% Deal with dataFolder
-if ~isdir(dataFolder), mkdir(dataFolder); end
-dataFolder = fullfile([getfield(what(dataFolder), 'path') filesep]);
+%% Deal with niiFolder
+if ~isdir(niiFolder), mkdir(niiFolder); end
+niiFolder = fullfile([getfield(what(niiFolder), 'path') filesep]);
 converter = ['dicm2nii.m 20' reviseDate];
-if errorLog('', dataFolder) % let it remember dataFolder for later call
+if errorLog('', niiFolder) % let it remember niiFolder for later call
     more off;
     disp(['Xiangrui Li''s ' converter ' (feedback to xiangrui.li@gmail.com)']);
 end
@@ -443,7 +439,7 @@ end
 %% Unzip if compressed file is the source
 if ~isempty(unzip_cmd)
     [~, fname, ext1] = fileparts(src);
-    dcmFolder = sprintf('%stmpDcm%s/', dataFolder, fname);
+    dcmFolder = sprintf('%stmpDcm%s/', niiFolder, fname);
     if ~isdir(dcmFolder), mkdir(dcmFolder); end
     disp(['Extracting files from ' fname ext1 ' ...']);
 
@@ -848,7 +844,7 @@ for i = 1:nRun
     end
     
     nii = nii_tool('init', img); % create nii struct based on img
-    fname = [dataFolder fnames{i}]; % name without ext
+    fname = [niiFolder fnames{i}]; % name without ext
 
     % Compute bval & bvec in image reference for DTI series
     if s.isDTI, [h{i}, nii] = get_dti_para(h{i}, nii); end
@@ -874,7 +870,7 @@ for i = 1:nRun
 end
 
 h = cell2struct(h, fnames, 2); % convert into struct
-fname = [dataFolder 'dcmHeaders.mat'];
+fname = [niiFolder 'dcmHeaders.mat'];
 if exist(fname, 'file') % if file exists, we update fields only
     S = load(fname);
     for i = 1:numel(fnames), S.h.(fnames{i}) = h.(fnames{i}); end
@@ -1717,7 +1713,7 @@ hs.about = uicontrol('Style', 'popup', ...
     'Position', [342 12 72 20], 'Callback', cb('about'));
 
 ph = uipanel(fh, 'Units', 'Pixels', 'Position', [4 50 410 102], 'FontSize', fSz, ...
-    'BackgroundColor', clr, 'Title', 'Preferences (normally no change needed)');
+    'BackgroundColor', clr, 'Title', 'Preferences (also apply to command line and future sessions)');
 setpf = @(p)['setpref(''dicm2nii_gui_para'',''' p ''',get(gcbo,''Value''));'];
 
 p = 'lefthand';
@@ -1980,11 +1976,11 @@ end
 
 %% Write error info to a file in case user ignores Command Window output
 function firstTime = errorLog(errInfo, folder)
-persistent dataFolder;
-if nargin>1, firstTime = isempty(dataFolder); dataFolder = folder; end
+persistent niiFolder;
+if nargin>1, firstTime = isempty(niiFolder); niiFolder = folder; end
 if isempty(errInfo), return; end
 fprintf(2, ' %s\n', errInfo); % red text in Command Window
-fid = fopen([dataFolder 'dicm2nii_warningMsg.txt'], 'a');
+fid = fopen([niiFolder 'dicm2nii_warningMsg.txt'], 'a');
 fseek(fid, 0, -1); 
 fprintf(fid, '%s\n', errInfo);
 fclose(fid);
@@ -1992,7 +1988,7 @@ fclose(fid);
 %% Get the last date string in history
 function dStr = reviseDate(mfile)
 if nargin<1, mfile = mfilename; end
-dStr = '160408?';
+dStr = '160927?';
 fid = fopen(which(mfile));
 if fid<1, return; end
 str = fread(fid, '*char')';

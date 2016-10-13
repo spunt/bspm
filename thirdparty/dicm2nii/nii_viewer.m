@@ -45,19 +45,25 @@ function nii_viewer(fname, overlayName)
 % 
 % A special overlay feature "Add aligned overlay" can be used to check the
 % effect of registration, or overlay an image to a different coordinate system
-% without explicitly transformation. It will ask for a NIfTI and a
-% transformation matrix which aligns the NIfTI to the background image. Here is
-% an example to check FSL alignment. From a .feat/reg folder, Open "highres" as
-% background image. "Add overlay" for "example_func". If there is head movement
-% between the highres and the functional scans, the overlap will be off. Now
-% "Add aligned overlay" for "example_func", and use "example_func2highres.mat"
-% as the matrix. The two dataset should overlap well if the alignment matrix is
-% accurate. Here is another example to overlay to a different system for FSL
-% result. Open a file .feat/reg/standard.nii.gz as background. If an image like
+% without creating a transformed file. It will ask for two files. The first is
+% the overlay NIfTI file, and the second is either a transformation matrix file
+% which aligns the overlay to the background image, or a warp file which
+% transforms the overlay into the background reference.
+% 
+% Here is an example to check FSL alignment. From a .feat/reg folder, Open
+% "highres" as background image. "Add overlay" for "example_func". If there is
+% head movement between the highres and the functional scans, the overlap will
+% be off. Now "Add aligned overlay" for "example_func", and use
+% example_func2highres.mat as the matrix. The two dataset should overlap well if
+% the alignment matrix is accurate.
+% 
+% Here is another example to overlay to a different coordinate system for FSL
+% result. Open .feat/reg/standard.nii.gz as background. If an image like
 % .feat/stats/zstat1.nii.gz is added as an overlay, a warning message will say
 % inconsistent coordinate system since the zstat image is in Scanner Anat. The
-% correct way is to "Add aligned overlay" for zstat1, and use
-% .feat/reg/example_func2standard.mat as alignment matrix.
+% correct way is to "Add aligned overlay" for zstat1, and either use
+% .feat/reg/example_func2standard.mat for linear transformation or better use
+% .feat/reg/example_func2standard_warp.nii.gz if available for alignment.
 % 
 % When the mouse pointer is moved onto a voxel, the voxel indices, corresponding
 % x/y/z coordinates and voxel value will show on the panel. If there is an
@@ -231,6 +237,8 @@ function nii_viewer(fname, overlayName)
 % 160715 lut2img: bug fix for custom LUT; custom LUT uses rg [0 255]; add gap=0.
 % 160721 Implement 'Set crosshair at' 'a point with value of'.
 % 160730 Allow to load single volume for large dataset.
+% 161003 Add aligned overlay: accept FSL warp file as transformation.
+% 161010 Implement 'Save volume as'; xyzr2roi: use valid q/sform.
 %%
 
 pf = getpref('nii_viewer_para');
@@ -470,6 +478,7 @@ uimenu(h, 'Label', 'Apply modulation', 'Callback', @addMask);
 uimenu(h, 'Label', 'Load custom LUT', 'Callback', cb('custom'));
 h_savefig = uimenu(h, 'Label', 'Save figure as');
 h_saveas = uimenu(h, 'Label', 'Save NIfTI as');
+uimenu(h, 'Label', 'Save volume as ...', 'Callback', cb('saveVolume'));
 uimenu(h, 'Label', 'Create ROI file ...', 'Callback', cb('ROI'));
 uimenu(h, 'Label', 'Close window', 'Accelerator', 'W', 'Callback', 'close gcf');
 
@@ -742,20 +751,11 @@ switch cmd
                 '*.hdr.gz'], 'Select overlay NIfTI');
             if ~ischar(fname), return; end
             fname = fullfile(pName, fname);
-            [mtx, pName] = uigetfile([pName '/*.mat'], ['Select the ' ...
-                'text matrix file which aligns the nii to background']);
+            [mtx, pName] = uigetfile([pName '/*.mat;*_warp.nii;*_warp.nii.gz'], ...
+                'Select FSL mat file or warp file transforming the nii to background');
             if ~ischar(mtx), return; end
             mtx = fullfile(pName, mtx);
-            try 
-                R = load(mtx, '-ascii');
-                if ~isequal(size(R), [4 4])
-                    error('Invalid transformation matrix file: %s', mtx);
-                end
-            catch me
-                errordlg(me.message);
-                return;
-            end
-            addOverlay(fname, fh, R, mtx);
+            addOverlay(fname, fh, mtx);
         else
             [fname, pName] = uigetfile([pName '/*.nii; *.hdr;*.nii.gz;' ...
                 '*.hdr.gz'], 'Select overlay NIfTI', 'MultiSelect', 'on');
@@ -1014,6 +1014,7 @@ switch cmd
         jf = hs.files.getSelectedIndex+1;
         img = hs.q{jf}.nii.img(:,:,:,hs.volume.getValue);
         c = img_cog(img);
+        if any(isnan(c)), errordlg('No valid COG found'); return; end
         c = round(hs.q{hs.iback}.R \ (hs.q{jf}.R * [c-1; 1])) + 1;
         for i = 1:3, hs.ijk(i).setValue(c(i)); end
     case 'maximum'
@@ -1117,6 +1118,28 @@ switch cmd
         hs.scroll.Position(3) = x;
         hs.params.Position(1) = x+2;
         hs.value.Position(3) = max(1, width-x-hs.value.Position(1));
+    case 'saveVolume' % save 1 or more volumes as a nifti
+        jf = hs.files.getSelectedIndex+1;
+        nam = hs.scroll.UserData(jf).fname;
+        t = hs.scroll.UserData(jf).volume;
+        while 1
+            a = inputdlg('Volume indice to save (2:4 for example)', ...
+                'Save Volume', 1, {num2str(t)});
+            if isempty(a), return; end
+            try %#ok
+                t = eval(['[' a{1} '];']);
+                break;
+            end
+        end
+        pName = fileparts(nam);
+        [fname, pName] = uiputfile([pName '/*.nii;*.nii.gz'], ...
+            'Input name to save volume as');
+        if ~ischar(fname), return; end
+        fname = fullfile(pName, fname);
+        
+        nii = nii_tool('load', nam); % re-load to be safe
+        nii.img =  nii.img(:,:,:,t);
+        nii_tool('save', nii, fname);
     case 'ROI' % save sphere
         c0 = cell2mat(get(hs.ijk, 'Value'));
         c0 = hs.q{hs.iback}.R * [c0-1; 1];
@@ -1138,7 +1161,7 @@ switch cmd
         
         nii = hs.q{hs.files.getSelectedIndex+1}.nii; % original hdr
         b = xyzr2roi(c, r, nii.hdr);        
-        nii.img = single(b); % single better supported by other packages
+        nii.img = single(b); % single better supported by FSL
         nii_tool('save', nii, fname);
     otherwise
         error('Unknown Callback: %s', cmd);
@@ -1311,7 +1334,15 @@ for i = 1:numel(p)
             [Y, X, Z] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
             I = [X(:) Y(:) Z(:)]' - 1; % ijk grids of background img
             I(ix,:) = ind-1; I(4,:) = 1;
-            I = hs.q{i}.R \ (hs.q{i}.R0 * I) + 1; % ijk+1 for overlay img
+            
+            if isfield(hs.q{i}, 'warp')
+                iw = {':' ':' ':' ':'}; iw{ix} = ind;
+                warp = hs.q{i}.warp(iw{:});
+                warp = reshape(warp, [prod(dim) 3])'; warp(4,:) = 0;
+                I = hs.q{i}.R \ (hs.q{i}.R0 * I + warp) + 1;
+            else
+                I = hs.q{i}.R \ (hs.q{i}.R0 * I) + 1; % ijk+1 for overlay img
+            end
             
             for j = 1:dim4
                 if p(i).smooth
@@ -1380,17 +1411,44 @@ for i = 1:numel(p)
 end
 
 %% Add an overlay
-function addOverlay(fname, fh, mtx, mtxFile)
+function addOverlay(fname, fh, mtx)
 hs = guidata(fh);
 frm = hs.form_code;
-aligned = nargin>2 && isequal(size(mtx), [4 4]);
+aligned = nargin>2;
 R_back = hs.q{hs.iback}.R;
 if aligned % aligned mtx: do it in special way
     [q, ~, rg, dim] = read_nii(fname, frm, 0); % no re-orient
     R0 = nii_xform_mat(hs.q{hs.iback}.nii.hdr, frm(1)); % original background R
     
+    try
+        [~, ~, ext] = fileparts(mtx);
+        if strcmpi(ext, '.mat')
+            R = load(mtx, '-ascii');
+            if ~isequal(size(R), [4 4])
+                error('Invalid transformation matrix file: %s', mtx);
+            end
+        else % see nii_xform
+            R = eye(4);
+            warp = nii_tool('img', mtx);
+            if ~isequal(size(warp), [hs.q{hs.iback}.nii.hdr.dim(2:4) 3])
+                error('warp file and template file img size don''t match.');
+            end
+            if det(R0(1:3,1:3))<0, warp(:,:,:,1) = -warp(:,:,:,1); end
+            [~, perm, flp] = reorient(R0, hs.q{hs.iback}.nii.hdr.dim(2:4));
+            if ~isequal(perm, 1:3), warp = permute(warp, [perm 4]); end
+            for j = 1:3
+                if flp(j), warp = flipdim(warp, j); end %#ok
+            end
+            q.warp = warp;
+            q.R0 = R_back; % always interp
+        end
+    catch me
+        errordlg(me.message);
+        return;
+    end
+
     % see nii_xform for more comment on following method
-    R = R0 / diag([hs.q{hs.iback}.nii.hdr.pixdim(2:4) 1]) * mtx * diag([q.pixdim 1]);
+    R = R0 / diag([hs.q{hs.iback}.nii.hdr.pixdim(2:4) 1]) * R * diag([q.pixdim 1]);
     [~, i1] = max(abs(q.R(1:3,1:3)));
     [~, i0] = max(abs(R(1:3,1:3)));
     flp = sign(R(i0+[0 4 8])) ~= sign(q.R(i1+[0 4 8]));
@@ -1399,7 +1457,7 @@ if aligned % aligned mtx: do it in special way
         rotM(1:3,4) = (dim-1).* flp;
         R = R / rotM;
     end
-
+            
     [q.R, perm, q.flip] = reorient(R, dim); % in case we apply mask to it
     if ~isequal(perm, 1:3)
         dim = dim(perm);
@@ -1409,7 +1467,7 @@ if aligned % aligned mtx: do it in special way
     for j = 1:3
         if q.flip(j), q.nii.img = flipdim(q.nii.img, j); end %#ok 
     end
-    q.alignMtx = mtxFile; % info only for NIfTI essentials
+    q.alignMtx = mtx; % info only for NIfTI essentials
 else
     [q, frm, rg, dim] = read_nii(fname, frm);
 
@@ -1574,7 +1632,7 @@ end
 if q.nii.hdr.scl_slope==0, q.nii.hdr.scl_slope = 1; end
 if q.nii.hdr.scl_slope~=1 || q.nii.hdr.scl_inter~=0
     if isfloat(q.nii.img)
-        q.nii.img = q.nii.img  * q.nii.hdr.scl_slope + q.nii.hdr.scl_inter;
+        q.nii.img = q.nii.img * q.nii.hdr.scl_slope + q.nii.hdr.scl_inter;
     else
         q.scl_slope = q.nii.hdr.scl_slope;
         q.scl_inter = q.nii.hdr.scl_inter;
@@ -2058,12 +2116,17 @@ for i = 1:numel(p) % show top one first
     if p(i).show == 0, continue; end
     t = round(p(i).volume);
     if isfield(hs.q{i}, 'R0') % need interpolation
-        I0 = hs.q{i}.R \ (hs.q{i}.R0 * [I-1 1]'); % overlay ijk
+        if isfield(hs.q{i}, 'warp')
+            warp = hs.q{i}.warp(I(1), I(2), I(3), :);
+            I0 = hs.q{i}.R \ (hs.q{i}.R0 * [I-1 1]' + [warp(:); 0]);
+        else
+            I0 = hs.q{i}.R \ (hs.q{i}.R0 * [I-1 1]'); % overlay ijk
+        end
         I0 = round(I0(1:3)+1);
     else I0 = I;
     end
     try
-        val = hs.q{i}.nii.img(I0(1),I0(2),I0(3),t,:);
+        val = hs.q{i}.nii.img(I0(1), I0(2), I0(3), t, :);
         if isfield(hs.q{i}, 'scl_slope')
             val = val * hs.q{i}.scl_slope + hs.q{i}.scl_inter;
         end
@@ -2750,7 +2813,7 @@ function b = xyzr2roi(c, r, hdr)
 dim = single(hdr.dim(2:4));
 [j, i, k] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
 d = [i(:) j(:) k(:)]'-1; d(4,:) = 1; % ijk in 4 by nVox
-R = [hdr.srow_x; hdr.srow_y; hdr.srow_z; 0 0 0 1]; % suppose sform
+R = nii_xform_mat(hdr);
 d = R * d; % xyz in 4 by nVox
 
 d = bsxfun(@minus, d(1:3,:), c(:)); % dist in x y z direction from center
