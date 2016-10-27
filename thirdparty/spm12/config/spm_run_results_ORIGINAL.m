@@ -92,6 +92,9 @@ for k = 1:numel(cspec)
                 if strcmp(job.print,'csv'), cmd = 'open(''%s'')';
                 else                        cmd = 'winopen(''%s'')'; end
                 fprintf('Saving results to:\n  %s\n',spm_file(ofile,'link',cmd));
+            case 'nidm'
+                nidmfile = spm_results_nidm(SPM,xSPM,TabDat);
+                fprintf('Exporting results in:\n  %s\n',nidmfile);
             otherwise
                 if ~spm('CmdLine')
                     spm_figure('Print','Graphics','',job.print);
@@ -157,23 +160,6 @@ for k = 1:numel(cspec)
             fprintf('Written %s\n',spm_file(F,'link',cmd));
         otherwise
             error('Unknown option.');
-    end
-    
-    %- Export to NIDM
-    %----------------------------------------------------------------------    
-    fn = fieldnames(job.export);
-    switch fn{1}
-        case 'no'
-        case 'nidm'
-            modalities = {'AMRI','FMRI','DMRI','EEG','MEG','PET','SPECT'};
-            modality = modalities{job.export.nidm.modality};
-
-            refspaces = {'subject','ixi','icbm','custom','mni','talairach'};
-            refspace = refspaces{job.export.nidm.refspace};
-                
-            nidmfile = spm_results_nidm(SPM,xSPM,TabDat, ...
-                job.export.nidm.subjects, modality, refspace);
-            fprintf('Exporting results in:\n  %s\n',nidmfile);
     end
     
 end

@@ -1,0 +1,15 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix niiri: <http://iri.nidash.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix nidm_CoordinateSpace: <http://purl.org/nidash/nidm#NIDM_0000016> .
+@prefix nidm_voxelUnits: <http://purl.org/nidash/nidm#NIDM_0000133> .
+@prefix nidm_inWorldCoordinateSystem: <http://purl.org/nidash/nidm#NIDM_0000105> .
+@prefix nidm_numberOfDimensions: <http://purl.org/nidash/nidm#NIDM_0000112> .
+@prefix nidm_Ixi549CoordinateSystem: <http://purl.org/nidash/nidm#NIDM_0000050> .
+
+niiri:coordinate_space_id_1 a prov:Entity , nidm_CoordinateSpace: ;
+	nidm_voxelUnits: "[ \"mm\", \"mm\", \"mm\" ]"^^xsd:string ;
+	nidm_inWorldCoordinateSystem: nidm_Ixi549CoordinateSystem: ;
+	nidm_numberOfDimensions: "3"^^xsd:int .

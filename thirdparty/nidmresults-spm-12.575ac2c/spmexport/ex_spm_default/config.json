@@ -1,0 +1,7 @@
+
+{
+"software": "spm",
+"ground_truth": ["thr_voxeluncp001/nidm.ttl", "hrf_spmcanonical/nidm.ttl", "con_t/nidm.ttl", "clusterconn_18/nidm.ttl", "alt_onetailed/nidm.ttl"],
+"inclusive": true,
+"versions": ["1.3.0-rc2"]
+}

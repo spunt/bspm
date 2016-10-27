@@ -1,0 +1,13 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix niiri: <http://iri.nidash.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix nidm_ExtentThreshold: <http://purl.org/nidash/nidm#NIDM_0000026> .
+@prefix nidm_clusterSizeInVoxels: <http://purl.org/nidash/nidm#NIDM_0000084> .
+@prefix nidm_clusterSizeInResels: <http://purl.org/nidash/nidm#NIDM_0000156> .
+@prefix obo_statistic: <http://purl.obolibrary.org/obo/STATO_0000039> .
+
+
+niiri:extent_threshold_stat_id a prov:Entity, nidm_ExtentThreshold:, obo_statistic: ;
+    nidm_clusterSizeInVoxels: "10"^^xsd:int .

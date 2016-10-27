@@ -1,0 +1,13 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix niiri: <http://iri.nidash.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix crypto: <http://id.loc.gov/vocabulary/preservation/cryptographicHashFunctions#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+
+@prefix nidm_DisplayMaskMap: <http://purl.org/nidash/nidm#NIDM_0000020> .
+@prefix nidm_inCoordinateSpace: <http://purl.org/nidash/nidm#NIDM_0000104> .
+
+
+niiri:display_map_id a prov:Entity , nidm_DisplayMaskMap: ;
+	dct:format "image/nifti"^^xsd:string .

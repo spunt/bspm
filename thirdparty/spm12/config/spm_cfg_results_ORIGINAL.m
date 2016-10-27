@@ -282,125 +282,9 @@ if ispc
     print.labels{end+1} = 'Excel spreadsheet file';
     print.values{end+1} = 'xls';
 end
+print.labels{end+1} = 'NIDM (Neuroimaging Data Model)';
+print.values{end+1} = 'nidm';
 print.def = @(val)spm_get_defaults('ui.print', val{:});
-
-%--------------------------------------------------------------------------
-% Number of subjects in the group
-%--------------------------------------------------------------------------
-numsubjects         = cfg_entry;
-numsubjects.tag     = 'numsubjects';
-numsubjects.name    = 'Number of subjects';
-numsubjects.help    = {'Number of subjects in the group.'};
-numsubjects.strtype = 'r';
-numsubjects.num     = [1 1];
-
-%--------------------------------------------------------------------------
-% Group label
-%--------------------------------------------------------------------------
-grouplabel         = cfg_entry;
-grouplabel.tag     = 'label';
-grouplabel.name    = 'Label';
-grouplabel.help    = {'Label for the group.'};
-grouplabel.strtype = 's';
-grouplabel.num     = [0 Inf];
-
-%--------------------------------------------------------------------------
-% group definition
-%--------------------------------------------------------------------------
-group      = cfg_branch;
-group.tag  = 'group';
-group.name = 'Group';
-group.val  = {grouplabel numsubjects};
-group.help = {''};
-
-%--------------------------------------------------------------------------
-% groups for group analysis
-%--------------------------------------------------------------------------
-groups        = cfg_repeat;
-groups.tag    = 'groups';
-groups.name   = 'Group analysis';
-groups.help   = {''};
-groups.values = {group};
-groups.num    = [1 Inf];
-
-%--------------------------------------------------------------------------
-% single-subject analysis
-%--------------------------------------------------------------------------
-subject      = cfg_const;
-subject.tag  = 'subject';
-subject.name = 'Single-subject analysis';
-subject.val  = { 1 };
-subject.help = {'Single-subject analysis.'};
-
-%--------------------------------------------------------------------------
-% single-subject/group analysis
-%--------------------------------------------------------------------------
-subjects        = cfg_choice;
-subjects.tag    = 'subjects';
-subjects.name   = 'Single-subject or group analysis?';
-subjects.help   = {''};
-subjects.values = {subject groups};
-
-%--------------------------------------------------------------------------
-% Modality
-%--------------------------------------------------------------------------
-modality        = cfg_menu;
-modality.tag    = 'modality';
-modality.name   = 'Modality';
-modality.help   = {['Modality.']};
-modality.labels = {'Anatomical MRI',...
-                'Functional MRI',...
-                'Diffusion MRI',...
-                'EEG',...
-                'MEG',...
-                'PET',...
-                'SPECT'}';
-modality.values = { 1 2 3 4 5 6 7 };
-
-%--------------------------------------------------------------------------
-% Reference space
-%--------------------------------------------------------------------------
-refspace        = cfg_menu;
-refspace.tag    = 'refspace';
-refspace.name   = 'Reference space';
-refspace.help   = {['Reference space. For an experiment completed only ',...
-    'within SPM, choose one of the first 4 options.']};
-refspace.labels = {'Subject space (no normalisation)',...
-                'Normalised space (using segment)',...
-                'Normalised space (using old segment)',...
-                'Customized space',...
-                'Other normalised MNI space',...                
-                'Other normalised Talairach space',...                                
-                 }';
-refspace.values = { 1 2 3 4 5 6 };
-
-%--------------------------------------------------------------------------
-% Export as a NIDM-Results pack
-%--------------------------------------------------------------------------
-nidm = cfg_branch;
-nidm.tag      = 'nidm';
-nidm.name     = 'Yes';   
-nidm.val      = {subjects modality refspace};
-nidm.help     = {['Yes']};    
-
-%--------------------------------------------------------------------------
-% Do not export
-%--------------------------------------------------------------------------
-no_export      = cfg_const;
-no_export.tag  = 'no';
-no_export.name = 'No';
-no_export.val  = { 0 };
-no_export.help = {'Do not export the results.'};
-
-%--------------------------------------------------------------------------
-% export Export results as NIDM?
-%--------------------------------------------------------------------------
-export        = cfg_choice;
-export.tag    = 'export';
-export.name   = 'Export results using the Neuroimaging Data Model (NIDM)?';
-export.help   = {''};
-export.values = {no_export nidm};
-export.val = {no_export};
 
 %--------------------------------------------------------------------------
 % results Results Report
@@ -408,7 +292,7 @@ export.val = {no_export};
 results      = cfg_exbranch;
 results.tag  = 'results';
 results.name = 'Results Report';
-results.val  = {spmmat generic units print write export};
+results.val  = {spmmat generic units print write};
 results.help = {''};
 results.prog = @spm_run_results;
 results.vout = @vout_results;

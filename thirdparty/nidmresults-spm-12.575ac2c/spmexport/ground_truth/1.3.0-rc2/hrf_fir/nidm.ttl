@@ -1,0 +1,14 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix niiri: <http://iri.nidash.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix nfo: <http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#> .
+
+@prefix nidm_DesignMatrix: <http://purl.org/nidash/nidm#NIDM_0000019> .
+@prefix nidm_hasHRFBasis: <http://purl.org/nidash/nidm#NIDM_0000102> .
+@prefix nidm_FiniteImpulseResponseBasisSet: <http://purl.org/nidash/nidm#NIDM_0000028> .
+
+
+niiri:first_level_design_matrix_id a prov:Entity , nidm_DesignMatrix: ;
+    nidm_hasHRFBasis: nidm_FiniteImpulseResponseBasisSet: .

@@ -1,0 +1,7 @@
+
+{
+"software": "spm",
+"ground_truth": ["thr_voxelfwep05/nidm.ttl"],
+"inclusive": true,
+"versions": ["1.3.0-rc2"]
+}
