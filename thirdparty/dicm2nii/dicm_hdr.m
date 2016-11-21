@@ -99,7 +99,7 @@ end
 
 if nargin<3, iFrames = []; end
 p.iFrames = iFrames;
-fid = fopen(fname);
+fid = fopen(fname, 'r', 'l');
 if fid<0, info = ['File not exists: ' fname]; return; end
 closeFile = onCleanup(@() fclose(fid)); % auto close when done or error
 fseek(fid, 0, 1); fSize = ftell(fid); fseek(fid, 0, -1);
@@ -557,6 +557,7 @@ function ch = read_ProtocolDataBlock(ch)
 n = typecast(ch(1:4), 'int32') + 4; % nBytes, zeros may be padded to make 4x
 if ~all(ch(5:6) == [31 139]') || n>numel(ch), return; end % gz signature
 
+gunzip_mem = nii_tool('func_handle', 'gunzip_mem');
 b = gunzip_mem(ch(5:n));
 b = regexp(char(b'), '(\w*)\s+"(.*)"', 'tokens', 'dotexceptnewline');
 if isempty(b{1}), return; end % guzip faild or wrong format
@@ -569,39 +570,6 @@ try %#ok
         end
     end
     ch = rst;
-end
-end
-
-%% gunzip data in memory if possible.
-% For a GE ProtocolDataBlock, memory / file approaches take 0.5 / 43 ms.
-% When gz_bytes is large, pigz will be faster. The reversing point is about 8M.
-function bytes = gunzip_mem(gz_bytes)
-bytes = [];
-try
-    import com.mathworks.mlwidgets.io.*
-    streamCopier = InterruptibleStreamCopier.getInterruptibleStreamCopier;
-    baos = java.io.ByteArrayOutputStream;
-    b = typecast(gz_bytes, 'int8');
-    bais = java.io.ByteArrayInputStream(b);
-    gzis = java.util.zip.GZIPInputStream(bais);
-    streamCopier.copyStream(gzis, baos);
-    bytes = typecast(baos.toByteArray, 'uint8'); % int8 to uint8
-catch
-    try %#ok
-        tmp = tempname; % temp gz file
-        fid = fopen([tmp '.gz'], 'w');
-        if fid<0, return; end
-        cln = onCleanup(@() delete([tmp '*'])); % delete gz and unziped files
-        fwrite(fid, gz_bytes, 'uint8');
-        fclose(fid);
-        
-        gunzipOS = nii_tool('func_handle', 'gunzipOS');
-        gunzipOS([tmp '.gz']);
-        
-        fid = fopen(tmp);
-        bytes = fread(fid, '*uint8');
-        fclose(fid);
-    end
 end
 end
 

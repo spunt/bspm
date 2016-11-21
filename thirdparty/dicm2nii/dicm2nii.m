@@ -350,15 +350,7 @@ function varargout = dicm2nii(src, niiFolder, fmt)
 
 if nargout, varargout{1} = ''; end
 if nargin==3 && ischar(fmt) && strcmp(fmt, 'func_handle')
-    if strcmp(niiFolder, 'all') % for command line test
-        fcns = localfunctions; % only for Matlab since 2013b
-        for i = 1:numel(fcns)
-            nam = func2str(fcns{i});
-            assignin('base', nam, eval(['@' nam]));
-        end
-    else
-        varargout{1} = eval(['@' niiFolder]);
-    end
+    varargout{1} = str2func(niiFolder);
     return;
 end
 
@@ -1371,8 +1363,8 @@ cosSL = R(iSL, 3);
 
 pixdim = tryGetField(s, 'PixelSpacing');
 if isempty(pixdim)
-    pixdim = [1 1]; % fake
-    xyz_unit = 0; % not uint information
+    pixdim = [1 1]'; % fake
+    xyz_unit = 0; % no unit information
 else
     xyz_unit = 2; % mm
 end
@@ -1380,8 +1372,10 @@ thk = tryGetField(s, 'SpacingBetweenSlices');
 if isempty(thk), thk = tryGetField(s, 'SliceThickness', pixdim(1)); end
 pixdim = [pixdim(:); thk];
 R = R * diag(pixdim); % apply vox size
+ipp = tryGetField(s, 'ImagePositionPatient');
+if isempty(ipp), ipp = -(dim'.*pixdim)/2; end
 % Next is almost dicom xform matrix, except mosaic trans and unsure slice_dir
-R = [R tryGetField(s, 'ImagePositionPatient', -dim'/2); 0 0 0 1];
+R = [R ipp; 0 0 0 1];
 
 % rest are former: R = verify_slice_dir(R, s, dim, iSL)
 if dim(3)<2, return; end % don't care direction for single slice
@@ -1409,19 +1403,17 @@ if isfield(s, 'CSASeriesHeaderInfo') % Siemens both mosaic and regular
     return;
 end
 
-pos = []; % SliceLocation for last or center slice we try to retrieve
+pos = []; % volume center we try to retrieve
 if isfield(s, 'LastScanLoc') && isfield(s, 'FirstScanLocation') % GE
     pos = (s.LastScanLoc + s.FirstScanLocation) / 2; % mid-slice center
     if iSL<3, pos = -pos; end % RAS convention!
-    pos = [R(iSL, 1:2) pos] * [-(dim(1:2)-1)/2 1]'; % mid-slice location
+    pos = pos - R(iSL, 1:2) * (dim(1:2)'-1)/2; % mid-slice location
 end
 
 if isempty(pos) && isfield(s, 'Stack') % Philips
     ori = {'RL' 'AP' 'FH'}; ori = ori{iSL};
     pos = tryGetField(s.Stack.Item_1, ['MRStackOffcentre' ori]);
-    if ~isempty(pos)
-        pos = [R(iSL, 1:2) pos] * [-dim(1:2)/2 1]'; % mid-slice location
-    end
+    pos = pos - R(iSL, 1:2) * dim(1:2)'/2; % mid-slice location
 end
 
 if isempty(pos) % keep right-handed, and warn user

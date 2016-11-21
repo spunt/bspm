@@ -1,4 +1,4 @@
-function nii_viewer(fname, overlayName)
+function varargout = nii_viewer(fname, overlayName)
 % Basic tool to visualize NIfTI images.
 % 
 %  NII_VIEWER('/data/subj2/fileName.nii.gz')
@@ -239,7 +239,16 @@ function nii_viewer(fname, overlayName)
 % 160730 Allow to load single volume for large dataset.
 % 161003 Add aligned overlay: accept FSL warp file as transformation.
 % 161010 Implement 'Save volume as'; xyzr2roi: use valid q/sform.
+% 161018 Take care of issue converting long file name to var name.
+% 161103 Fix qform-only overlay, too long fig title, overlay w/o valid formCode.
+% 161108 Implement "Crop below crosshair" to remove excessive neck tissue.
+% 161115 Use .mat file for early spm Analyze file.
 %%
+
+if nargin==2 && ischar(fname) && strcmp(fname, 'func_handle')
+    varargout{1} = str2func(overlayName);
+    return;
+end
 
 pf = getpref('nii_viewer_para');
 if isempty(pf) || ~isfield(pf, 'mouseOver')
@@ -319,7 +328,9 @@ else
 end
 fh = figure(fn);
 hs.fig = handle(fh); % have to use numeric for uipanel for older matlab
-figNam = ['nii_viewer - ' p.fname ' (' formcode2str(hs.form_code(1)) ')'];
+figNam = p.fname;
+if numel(figNam)>40, figNam = [figNam(1:40) '...']; end
+figNam = ['nii_viewer - ' figNam ' (' formcode2str(hs.form_code(1)) ')'];
 if pos(1)+siz(1) > res(1), pos(1) = res(1)-siz(1)-10; end
 if pos(2)+siz(2) > res(2)-130, pos(2) = min(pos(2), 50); end
 set(fh, 'Toolbar', 'none', 'Menubar', 'none', 'Renderer', 'opengl', ...
@@ -479,6 +490,7 @@ uimenu(h, 'Label', 'Load custom LUT', 'Callback', cb('custom'));
 h_savefig = uimenu(h, 'Label', 'Save figure as');
 h_saveas = uimenu(h, 'Label', 'Save NIfTI as');
 uimenu(h, 'Label', 'Save volume as ...', 'Callback', cb('saveVolume'));
+uimenu(h, 'Label', 'Crop below crosshair', 'Callback', cb('cropNeck'));
 uimenu(h, 'Label', 'Create ROI file ...', 'Callback', cb('ROI'));
 uimenu(h, 'Label', 'Close window', 'Accelerator', 'W', 'Callback', 'close gcf');
 
@@ -820,6 +832,8 @@ switch cmd
         nam(~isstrprop(nam, 'alphanum')) = '_'; % make it valid for var name
         nam = [nam '_' cmd];
         nam = strrep(nam, '__', '_');
+        n = numel(nam); nm = namelengthmax;
+        if n>nm, nam(nm-4:n-4) = ''; end
         assignin('base', nam, hdr);
         evalin('base', ['open ' nam]);
     case 'cross' % show/hide crosshairs and RAS labels
@@ -1163,6 +1177,29 @@ switch cmd
         b = xyzr2roi(c, r, nii.hdr);        
         nii.img = single(b); % single better supported by FSL
         nii_tool('save', nii, fname);
+    case 'cropNeck'
+        k0 = get(hs.ijk(3), 'Value') - 1;
+        jf = hs.files.getSelectedIndex+1;
+        nam = hs.scroll.UserData(jf).fname;
+        pName = fileparts(nam);
+        [fname, pName] = uiputfile([pName '/*.nii;*.nii.gz'], ...
+            'Input file name to save cropped image');
+        if ~ischar(fname), return; end
+        fname = fullfile(pName, fname);
+        
+        dim = single(hs.q{jf}.nii.hdr.dim(2:4));
+        [j, i, k] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
+        ijk = [i(:) j(:) k(:)]'-1; ijk(4,:) = 1; % ijk in 4 by nVox
+        R = nii_xform_mat(hs.q{jf}.nii.hdr, hs.form_code); % original R
+        k = hs.q{hs.iback}.R \ (R * ijk); % background ijk
+        
+        nii = nii_tool('load', nam);
+        dim = size(nii.img);
+        n = prod(dim(1:3));
+        nii.img = reshape(nii.img, [n prod(dim)/n]);
+        nii.img(k(3,:)<k0, :) = 0;
+        nii.img = reshape(nii.img, dim);
+        nii_tool('save', nii, fname);
     otherwise
         error('Unknown Callback: %s', cmd);
 end
@@ -1259,7 +1296,6 @@ try
     if ispc || ismac % DropAction==2 if no Modifier pressed
         ctlDn = evt.DropAction==1; % java.awt.dnd.DnDConstants.ACTION_COPY
     else % for linux, DropAction==1 if no Modifier pressed or control pressed
-        % java_robot(fh, 'key');
         java_robot(fh, {'key' 'click'});
         ctlDn = strcmp(get(fh, 'SelectionType'), 'alt') || ...
                 any(strcmpi(fh.UserData, 'control'));
@@ -1473,9 +1509,22 @@ else
 
     % Silently use another background R_back matching overlay: very rare
     if frm>0 && frm ~= hs.form_code(1) && any(frm == hs.form_code)
-        R = nii_xform_mat(hs.q{hs.iback}.nii.hdr, frm); % img re-orient already done
+        R = nii_xform_mat(hs.q{hs.iback}.nii.hdr, frm); % img alreay re-oriented
         R_back = reorient(R, hs.q{hs.iback}.nii.hdr.dim(2:4));
-    elseif frm ~= hs.form_code(1)
+    elseif frm==0 && isequal(q.nii.hdr.dim(2:4), hs.q{hs.iback}.nii.hdr.dim(2:4))
+        q.R = hs.q{hs.iback}.R; % best guess: use background xform
+        q.perm = hs.q{hs.iback}.perm;
+        q.nii.img = permute(q.nii.img, [q.perm 4:8]);
+        for i = 1:3
+            if q.flip(i) ~= hs.q{hs.iback}.flip(i)
+                q.nii.img = flipdim(q.nii.img, i); %#ok
+            end
+        end
+        q.flip = hs.q{hs.iback}.flip;
+        warndlg(['There is no valid coordinate system for the overlay. ' ...
+         'The viewer supposes the same coordinate as the background.'], ...
+         'Transform Inconsistent');
+    elseif ~any(frm == hs.form_code)
         warndlg(['There is no matching coordinate system between the overlay ' ...
          'image and the background image. The overlay is likely meaningless.'], ...
          'Transform Inconsistent');
@@ -1584,14 +1633,15 @@ set_cdata(hs);
 set_xyz(hs);
 
 %% Reorient 4x4 R
-function [R, perm, flp] = reorient(R, dim)
+function [R, perm, flp] = reorient(R, dim, leftHand)
 a = abs(R(1:3,1:3));
 [~, ixyz] = max(a);
 if ixyz(2) == ixyz(1), a(ixyz(2),2) = 0; [~, ixyz(2)] = max(a(:,2)); end
 if any(ixyz(3) == ixyz(1:2)), ixyz(3) = setdiff(1:3, ixyz(1:2)); end
 [~, perm] = sort(ixyz);
 R(:,1:3) = R(:,perm);
-flp = R([1 6 11]) < 0;
+flp = R([1 6 11]) < 0; % diag(R(1:3, 1:3))
+if nargin>2 && leftHand, flp(1) = ~flp(1); end
 rotM = diag([1-flp*2 1]);
 rotM(1:3, 4) = (dim(perm)-1) .* flp; % 0 or dim-1
 R = R / rotM; % xform matrix after flip
@@ -1616,15 +1666,17 @@ if nargin<2, ask_code = []; end
 [q.R, frm] = nii_xform_mat(q.nii.hdr, ask_code);
 dim = dim(1:3);
 q.pixdim = q.nii.hdr.pixdim(2:4);
-q.flip = false(1,3);
 if nargin<3 || reOri
-    [q.R, perm, q.flip] = reorient(q.R, dim);
-    if ~isequal(perm, 1:3)
-        dim = dim(perm);
-        q.pixdim = q.pixdim(perm);
-        q.nii.img = permute(q.nii.img, [perm 4:8]);
+    [q.R, q.perm, q.flip] = reorient(q.R, dim);
+    if ~isequal(q.perm, 1:3)
+        dim = dim(q.perm);
+        q.pixdim = q.pixdim(q.perm);
+        q.nii.img = permute(q.nii.img, [q.perm 4:8]);
     end
     for i = 1:3, if q.flip(i), q.nii.img = flipdim(q.nii.img, i); end; end %#ok
+else
+    q.perm = 1:3;
+    q.flip = false(1,3);
 end
 if size(q.nii.img,4)<4 && ~isfloat(q.nii.img)
     q.nii.img = single(q.nii.img); 
@@ -1660,7 +1712,7 @@ if q.nii.hdr.intent_code == 1002 % Label
     end
 end
 
-img = q.nii.img(:,:,:,1,1,1,1,1);
+img = q.nii.img(:,:,:,1);
 if ~isreal(img), img = abs(img); end
 if ~isfloat(img)
     img = single(img) * q.nii.hdr.scl_slope + q.nii.hdr.scl_inter;
@@ -1676,35 +1728,41 @@ else
     rg = get_range(img);
 end
 
-%% Return xform mat and form_code: form_code may have two if no valid ask_code
+%% Return xform mat and form_code: form_code may have two if not to ask_code
 function [R, frm] = nii_xform_mat(hdr, ask_code)
-c = [hdr.sform_code hdr.qform_code];
-f = c(c>=1 & c<=4); f(mod(f,1)>0) = []; % 1/2/3/4 only
-if isempty(f) || ~strncmp(hdr.magic, 'n', 1) % make up R for Analyze file
-    R = [diag(hdr.pixdim(2:4)) -(hdr.dim(2:4).*hdr.pixdim(2:4)/2)'; 0 0 0 1];
-    R(1,:) = -R(1,:); % left handed?
+fs = [hdr.sform_code hdr.qform_code]; % sform preferred
+if fs(1)==fs(2), fs = fs(1); end % sform if both are the same
+f = fs(fs>=1 & fs<=4); % 1/2/3/4 only
+if isempty(f) || ~strncmp(hdr.magic, 'n', 1) % treat it as Analyze
     frm = 0;
+    try % try spm style Analyze
+        [pth, nam, ext] = fileparts(hdr.file_name);
+        if strcmpi(ext, '.gz'), [~, nam] = fileparts(nam); end
+        R = load(fullfile(pth, [nam '.mat']));
+        R = R.M;
+    catch % make up R for Analyze: suppose xyz order with left storage 
+        R = [diag(hdr.pixdim(2:4)) -(hdr.dim(2:4).*hdr.pixdim(2:4)/2)'; 0 0 0 1];
+        R(1,:) = -R(1,:); % use left handed
+    end
     return;
 end
-useS = true; frm = c(1);
-if nargin<2 || isempty(ask_code)
-    if c(1)<1 && c(2)>0, frm = c(2); useS = false; end
-    if all(c>0) && c(1)~=c(2), frm(2) = c(c~=frm); end % return 2 frm code
-elseif numel(ask_code) == 1
-    if c(1)~=ask_code && c(2)==ask_code, frm = c(2); useS = false; end
-elseif numel(ask_code) == 2
-    if c(1)~=ask_code(1) && ... 
-          (c(2)==ask_code(1) || (c(1)~=ask_code(2) && c(2)==ask_code(2)))
-        frm = c(2); useS = false;
-    end
+
+if numel(f)==1 || nargin<2 || isempty(ask_code) % only 1 avail or no ask_code
+    frm = f;
+else % numel(f) is 2, numel(ask_code) can be 1 or 2
+    frm = f(f == ask_code(1));
+    if isempty(frm) && numel(ask_code)>1, frm = f(f == ask_code(2)); end
+    if isempty(frm), frm = f(1); end % no match to ask_code, use sform
 end
-if useS
+
+if frm(1) == fs(1) % match sform_code or no match
     R = [hdr.srow_x; hdr.srow_y; hdr.srow_z; 0 0 0 1];
-else % use qform
+else % match qform_code
     b = hdr.quatern_b;
     c = hdr.quatern_c;
     d = hdr.quatern_d;
     a = sqrt(1-b*b-c*c-d*d);
+    if ~isreal(a), a = 0; end % avoid complex due to precision
     R = [1-2*(c*c+d*d)  2*(b*c-d*a)     2*(b*d+c*a);
          2*(b*c+d*a)    1-2*(b*b+d*d)   2*(c*d-b*a);
          2*(b*d-c*a )   2*(c*d+b*a)     1-2*(b*b+c*c)];
@@ -1714,8 +1772,8 @@ else % use qform
 end
 
 %% Create java SpinnerNumber
-% h = java_spinner(pos_1x4, [val min max step], parent, callback, fmt, helpTxt)
 function h = java_spinner(pos, val, parent, callback, fmt, helpTxt)
+% val: [curVal min max step]
 mdl = javax.swing.SpinnerNumberModel(val(1), val(2), val(3), val(4));
 % jSpinner = javax.swing.JSpinner(mdl);
 jSpinner = com.mathworks.mwswing.MJSpinner(mdl);
@@ -1727,19 +1785,21 @@ h.setFont(java.awt.Font('Tahoma', 0, 11));
 
 %% estimate intensity for lower and upper bound of display
 function rg = get_range(img)
+img = img(:);
+img(isnan(img) | isinf(img)) = [];
 if size(img,8)>2
-    if max(img(:))>2, rg = [0 255];
+    if max(img)>2, rg = [0 255];
     else rg = [0 1];
     end
     return;
 end
-ind = abs(img(:))>50;
-if sum(ind)<numel(img)/10, ind = abs(img(:))>std(img(:))/2; end
+ind = abs(img)>50;
+if sum(ind)<numel(img)/10, ind = abs(img)>std(img)/2; end
 im = img(ind);
 mn = mean(im);
 sd = std(im);
 rg = mn + [-2 2]*sd;
-mi = min(img(:)); ma = max(img(:));
+mi = min(img); ma = max(img);
 if rg(1)<=0 && mn-sd>0, rg(1) = sd/5; end
 if rg(1)<mi || isnan(rg(1)), rg(1) = mi; end
 if rg(2)>ma || isnan(rg(2)), rg(2) = ma; end
@@ -2836,15 +2896,15 @@ for i = 1:3
 end
 
 %% java robot key press and/or click at hs.ax(4)
-function java_robot(fh, key)
+function java_robot(fh, action)
 oldState = pause('on');
 rob = java.awt.Robot();
-if any(strcmp(key, 'key'))
+if any(strcmp(action, 'key'))
     dummy = java.awt.event.KeyEvent.VK_SHIFT; % a key with no effect on fig
     drawnow; rob.keyPress(dummy); rob.delay(20); rob.keyRelease(dummy);
     pause(0.05); drawnow; % fire KeyPressFnc to set fh.UserData
 end
-if any(strcmp(key, 'click'))
+if any(strcmp(action, 'click'))
     mousexy = get(0, 'PointerLocation'); % for later restore
     posF = getpixelposition(fh);
     hs = guidata(fh);

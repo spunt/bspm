@@ -52,16 +52,13 @@ function varargout = nii_tool(cmd, varargin)
 % 
 % - Initialize nii struct based on img, normally 3D or 4D array. Most fields in
 % the returned nii.hdr contain default values, and need to be updated based on
-% dicom or other information. Important ones include pixdim and s/qform_code and
+% dicom or other information. Important ones include pixdim, s/qform_code and
 % related parameters.
 % 
 % The NIfTI datatype will depend on data type of img. Most Matlab data types are
 % supported, including 8/16/32/64 bit signed and unsigned integers, single and
 % double floating numbers. Single/double complex and logical array are also
 % supported.
-% 
-% NII_TOOL returns img with the same data type as it is stored, while numeric
-% values in hdr are in double regardless the data type in the file.
 % 
 % The optional third input is needed only if img contains RGB/RGBA data. It
 % specifies which dimension in img encodes for RGB or RGBA. In other words, if a
@@ -130,6 +127,9 @@ function varargout = nii_tool(cmd, varargin)
 % - Load NIfTI file into nii struct. The returned struct includes NIfTI 'hdr'
 % and 'img', as well as 'ext' if the file contains NIfTI extension.
 % 
+% NII_TOOL returns nii.img with the same data type as stored in the file, while
+% numeric values in hdr are in double precision for convenience.
+% 
 % 
 % NII_TOOL('save', nii, filename, force_3D);
 % 
@@ -168,8 +168,8 @@ function varargout = nii_tool(cmd, varargin)
 % volume order is based on alphabetical order of file names.
 % 
 % Note that the files to be concatenated must have the same datatype, dim, voxel
-% size, scaling slope and intercept, transformation matrix, etc. This is true if
-% files are for the same dicom series. 
+% size, scaling slope and intercept, transformation matrix, etc. This is
+% normally true if files are for the same dicom series.
 % 
 % Following example shows how to convert a series of 3D files into a 4D file:
 % 
@@ -236,7 +236,7 @@ function varargout = nii_tool(cmd, varargin)
 % 150321 swapbytes(nByte) for ecode=40 with big endian
 % 150401 Add 'default' to set/query version and rgb_dim default setting
 % 150514 read_ext: decode txt edata by dicm2nii.m
-% 150517 fhandle: provide a way to use gunzipOS etc from outside
+% 150517 func_handle: provide a way to use gunzipOS etc from outside
 % 150617 auto detect rgb_dim 1&3 for 'load' etc using ChrisR method
 % 151025 Change subfunc img2datatype as 'update' for outside access
 % 151109 Include dd.win (exe) from WinAVR-20100110 for partial gz unzip
@@ -247,6 +247,10 @@ function varargout = nii_tool(cmd, varargin)
 % 160326 fix setpref for older Octave: set each parameter separately.
 % 160531 fopen uses 'W' for 'w': performance benefit according to Yair.
 % 160701 subFuncHelp: bug fix for mfile case.
+% 161018 gunzipOS: use unique name for outName, to avoid problem with parfor.
+% 161025 make included linux pigz executible; fix "dd" for windows.
+% 161031 gunzip_mem(), nii_bytes() for hdr/ext read: read uint8 then parse;
+%        Replace hdr.machine with hdr.swap_endian.
 
 persistent C para; % C columns: name, length, format, value, offset
 if isempty(C)
@@ -443,54 +447,62 @@ elseif strcmpi(cmd, 'hdr')
     end
     
     fname = nii_name(varargin{1}, '.hdr'); % get .hdr if it is .img
-    if numel(fname)>7 && strcmpi(fname((-6:0)+end), '.nii.gz')
-        bytes = 544; % do full gunzip for .hdr.gz
-    else
-        bytes = [];
-    end
-
-    [fid, clnObj, niiVer] = fopen_nii(fname, [], bytes); %#ok<ASGLU>
-    varargout{1} = read_hdr(fid, niiVer, C, fname);
+    [b, fname] = nii_bytes(fname, 600); % v2: 544+10 gzip header
+    varargout{1} = read_hdr(b, C, fname);
    
-elseif any(strcmpi(cmd, {'ext' 'img' 'load'})) 
+elseif any(strcmpi(cmd, {'img' 'load'})) 
     if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
-    if ischar(varargin{1})
+    
+    if ischar(varargin{1}) % file name input
         fname = nii_name(varargin{1}, '.hdr');
+        nii = struct;
     elseif isstruct(varargin{1}) && isfield(varargin{1}, 'file_name')
-        fname = varargin{1}.file_name;
+        nii.hdr = varargin{1};
+        fname = nii.hdr.file_name;
     else        
         error(['nii_tool(''%s'') needs a file name or hdr struct from ' ...
             'nii_tool(''hdr'') as second input'], cmd); 
     end
     
-    [fid, clnObj, niiVer, isNii] = fopen_nii(fname); %#ok<ASGLU>
-    nii.hdr = read_hdr(fid, niiVer, C, fname);
-    
-    if strcmpi(cmd, 'ext') || strcmpi(cmd, 'load') 
-        if ~isempty(nii.hdr.extension) && nii.hdr.extension(1)
-            nii.ext = read_ext(fid, nii.hdr);
-            if strcmpi(cmd, 'ext')
-                varargout{1} = nii.ext;
-                return; 
-            end
-        elseif strcmpi(cmd, 'ext')
-            varargout{1} = []; 
-            return; 
-        end
+    if strcmpi(cmd, 'load')
+    	[ext, nii.hdr] = nii_tool('ext', varargin{1});
+        if ~isempty(ext), nii.ext = ext; end
+    elseif ~isfield(nii, 'hdr')
+    	nii.hdr = nii_tool('hdr', fname);        
+    end
+
+    nii.img = read_img(nii.hdr, para);
+    if strcmpi(cmd, 'load')
+        varargout{1} = nii;
+    else % img
+        varargout{1} = nii.img;
     end
     
-    if strcmpi(cmd, 'load') || strcmpi(cmd, 'img')
-        if ~isNii % close .hdr file, and open .img file
-            fname = nii_name(fname, '.img');
-            [fid, clnObj] = fopen_nii(fname, nii.hdr.machine); %#ok
-        end
-        nii.img = read_img(fid, nii.hdr, para);
-        if strcmpi(cmd, 'img')
-            varargout{1} = nii.img;
-        else % load
-            varargout{1} = nii;
-        end
+elseif strcmpi(cmd, 'ext') 
+    if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
+    
+    if ischar(varargin{1}) % file name input
+        fname = nii_name(varargin{1}, '.hdr');
+        hdr = nii_tool('hdr', fname);
+    elseif isstruct(varargin{1}) && isfield(varargin{1}, 'file_name')
+        hdr = varargin{1};
+        fname = hdr.file_name;
+    else        
+        error(['nii_tool(''%s'') needs a file name or hdr struct from ' ...
+            'nii_tool(''hdr'') as second input'], cmd); 
     end
+    
+    if isempty(hdr.extension) || hdr.extension(1)==0
+        varargout{1} = [];
+    else
+        if hdr.vox_offset>0, nByte = hdr.vox_offset + 64; % .nii arbituary +64
+        else nByte = inf;
+        end
+        b = nii_bytes(fname, nByte);
+        varargout{1} = read_ext(b, hdr);
+    end
+    if nargout>1, varargout{2} = hdr; end
+    
 elseif strcmpi(cmd, 'RGBStyle')
     styles = {'afni' '' 'mricron' 'fsl'};
     curStyle = styles{para.rgb_dim};
@@ -508,6 +520,7 @@ elseif strcmpi(cmd, 'RGBStyle')
     end
     if nargout, varargout{1} = curStyle; end % return old one
     para.rgb_dim = irgb; % no save to pref
+    
 elseif strcmpi(cmd, 'cat3D')
     if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     fnames = varargin{1};
@@ -527,6 +540,7 @@ elseif strcmpi(cmd, 'cat3D')
     % For now, omit all consistence check between files
     for i = 2:n, nii.img(:,:,:,i) = nii_tool('img', fnames{i}); end
     varargout{1} = nii_tool('update', nii); % update dim
+    
 elseif strcmpi(cmd, 'default')
     flds = {'version' 'rgb_dim'}; % may add more in the future
     pf = getpref('nii_tool_para');
@@ -543,6 +557,7 @@ elseif strcmpi(cmd, 'default')
         setpref('nii_tool_para', flds{ind}, in2.(nam{i}));
     end
     if val.version ~= para.version, C = niiHeader(para.version); end
+    
 elseif strcmpi(cmd, 'update') % old img2datatype subfunction
     if nargin<2, error('nii_tool(''%s'') needs second input', cmd); end
     nii = varargin{1};
@@ -603,7 +618,7 @@ elseif strcmpi(cmd, 'update') % old img2datatype subfunction
     varargout{1} = nii;
     if nargout>1, varargout{2} = fmt; end
 elseif strcmpi(cmd, 'func_handle') % make a local function avail to outside 
-    varargout{1} = eval(['@' varargin{1}]);
+    varargout{1} = str2func(varargin{1});
 else
     error('Invalid command for nii_tool: %s', cmd);
 end
@@ -745,7 +760,7 @@ para.version  = niiVer;
 
 %% Subfunction: use pigz or system gzip if available (faster)
 function gzipOS(fname)
-persistent cmd; % command to run gzip
+persistent cmd; % command to gzip
 if isempty(cmd)
     cmd = check_gzip;
     if ischar(cmd)
@@ -757,7 +772,7 @@ if isempty(cmd)
 end
 
 if islogical(cmd)
-    if cmd, gzip(fname); delete(fname); end
+    if cmd, gzip(fname); deleteFile(fname); end
     return;
 end
 if ispc
@@ -789,6 +804,9 @@ elseif ispc % rename back pigz for Windows. Renamed to trick Matlab Central
             movefile(fname, [m_dir '\pthreadGC2.dll'], 'f');
         end
     end
+else % linux
+    [st, val] = fileattrib([m_dir '/pigz']);
+    if st && ~val.UserExecute, fileattrib([m_dir '/pigz'], '+x'); end
 end
 
 cmd = fullfile(m_dir, 'pigz');
@@ -808,6 +826,7 @@ end
     
 cmd = true; % use slower matlab gzip/gunzip
 
+%% check dd command, return empty if not available
 function dd = check_dd
 [err, ~] = system('dd --version 2>&1');
 if ~err, dd = 'dd'; return; end % dd with linix/mac, and maybe windows
@@ -818,14 +837,14 @@ if ispc % rename it as exe
     if exist(fname, 'file') % first time after download
         try movefile(fname, [m_dir '\dd.exe'], 'f'); catch, end
     end
-    dd = fullfile(m_dir, 'dd');
+    dd = ['"' fullfile(m_dir, 'dd') '"'];
     [err, ~] = system([dd ' --version 2>&1']);
-    if ~err, dd = ['"' dd '"']; return; end
+    if ~err, return; end
 end
 dd = '';
 
 %% Try to use in order of pigz, system gunzip, then matlab gunzip
-function outName = gunzipOS(fname, bytes)
+function outName = gunzipOS(fname, nByte)
 persistent cmd dd pth; % command to run gupzip, dd tool, and temp_path
 if isempty(cmd)
     cmd = check_gzip;
@@ -837,7 +856,7 @@ if isempty(cmd)
     dd = check_dd;
     if ~isempty(dd), dd = [' | ' dd ' count=']; end
     
-    if ispc % matlab tempdir could be slow to due to cd in and out
+    if ispc % matlab tempdir could be slow due to cd in and out
         pth = getenv('TEMP');
         if isempty(pth), pth = pwd; end
     else
@@ -851,70 +870,93 @@ if islogical(cmd)
     return;
 end
 
-[pth1, outName, ext] = fileparts(fname);
+[~, outName, ext] = fileparts(fname);
+uid = [datestr(now, 'yymmddHHMMSSfff') sprintf('_%06x', randi(1e7))];
+if strcmpi(ext, '.gz') % likely always true
+    [~, outName, ext1] = fileparts(outName);
+    outName = [outName uid ext1];
+else
+    outName = [outName uid];
+end
 outName = fullfile(pth, outName);
-if ~isempty(dd) && nargin>1 && ~isempty(bytes) % unzip only part of data
+if ~isempty(dd) && nargin>1 && ~isinf(nByte) % unzip only part of data
     try
-        n = num2str(ceil(bytes/512)); % 512: default ibs
-%         [err, str] = system([cmd 'c "' fname '"' dd n ' of="' outName '"']);
-%         if err==0 && isempty(strfind(str, 'error')), return; end
+        n = num2str(ceil(nByte/512)); % 512: default ibs
         [err, ~] = system([cmd 'c "' fname '"' dd n ' of="' outName '"']);
         if err==0, return; end
     catch
     end
 end
 
-if ~strcmp(pth1, pth), copyfile(fname, [outName ext], 'f'); end
+copyfile(fname, [outName ext], 'f');
 [err, str] = system([cmd ' "' outName ext '"']); % overwrite if exist
 if err, fprintf(2, 'Error during decompression:\n%s\n', str); end
 
+%% cast bytes into a type, swapbytes if needed
+function out = cast_swap(b, typ, swap)
+out = typecast(b, typ);
+if swap, out = swapbytes(out); end
+out = double(out); % for convenience
+
 %% subfunction: read hdr
-function hdr = read_hdr(fid, niiVer, C, fname)
-if niiVer>1, C = niiHeader(niiVer); end % C defaults for version 1
-fseek(fid, 0, 'bof');
-for i = 1:size(C,1)
-    hdr.(C{i,1}) = fread(fid, C{i,2}, C{i,3})';
-    if strcmp(C{i,3}, 'char*1')
-        hdr.(C{i,1}) = deblank(char(hdr.(C{i,1})));
+function hdr = read_hdr(b, C, fname)
+n = typecast(b(1:4), 'int32');
+if     n==348, niiVer = 1; swap = false;
+elseif n==540, niiVer = 2; swap = false;
+else
+    n = swapbytes(n);
+    if     n==348, niiVer = 1; swap = true;
+    elseif n==540, niiVer = 2; swap = true;
+    else error('Not valid NIfTI file: %s', fname);
     end
 end
 
-hdr.version = niiVer; % for 'save', unless user asks to change
-[~, ~, hdr.machine]= fopen(fid); % use it for .img file
-
-[pth, nam, ext] = fileparts(fname); % fname may be .gz
-if isempty(pth)
-    [pth, nam, ext] = fileparts(which(fname)); % in current folder or path
+if niiVer>1, C = niiHeader(niiVer); end % C defaults for version 1
+for i = 1:size(C,1)
+    try a = b(C{i,5}+1 : C{i+1,5}); 
+    catch
+        if C{i,5}==numel(b), a = [];
+        else a = b(C{i,5} + (1:C{i,2})); % last item extension is in bytes
+        end
+    end
+    if strcmp(C{i,3}, 'char*1')
+        a = deblank(char(a));
+    else
+        a = cast_swap(a, C{i,3}, swap);
+        a = double(a);
+    end
+    hdr.(C{i,1}) = a;
 end
-pth = fullfile(getfield(what(pth), 'path')); % full path
-hdr.file_name = fullfile(pth, [nam ext]); % fname with full path
+  
+hdr.version = niiVer; % for 'save', unless user asks to change
+hdr.swap_endian = swap;
+hdr.file_name = fname;
 
 %% subfunction: read ext, and decode it if known ecode
-function ext = read_ext(fid, hdr)
-ext = []; % to avoid error, such as no ext but hdr.extension(1) was set
+function ext = read_ext(b, hdr)
+ext = []; % avoid error if no ext but hdr.extension(1) was set
 nEnd = hdr.vox_offset;
-if nEnd == 0 % .hdr file
-    fseek(fid, 0, 'eof');
-    nEnd = ftell(fid); % total bytes of the .hdr file
-end
-fseek(fid, hdr.sizeof_hdr+4, 'bof'); % +4 skip hdr.extension
-i = 1; % nExt. It would be nice if hdr.extension(2) stores nExt
-while ftell(fid) < nEnd
-    esize = fread(fid, 1, 'int32'); % multiple of 16
-    if isempty(esize) || mod(esize,16), break; end % just to be safe
+if nEnd == 0, nEnd = numel(b); end % .hdr file
+
+swap = hdr.swap_endian;
+j = hdr.sizeof_hdr + 4; % 4 for hdr.extension
+while j < nEnd
+    esize = cast_swap(b(j+(1:4)), 'int32', swap); j = j+4; % x16
+    if isempty(esize) || mod(esize,16), return; end % just to be safe
+    i = numel(ext) + 1;
     ext(i).esize = esize; %#ok<*AGROW>
-    ext(i).ecode = fread(fid, 1, 'int32'); 
-    ext(i).edata = fread(fid, ext(i).esize-8, '*uint8'); % -8 for esize & ecode
+    ext(i).ecode = cast_swap(b(j+(1:4)), 'int32', swap); j = j+4; 
+    ext(i).edata = b(j+(1:esize-8))'; % -8 for esize & ecode
+    j = j + esize - 8;
 
     % Decode edata if we know ecode
     if ext(i).ecode == 40 % Matlab: any kind of matlab variable
-        nByte = typecast(ext(i).edata(1:4), 'int32'); % num of bytes of MAT data
-        if strcmp(hdr.machine, 'ieee-be'), nByte = swapbytes(nByte); end
+        nByte = cast_swap(ext(i).edata(1:4), 'int32', swap); % num of bytes of MAT data
         tmp = [tempname '.mat']; % temp MAT file to save edata
-        fid1 = fopen(tmp, 'w');
+        fid1 = fopen(tmp, 'W');
         fwrite(fid1, ext(i).edata(5:nByte+4)); % exclude padded zeros
         fclose(fid1);
-        deleteMat = onCleanup(@() delete(tmp)); % delete temp file after done
+        deleteMat = onCleanup(@() deleteFile(tmp)); % delete temp file after done
         ext(i).edata_decoded = load(tmp); % load into struct
     elseif ext(i).ecode == 6 % plain text
         str = char(ext(i).edata');
@@ -924,8 +966,8 @@ while ftell(fid) < nEnd
             ss = struct;
             ind = strfind(str, [';' char([0 10])]); % strsplit error in Octave
             ind = [-2 ind]; % -2+3=1: start of first para
-            for j = 1:numel(ind)-1
-                a = str(ind(j)+3 : ind(j+1));
+            for k = 1:numel(ind)-1
+                a = str(ind(k)+3 : ind(k+1));
                 a(a==0) = []; % to be safe. strtrim wont remove null
                 a = strtrim(a);
                 if isempty(a), continue; end
@@ -937,33 +979,27 @@ while ftell(fid) < nEnd
                 end
             end
             flds = fieldnames(ss); % make all vector column
-            for j = 1:numel(flds)
-                val = ss.(flds{j});
-                if isnumeric(val) && isrow(val), ss.(flds{j}) = val'; end
+            for k = 1:numel(flds)
+                val = ss.(flds{k});
+                if isnumeric(val) && isrow(val), ss.(flds{k}) = val'; end
             end
             ext(i).edata_decoded = ss;
         end
     elseif ext(i).ecode == 4 % AFNI
         ext(i).edata_decoded = deblank(char(ext(i).edata)');
     elseif ext(i).ecode == 2 % dicom
-        no_dicm_hdr = isempty(which('dicm_hdr'));
-        if no_dicm_hdr && isempty(which('dicominfo')), return; end 
         tmp = [tempname '.dcm'];
-        fid1 = fopen(tmp, 'w');
+        fid1 = fopen(tmp, 'W');
         fwrite(fid1, ext(i).edata);
         fclose(fid1);
-        deleteDcm = onCleanup(@() delete(tmp));
-        if no_dicm_hdr
-            ext(i).edata_decoded = dicominfo(tmp);
-        else
-            ext(i).edata_decoded = dicm_hdr(tmp);
-        end
+        deleteDcm = onCleanup(@() deleteFile(tmp));
+        ext(i).edata_decoded = dicm_hdr(tmp);
     end
-    i = i + 1;
 end
 
 %% subfunction: read img
-function img = read_img(fid, hdr, para)
+% memory gunzip may be slow and error for large img, so use file unzip
+function img = read_img(hdr, para)
 ind = para.datatype == hdr.datatype;
 if ~any(ind)
     error('Datatype %g is not supported by nii_tool.', hdr.datatype);
@@ -973,9 +1009,30 @@ dim = hdr.dim(2:8);
 dim(hdr.dim(1)+1:7) = 1; % avoid some error in file
 dim(dim<1) = 1;
 valpix = para.valpix(ind);
-n = prod(dim); % num of values
+n = prod(dim); % num of voxels
+
+fname = nii_name(hdr.file_name, '.img'); % in case of .hdr/.img pair
+fid = fopen(fname);
+sig = fread(fid, 2, '*uint8')';
+if isequal(sig, [31 139]) % .gz
+    fclose(fid);
+    fname = gunzipOS(fname);
+    cln = onCleanup(@() deleteFile(fname)); % delete gunzipped file
+    fid = fopen(fname);
+end
+
+if hdr.swap_endian % switch between LE and BE
+    [~, ~, ed] = fopen(fid); % default endian: almost always ieee-le
+    fclose(fid);
+    if isempty(strfind(ed, '-le')), ed = strrep(ed, '-be', '-le');
+    else ed = strrep(ed, '-le', '-be');
+    end
+    fid = fopen(fname, 'r', ed); % re-open with changed endian
+end
+
 fseek(fid, hdr.vox_offset, 'bof');
 img = fread(fid, n*valpix, ['*' para.format{ind}]); % * to keep original class
+fclose(fid);
 
 if any(hdr.datatype == [128 511 2304]) % RGB or RGBA
     a = reshape(single(img), valpix, n); % assume rgbrgbrgb...
@@ -995,8 +1052,9 @@ else % all others: valpix=1
     img = reshape(img, dim);
 end
 
-if (hdr.intent_code == 2003 && dim(5) == 3) || ...  % RGB triplet in 5th dim
-      (hdr.intent_code == 2004  && dim(5) == 4) % RGBA quadruplet in 5th dim
+% RGB triplet in 5th dim OR RGBA quadruplet in 5th dim
+c = hdr.intent_code;
+if (c == 2003 && dim(5) == 3) || (c == 2004  && dim(5) == 4) 
     img = permute(img, [1:4 6:8 5]);
 end
 
@@ -1013,68 +1071,17 @@ if ~strcmpi(e, '.hdr') && ~strcmpi(e, '.img')
     error(['Invalid NIfTI file name: ' fname]); 
 end
 fname(n+(-3:0)) = ext; % if not return or error, change it
- 
-%% fopen NIfTI file, check endian, niiVer and nii/hdr by 'magic' for header file
-% clnObj takes care of fclose(fid) and delete(fopen(fid)) if isGz 
-function [fid, clnObj, niiVer, isNii] = fopen_nii(fname, endian, bytes)
-if nargin<2 || isempty(endian), endian = 'ieee-le'; end % only useful for .img
-[fid, err] = fopen(fname, 'r', endian);
+
+%% Read NIfTI file as bytes, gunzip if needed, but ignore endian
+function [b, fname] = nii_bytes(fname, nByte)
+if nargin<2, nByte = inf; end
+[fid, err] = fopen(fname); % system default endian
 if fid<1, error([err ': ' fname]); end
-
-n = fread(fid, 4, '*uint8')'; % sizeof_hdr or signature
-isGz = isequal(n(1:2), [31 139]); % gz, tgz, tar file
-fnameIn = fname; % for error msg
-if isGz
-    if nargin<3, bytes = []; end
-    fclose(fid); % close .gz file
-    fname = gunzipOS(fname, bytes); % guzipped file, return unzipped fname
-    fid = fopen(fname, 'r', endian);
-    n = fread(fid, 4, '*uint8')';
-end
-
-if nargout<3 % must return here for .img
-    clnObj = onCleanup(@()closeFile(fid, isGz));
-    return;
-end
-
-% NIfTI: isBigEndian = dim(1)<0 || dim(1)>7; 
-if isequal(n, [92 1 0 0]) % LE 348, nifti 1 
-    niiVer = 1;
-elseif isequal(n, [0 0 1 92]) % BE 348, nifti 1
-    niiVer = 1;
-    fclose(fid);
-    fid = fopen(fname, 'r', 'ieee-be');
-elseif isequal(n, [28 2 0 0]) % LE 540, nifti 2
-    niiVer = 2;
-elseif isequal(n, [0 0 2 28]) % BE 540, nifti 2
-    niiVer = 2;
-    fclose(fid);
-    fid = fopen(fname, 'r', 'ieee-be');
-else
-    fclose(fid);
-    error('Not valid NIfTI file: %s', fnameIn);
-end
-clnObj = onCleanup(@()closeFile(fid, isGz)); % return it to auto-close file
-
-if niiVer == 1, fseek(fid, 344, 'bof'); end
-magic = fread(fid, 3, '*char')';
-vStr = num2str(niiVer);
-if strcmp(magic, ['n+' vStr])
-    isNii = true;
-elseif strcmp(magic, ['ni' vStr])
-    isNii = false;
-else % likely Analyze format. Use file ext for nii detection
-    isNii = strcmpi(fname(end+(-3:0)), '.nii');
-end
-
-%% fclose and delete ungzipped file if isGz
-function closeFile(fid, isGz)
-if isGz % close fid then delete tmp
-    fname = fopen(fid); % ungzipped file
-    fclose(fid);
-    delete(fname);
-else % only close fid
-    fclose(fid);
+b = fread(fid, nByte, '*uint8')';
+fname = fopen(fid);
+fclose(fid);
+if isequal(b(1:2), [31 139]) % gz, tgz file
+    b = gunzip_mem(b, fname, nByte)';
 end
 
 %% subfunction: get help for a command
@@ -1154,4 +1161,41 @@ end
 
 % if we reach here, no subcmd found in syntax
 fprintf(2, ' Unknown command for %s: %s\n', mfile, subcmd);
+
+%% gunzip bytes in memory if possible. 2nd/3rd input for fallback file gunzip
+% Trick: try-block avoid error for partial file unzip.
+function bytes = gunzip_mem(gz_bytes, fname, nByte)
+bytes = [];
+try
+    bais = java.io.ByteArrayInputStream(gz_bytes);
+    gzis = java.util.zip.GZIPInputStream(bais);
+    buff = java.io.ByteArrayOutputStream;
+    try org.apache.commons.io.IOUtils.copy(gzis, buff); end %#ok
+    gzis.close;
+    bytes = typecast(buff.toByteArray, 'uint8'); % faster than uint8()
+catch
+    if nargin<3 || isempty(nByte), nByte = inf; end
+    if nargin<2 || isempty(fname)
+        fname = [tempname '.gz']; % temp gz file
+        fid = fopen(fname, 'W');
+        if fid<0, return; end
+        cln = onCleanup(@() deleteFile(fname)); % delete temp gz file
+        fwrite(fid, gz_bytes, 'uint8');
+        fclose(fid);
+    end
+    
+    try %#ok
+        fname = gunzipOS(fname, nByte);
+        fid = fopen(fname);
+        bytes = fread(fid, nByte, '*uint8');
+        fclose(fid);
+        deleteFile(fname); % unzipped file
+    end
+end
+
+%% Delete file in background
+function deleteFile(fname)
+if ispc, system(['start "" /B del "' fname '"']);
+else system(['rm "' fname '" &']);
+end
 %%
