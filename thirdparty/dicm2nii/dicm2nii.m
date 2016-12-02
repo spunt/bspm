@@ -342,6 +342,7 @@ function varargout = dicm2nii(src, niiFolder, fmt)
 % 160901 Put pref onto GUI. 
 % 160920 Convert series with variable Rescale slope/inter.
 % 160921 Quick bug fix introduced on 160920: slope/inter applied for 2nd+ files.
+% 161129 Bug fix for irregular slice order in Philips multiframe dicm.
 
 % TODO: need testing files to figure out following parameters:
 %    flag for MOCO series for GE/Philips
@@ -785,7 +786,7 @@ for i = 1:nRun
                 img = reshape(img, dim);
             end
         end
-        % fix weird slice ordering for PAR (seen) and multiframe
+        % fix weird slice ordering for PAR and multiframe
         if isfield(s, 'SliceNumber'), img(:,:,s.SliceNumber,:) = img; end
     end
 
@@ -1322,6 +1323,8 @@ end
 %% Subfunction, Convert 3x3 direction cosine matrix to quaternion
 % Simplied from Quaternions by Przemyslaw Baranski 
 function [q, proper] = dcm2quat(R)
+% [q, proper] = dcm2quat(R)
+% Retrun quaternion abcd from normalized matrix R (3x3)
 proper = sign(det(R)); % always -1 if flip_dim1
 if proper<0, R(:,3) = -R(:,3); end
 
@@ -1833,15 +1836,15 @@ if ~isfield(s, 'LocationsInAcquisition') % use all frames
     s2 = struct(fld, nan(3, nFrame));
     s2 = dicm_hdr(s, s2, 1:nFrame);
     iSL = xform_mat(s);
-    ipp = s2.(fld)(iSL(3),:)';
-    [err, s.LocationsInAcquisition, sliceN] = checkImagePosition(ipp);
+    ipp = s2.(fld)';
+    [err, s.LocationsInAcquisition, sliceN] = checkImagePosition(ipp(:,iSL(3)));
     if ~isempty(err)
         errorLog([err ' for "' s.Filename '". Series skipped.']);
         s = []; return; % skip
     end
 end
 
-% Lastly check whether weird slice ordering: only seen in PAR though
+% Lastly check whether weird slice ordering: seen in PAR & dicom
 nSL = double(s.LocationsInAcquisition);
 i = MF_val('SliceNumberMR', s, 1); % Philips
 if ~isempty(i) 
@@ -1849,22 +1852,21 @@ if ~isempty(i)
     if isequal(i, [1 nSL]) || isequal(i, [nSL 1]), return; end % not 100% safe
 end
 
-if tryGetField(s, 'Dim3IsVolume', false)
-    iFrame = 1:(nFrame/nSL):nFrame;
-else
-    iFrame = 1:nSL;
+if tryGetField(s, 'Dim3IsVolume', false), iFrame = 1:(nFrame/nSL):nFrame;
+else iFrame = 1:nSL;
 end
 if ~exist('sliceN', 'var') % save time if done by checkImagePosition
-    s2 = struct(fld, nan(3, nFrame));
-    s2 = dicm_hdr(s, s2, 1:nFrame);
+    s2 = struct(fld, nan(3, nSL));
+    s2 = dicm_hdr(s, s2, iFrame);
     ipp = s2.(fld)';
     iSL = xform_mat(s);
     [~, sliceN] = sort(ipp(:,iSL(3)));
 end
-if any(diff(sliceN, 2)>0) % just avoid accident
+if any(diff(sliceN, 2)>0)
     s.SliceNumber = sliceN; % will be used to re-order img
-    s.(fld) = MF_val(fld, s2, iFrame(sliceN==1));
-    s.LastFile.(fld) = MF_val(fld, s2, iFrame(sliceN==nSL));
+    if size(ipp,1)>nSL, ipp = ipp(iFrame,:); end % all frames
+    s.(fld) = ipp(sliceN==1,:)';
+    s.LastFile.(fld) = ipp(sliceN==nSL,:)';
 end
 
 %% subfunction: return value from Shared or PerFrame FunctionalGroupsSequence
@@ -1980,7 +1982,7 @@ fclose(fid);
 %% Get the last date string in history
 function dStr = reviseDate(mfile)
 if nargin<1, mfile = mfilename; end
-dStr = '160927?';
+dStr = '161129?';
 fid = fopen(which(mfile));
 if fid<1, return; end
 str = fread(fid, '*char')';
@@ -2393,12 +2395,12 @@ warndlg(['Package updated successfully. Please restart ' mfile ...
 % 4VA25A phase image. Then we check EchoColumnPosition in CSA, and if it is
 % greater than half of the slice dim, sSliceArray.lSize is used as nMos. If no
 % CSA at all, the better way may be to peek into img to get nMos. Then the first
-% atempt is to check whether there is padded zeros. If so we count zeros either
+% attempt is to check whether there is padded zeros. If so we count zeros either
 % at top or bottom of the img to decide real slice dim. In case there is no
 % padded zeros, we use the single zero lines along phase dir seen in most (not
 % all) mosaic. If the lines are equally spaced, and nMos is divisible by mosaic
 % dim, we accept nMos. Otherwise, we fall back to NumberOfPhaseEncodingSteps,
-% which is used by dcm2nii, but is not accurate for most mosaic due to partial
+% which is used by dcm2nii, but is not reliable for most mosaic due to partial
 % fourier or less 100% phase fov.
 function nMos = nMosaic(s)
 nMos = csa_header(s, 'NumberOfImagesInMosaic');
@@ -2422,7 +2424,7 @@ end
 
 % The fix below is for dicom labeled as \MOSAIC in ImageType, but no CSA.
 if ~isType(s, '\MOSAIC'), return; end % non-Siemens returns here
-nMos = tryGetField(s, 'LocationsInAcquisition');
+nMos = tryGetField(s, 'LocationsInAcquisition'); % Siemens regular private tag
 if ~isempty(nMos), return; end
 
 dim = double([s.Columns s.Rows]); % slice or mosaic dim

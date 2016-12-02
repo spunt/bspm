@@ -33,7 +33,7 @@ function img = dicm_img(s, xpose)
 % 150404 Add 'if' block for numeric s.PixelData (BVfile). 
 % 160114 cast s.PixelData.Bytes to double (thx DavidR). 
 % 160127 support big endian files. 
-% 160521 support dicom wiht BitsStored~=HighBit+1 (tkx RayL).
+% 160521 support dicom with BitsStored~=HighBit+1 (tkx RayL).
 
 persistent flds dict;
 if isempty(flds), flds = {'Columns' 'Rows' 'BitsAllocated'}; end

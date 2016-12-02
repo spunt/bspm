@@ -147,44 +147,48 @@ if ~iscell(target)
     end
 end
 
-dim = single(hdr.dim(2:4));
-[Y, X, Z] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
-I = [X(:) Y(:) Z(:)]'-1; I(4,:) = 1; % template ijk
+d = single(hdr.dim(2:4));
+I = ones([d 4], 'single');
+[I(:,:,:,1), I(:,:,:,2), I(:,:,:,3)] = ndgrid(0:d(1)-1, 0:d(2)-1, 0:d(3)-1);
+I = permute(I, [4 1 2 3]);
+I = reshape(I, [4 prod(d)]);  % template ijk
 if exist('warp_img_fsl', 'var')
-    warp_img_fsl = reshape(warp_img_fsl, [prod(dim) 3])';
+    warp_img_fsl = reshape(warp_img_fsl, [prod(d) 3])';
     if det(R0(1:3,1:3))<0, warp_img_fsl(1,:) = -warp_img_fsl(1,:); end % correct?
     warp_img_fsl(4,:) = 0;
     I = R \ (R0 * I + warp_img_fsl) + 1; % ijk+1 (fraction) in source
 else
     I = R \ (R0 * I) + 1; % ijk+1 (fraction) in source
 end
-clear X Y Z;
-I = reshape(I(1:3,:)', [dim 3]);
+I = reshape(I(1:3,:)', [d 3]);
 
-d47 = nii.hdr.dim(5:8);
-d47(d47<1 | d47>32767) = 1;
+d48 = size(nii.img); % in case of RGB
+d48(numel(d48)+1:4) = 1; d48(1:3) = [];
 if islogical(nii.img)
     img = nii.img;
-    nii.img = false([dim d47]);
+    nii.img = false([d d48]);
     intrp = 'nearest'; missVal = 0;
 elseif strcmp(intrp, 'nearest')
     img = nii.img;
-    nii.img = zeros([dim d47], class(img)); %#ok
+    nii.img = zeros([d d48], class(img)); %#ok
 else
     img = single(nii.img);
-    nii.img = zeros([dim d47], 'single');
+    nii.img = zeros([d d48], 'single');
 end
-d8 = size(img, 8); % in case of RGB
-for i8=1:d8; for i7=1:d47(4); for i6=1:d47(3); for i5=1:d47(2); for i4=1:d47(1) %#ok
-    nii.img(:,:,:,i4,i5,i6,i7,i8) = interp3(img(:,:,:,i4,i5,i6,i7,i8), ...
-        I(:,:,:,2), I(:,:,:,1), I(:,:,:,3), intrp, missVal);
-end; end; end; end; end
+for i = 1:prod(d48)
+    nii.img(:,:,:,i) = interp3(img(:,:,:,i), I(:,:,:,2), I(:,:,:,1), I(:,:,:,3), intrp, missVal);
+end
+
+% for i8 = 1:d48(5); for i7=1:d48(4); for i6=1:d48(3); for i5=1:d48(2); for i4=1:d48(1) %#ok
+%     nii.img(:,:,:,i4,i5,i6,i7,i8) = interp3(img(:,:,:,i4,i5,i6,i7,i8), ...
+%         I(:,:,:,2), I(:,:,:,1), I(:,:,:,3), intrp, missVal);
+% end; end; end; end; end
 
 % copy xform info from template to rst nii
 nii.hdr.pixdim(1:4) = hdr.pixdim(1:4);
 flds = {'qform_code' 'sform_code' 'srow_x' 'srow_y' 'srow_z' ...
     'quatern_b' 'quatern_c' 'quatern_d' 'qoffset_x' 'qoffset_y' 'qoffset_z'};
-for i=1:numel(flds), nii.hdr.(flds{i}) = hdr.(flds{i}); end
+for i = 1:numel(flds), nii.hdr.(flds{i}) = hdr.(flds{i}); end
 
 if ~isempty(rst), nii_tool('save', nii, rst); end
 if nargout || isempty(rst), varargout{1} = nii_tool('update', nii); end

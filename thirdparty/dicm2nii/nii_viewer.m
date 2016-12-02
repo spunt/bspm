@@ -266,6 +266,7 @@ if nargin<1
 end
 
 [hs.q{1}, hs.form_code, rg, dim] = read_nii(fname);
+hs.q{1}.Ri = inv(hs.q{1}.R);
 nVol = size(hs.q{1}.nii.img, 4);
 hs.pixdim = hs.q{1}.pixdim;
 
@@ -299,7 +300,7 @@ p.smooth = false;
 p.interp = 1; % nearest
 p.volume = 1; % first volume
 
-hs.dim = single(dim); % single may save a lot memory for meshgrid
+hs.dim = single(dim); % single may save a lot memory for ndgrid
 hs.siz = siz; % image panel size
 hs.gap = min(hs.pixdim) ./ hs.pixdim * 3; % in unit of smallest pixdim
 
@@ -1187,18 +1188,20 @@ switch cmd
         if ~ischar(fname), return; end
         fname = fullfile(pName, fname);
         
-        dim = single(hs.q{jf}.nii.hdr.dim(2:4));
-        [j, i, k] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
-        ijk = [i(:) j(:) k(:)]'-1; ijk(4,:) = 1; % ijk in 4 by nVox
+        d = single(hs.q{jf}.nii.hdr.dim(2:4));
+        I = ones([d 4], 'single');
+        [I(:,:,:,1), I(:,:,:,2), I(:,:,:,3)] = ndgrid(0:d(1)-1, 0:d(2)-1, 0:d(3)-1);
+        I = permute(I, [4 1 2 3]);
+        I = reshape(I, [4 prod(d)]); % ijk in 4 by nVox
         R = nii_xform_mat(hs.q{jf}.nii.hdr, hs.form_code); % original R
-        k = hs.q{hs.iback}.R \ (R * ijk); % background ijk
+        k = hs.q{hs.iback}.Ri * R * I; % background ijk
         
         nii = nii_tool('load', nam);
-        dim = size(nii.img);
-        n = prod(dim(1:3));
-        nii.img = reshape(nii.img, [n prod(dim)/n]);
+        d = size(nii.img);
+        n = prod(d(1:3));
+        nii.img = reshape(nii.img, [n prod(d)/n]);
         nii.img(k(3,:)<k0, :) = 0;
-        nii.img = reshape(nii.img, dim);
+        nii.img = reshape(nii.img, d);
         nii_tool('save', nii, fname);
     otherwise
         error('Unknown Callback: %s', cmd);
@@ -1362,41 +1365,43 @@ for i = 1:numel(p)
         if ind<1 || ind>hs.dim(ix), continue; end
         ii = {':' ':' ':'};
         io = ii;
-        dim = hs.dim;
-        dim(ix) = 1; % 1 slice at dim ix
-        im = zeros([dim dim4], 'single');
+        d = hs.dim;
+        d(ix) = 1; % 1 slice at dim ix
+        im = zeros([d dim4], 'single');
         
         if isfield(hs.q{i}, 'R0') % interp, maybe smooth
-            [Y, X, Z] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
-            I = [X(:) Y(:) Z(:)]' - 1; % ijk grids of background img
-            I(ix,:) = ind-1; I(4,:) = 1;
+            I = ones([d 4], 'single');
+            [I(:,:,:,1), I(:,:,:,2), I(:,:,:,3)] = ndgrid(0:d(1)-1, 0:d(2)-1, 0:d(3)-1);
+            I = permute(I, [4 1 2 3]);
+            I = reshape(I, [4 prod(d)]); % ijk grids of background img
+            I(ix,:) = ind-1;
             
             if isfield(hs.q{i}, 'warp')
                 iw = {':' ':' ':' ':'}; iw{ix} = ind;
                 warp = hs.q{i}.warp(iw{:});
-                warp = reshape(warp, [prod(dim) 3])'; warp(4,:) = 0;
-                I = hs.q{i}.R \ (hs.q{i}.R0 * I + warp) + 1;
+                warp = reshape(warp, [prod(d) 3])'; warp(4,:) = 0;
+                I = hs.q{i}.Ri * (hs.q{i}.R0 * I + warp) + 1;
             else
-                I = hs.q{i}.R \ (hs.q{i}.R0 * I) + 1; % ijk+1 for overlay img
+                I = hs.q{i}.Ri * hs.q{i}.R0 * I + 1; % ijk+1 for overlay img
             end
             
             for j = 1:dim4
                 if p(i).smooth
                     ns = 3; % number of voxels (odd) used for smooth
-                    d3 = dim; d3(ix) = ns; % e.g. 3 slices
+                    d3 = d; d3(ix) = ns; % e.g. 3 slices
                     b = zeros(d3, 'single');
                     I0 = I(1:3,:);
                     for k = 1:ns % interp for each slice
                         I0(ix,:) = I(ix,:) - (ns+1)/2 + k;
                         a = interp3a(img(:,:,:,j), I0, interStr{p(i).interp});
-                        ii{ix} = k; b(ii{:}) = reshape(a, dim);
+                        ii{ix} = k; b(ii{:}) = reshape(a, d);
                     end
                     b = smooth23(b, 'gaussian', ns);
                     io{ix} = (ns+1)/2;
                     im(:,:,:,j) = b(io{:}); % middle one
                 else
                     a = interp3a(img(:,:,:,j), I, interStr{p(i).interp});
-                    im(:,:,:,j) = reshape(a, dim);
+                    im(:,:,:,j) = reshape(a, d);
                 end
             end
         elseif p(i).smooth % smooth only
@@ -1524,7 +1529,7 @@ else
         warndlg(['There is no valid coordinate system for the overlay. ' ...
          'The viewer supposes the same coordinate as the background.'], ...
          'Transform Inconsistent');
-    elseif ~any(frm == hs.form_code)
+    elseif frm ~= 2 && ~any(frm == hs.form_code)
         warndlg(['There is no matching coordinate system between the overlay ' ...
          'image and the background image. The overlay is likely meaningless.'], ...
          'Transform Inconsistent');
@@ -1556,6 +1561,7 @@ ii = [1 6 11 13:15]; % diag and offset: avoid huge ratio due to small value
 if ~isequal(hs.dim, dim) || any(abs(R_back(ii)./q.R(ii)-1) > 0.01)
     q.R0 = R_back;
 end
+q.Ri = inv(q.R);
 
 if ~isreal(q.nii.img)
     q.phase = angle(q.nii.img); % -pi to pi
@@ -1567,8 +1573,7 @@ end
 p = hs.scroll.UserData;
 n = numel(p);
 p(2:n+1) = p(1:n);
-hs.q(2:n+1) = hs.q(1:n);
-hs.q{1} = q;
+hs.q = [{q} hs.q];
 
 % duplicate image obj for overlay: will be at top
 p(1).hsI = copyimg(hs);
@@ -1634,6 +1639,13 @@ set_xyz(hs);
 
 %% Reorient 4x4 R
 function [R, perm, flp] = reorient(R, dim, leftHand)
+% [R, perm, flip] = reorient(R, dim, leftHand)
+% Re-orient transformation matrix R (4x4), so it will be diagonal major and
+% positive at diagonal, unless the optional third input is true, which requires
+% left-handed matrix, where R(1,1) will be negative.
+% The second input, the img space dimension (1x3), is needed. The perm output,
+% like [1 2 3] or a permutation of it, indicates if input R was permuted for 3
+% axis. The third output, flip
 a = abs(R(1:3,1:3));
 [~, ixyz] = max(a);
 if ixyz(2) == ixyz(1), a(ixyz(2),2) = 0; [~, ixyz(2)] = max(a(:,2)); end
@@ -1678,6 +1690,7 @@ else
     q.perm = 1:3;
     q.flip = false(1,3);
 end
+
 if size(q.nii.img,4)<4 && ~isfloat(q.nii.img)
     q.nii.img = single(q.nii.img); 
 end
@@ -1730,6 +1743,11 @@ end
 
 %% Return xform mat and form_code: form_code may have two if not to ask_code
 function [R, frm] = nii_xform_mat(hdr, ask_code)
+% [R, form] = nii_xform_mat(hdr, asked_code);
+% Return the transformation matrix from a NIfti hdr. By default, this returns
+% the sform if available. If the optional second input, required form code, is
+% provided, this will try to return matrix for that form code. The second
+% optional output returns the form code for the matrix.
 fs = [hdr.sform_code hdr.qform_code]; % sform preferred
 if fs(1)==fs(2), fs = fs(1); end % sform if both are the same
 f = fs(fs>=1 & fs<=4); % 1/2/3/4 only
@@ -1752,6 +1770,7 @@ if numel(f)==1 || nargin<2 || isempty(ask_code) % only 1 avail or no ask_code
 else % numel(f) is 2, numel(ask_code) can be 1 or 2
     frm = f(f == ask_code(1));
     if isempty(frm) && numel(ask_code)>1, frm = f(f == ask_code(2)); end
+    if isempty(frm) && any(f==2), frm = 2; end % use confusing code 2
     if isempty(frm), frm = f(1); end % no match to ask_code, use sform
 end
 
@@ -1804,6 +1823,7 @@ if rg(1)<=0 && mn-sd>0, rg(1) = sd/5; end
 if rg(1)<mi || isnan(rg(1)), rg(1) = mi; end
 if rg(2)>ma || isnan(rg(2)), rg(2) = ma; end
 if rg(1)==rg(2), rg(1) = mi; end
+% rg = round(rg, 2, 'significant'); % since 2014b
 rg = str2num(sprintf('%.2g ', rg)); %#ok<*ST2NM>
 if rg(1)==rg(2), rg(1) = mi; end
 if abs(rg(1))>10, rg(1) = floor(rg(1)/2)*2; end % even number
@@ -1812,7 +1832,7 @@ if abs(rg(2))>10, rg(2) = ceil(rg(2)/2)*2; end % even number
 %% Draw vector lines, called by set_cdata
 function vector_lines(hs, i, iaxis)
 p = hs.scroll.UserData;
-dim = single(size(hs.q{i}.nii.img));
+d = single(size(hs.q{i}.nii.img));
 if strcmpi(get(p(i).hsI(1), 'Type'), 'image') % just switched to "lines"
     delete(p(i).hsI);
     lut = hs.lut.UserData; % last lut
@@ -1828,10 +1848,12 @@ if strcmpi(get(p(i).hsI(1), 'Type'), 'image') % just switched to "lines"
     hs.scroll.UserData = p;
     
     if isfield(hs.q{i}, 'R0') && ~isfield(hs.q{i}, 'ivec')
-        [Y, X, Z] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
-        I = [X(:) Y(:) Z(:)]' - 1; I(4,:) = 1;
+        I = ones([d(1:3) 4], 'single');
+        [I(:,:,:,1), I(:,:,:,2), I(:,:,:,3)] = ndgrid(0:d(1)-1, 0:d(2)-1, 0:d(3)-1);
+        I = permute(I, [4 1 2 3]);
+        I = reshape(I, [4 prod(d(1:3))]);
         I = hs.q{i}.R0 \ (hs.q{i}.R * I) + 1;
-        hs.q{i}.ivec = reshape(I(1:3,:)', dim);
+        hs.q{i}.ivec = reshape(I(1:3,:)', d);
 
         R0 = hs.q{i}.R0(1:3, 1:3);
         R0 = bsxfun(@rdivide, R0, sqrt(sum(R0.^2)));
@@ -1857,9 +1879,9 @@ if any(abs(diff(hs.q{hs.iback}.pixdim))>1e-4) % non isovoxel background
 end
 
 if isfield(hs.q{i}, 'Rvec')
-    img = reshape(img, [prod(dim(1:3)) dim(4)]);
+    img = reshape(img, [prod(d(1:3)) d(4)]);
     img = img * hs.q{i}.Rvec;
-    img = reshape(img, dim);
+    img = reshape(img, d);
 end
 
 for ix = iaxis
@@ -1869,9 +1891,9 @@ for ix = iaxis
         I = abs(hs.q{i}.ivec(:,:,:,ix) - I);
         [~, I] = min(I, [], ix);
         
-        ii = {1:dim(1) 1:dim(2) 1:dim(3)};
+        ii = {1:d(1) 1:d(2) 1:d(3)};
         ii{ix} = single(1);
-        [ii{2}, ii{1}, ii{3}] = meshgrid(ii{[2 1 3]});
+        [ii{1}, ii{2}, ii{3}] = ndgrid(ii{:});
         ii{ix} = single(I);
         io = {':' ':' ':' ':'}; io{ix} = 1;
         im = img(io{:});
@@ -1879,14 +1901,14 @@ for ix = iaxis
             im(:,:,:,k) = interp3(img(:,:,:,j(k)), ii{[2 1 3]}, 'nearest');
         end
     
-        ind = sub2ind(dim(1:3), ii{:});
+        ind = sub2ind(d(1:3), ii{:});
         X = hs.q{i}.ivec(:,:,:,j(1)); X = permute(X(ind), [j([2 1]) ix]);
         Y = hs.q{i}.ivec(:,:,:,j(2)); Y = permute(Y(ind), [j([2 1]) ix]);    
     else
         ii = {':' ':' ':'};
         ii{ix} = I;
         im = img(ii{:}, j);
-        [X, Y] = meshgrid(1:dim(j(1)), 1:dim(j(2)));
+        [Y, X] = ndgrid(1:d(j(2)), 1:d(j(1)));
     end
     
     im = permute(im, [j([2 1]) 4 ix]);
@@ -2109,6 +2131,10 @@ end
 
 %% Simple version of interp3
 function V = interp3a(V, I, method)
+% V = interp3a(V, I, 'linear');
+% This is similar to interp3 from Matlab, but takes care of the Matlab version
+% issue, and the input is simplified for coordinate. The coordinate input are in
+% this way: I(1,:), I(2,:) and I(3,:) are for x, y and z. 
 persistent v;
 if isempty(v)
     try 
@@ -2137,6 +2163,9 @@ end
 
 %% 2D/3D smooth wrapper: no input check for 2D
 function out = smooth23(in, method, n, varargin)
+% out = smooth23(in, method, n, varargin)
+% This works the same as smooth3 from Matlab, except it also works if the input
+% is 2D.
 if size(in,3)>1, out = smooth3(in, method, n, varargin{:}); return; end
 if nargin<3 || isempty(n), n = 3; end
 if numel(n)==1, n = [n n]; end
@@ -2149,7 +2178,7 @@ elseif strcmp(method, 'gaussian')
     if nargin<4 || isempty(varargin{1}), sd = 0.65; 
     else sd = varargin{1}; 
     end
-    [x, y] = meshgrid(-k(2):k(2), -k(1):k(1));
+    [x, y] = ndgrid(-k(1):k(1), -k(2):k(2));
     kernal = exp(-(x.*x  +  y.*y) / (2*sd*sd));
     kernal = kernal / sum(kernal(:));
 else
@@ -2178,9 +2207,9 @@ for i = 1:numel(p) % show top one first
     if isfield(hs.q{i}, 'R0') % need interpolation
         if isfield(hs.q{i}, 'warp')
             warp = hs.q{i}.warp(I(1), I(2), I(3), :);
-            I0 = hs.q{i}.R \ (hs.q{i}.R0 * [I-1 1]' + [warp(:); 0]);
+            I0 = hs.q{i}.Ri * (hs.q{i}.R0 * [I-1 1]' + [warp(:); 0]);
         else
-            I0 = hs.q{i}.R \ (hs.q{i}.R0 * [I-1 1]'); % overlay ijk
+            I0 = hs.q{i}.Ri * hs.q{i}.R0 * [I-1 1]'; % overlay ijk
         end
         I0 = round(I0(1:3)+1);
     else I0 = I;
@@ -2213,12 +2242,18 @@ end
 hs.value.String = str;
 
 %% nii essentials
-function s = nii_essential(q)
-hdr = q.nii.hdr;
-s.FileName = hdr.file_name;
-if isfield(q, 'mask_info'), s.MaskedBy = q.mask_info; end
-if isfield(q, 'modulation_info'), s.ModulatdBy = q.modulation_info; end
-if isfield(q, 'alignMtx'), s.AlignMatrix = q.alignMtx; end
+function s = nii_essential(hdr)
+% info = nii_essential(hdr);
+% Decode important NIfTI hdr into struct info, which is human readable.
+if isfield(hdr, 'nii') % q input by nii_viewer
+    s.FileName = hdr.nii.hdr.file_name;
+    if isfield(hdr, 'mask_info'), s.MaskedBy = hdr.mask_info; end
+    if isfield(hdr, 'modulation_info'), s.ModulatdBy = hdr.modulation_info; end
+    if isfield(hdr, 'alignMtx'), s.AlignMatrix = hdr.alignMtx; end
+    hdr = hdr.nii.hdr;
+else
+    s.FileName = hdr.file_name;
+end
 switch hdr.intent_code
     case 2, s.intent = 'Correlation'; s.DoF = hdr.intent_p1;
     case 3, s.intent = 'T-test';      s.DoF = hdr.intent_p1;
@@ -2460,6 +2495,7 @@ res = res(end,1:2) + res(end,3:4) - res(1,1:2);
 %% estimate StepSize for java spinner
 function d = stepSize(val)
 d = abs(val/10);
+% d = round(d, 1, 'significant');
 d = str2double(sprintf('%.1g', d));
 d = max(d, 0.01);
 if d>4, d = round(d/2)*2; end
@@ -2495,10 +2531,13 @@ if all(isfield(hs.q{i}, {'R0' 'alignMtx'})) % background as mask
     if all(abs(R1(:)-hs.q{i}.R0(:))<1e-4), R0 = hs.q{i}.R; end % not 100% safe
 end
 
-dim = single(size(hs.q{i}.nii.img)); % dim for reoriented img
-dim(numel(dim)+1:3) = 1; dim = dim(1:3);
-[Y, X, Z] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
-I = [X(:) Y(:) Z(:)]'-1; I(4,:) = 1;
+d = single(size(hs.q{i}.nii.img)); % dim for reoriented img
+d(numel(d)+1:3) = 1; d = d(1:3);
+
+I = ones([d 4], 'single');
+[I(:,:,:,1), I(:,:,:,2), I(:,:,:,3)] = ndgrid(0:d(1)-1, 0:d(2)-1, 0:d(3)-1);
+I = permute(I, [4 1 2 3]);
+I = reshape(I, [4 prod(d)]); % ijk grids of background img
 I = R \ (R0 * I) + 1; % ijk+1 for mask
 I = round(I * 100) / 100;
 
@@ -2508,7 +2547,7 @@ if slope==0, slope = 1; end
 im = im * slope + nii.hdr.scl_inter;
 im = interp3a(im, I, 'nearest');
 im1 = im(~isnan(im)); % for threshold computation
-im = reshape(im, dim);
+im = reshape(im, d);
 
 if strcmp(get(h, 'Label'), 'Apply mask'); % binary mask
     if numel(unique(im1))<3
@@ -2870,20 +2909,27 @@ end
 
 %% Return binary sphere ROI from xyz and r (mm)
 function b = xyzr2roi(c, r, hdr)
-dim = single(hdr.dim(2:4));
-[j, i, k] = meshgrid(1:dim(2), 1:dim(1), 1:dim(3));
-d = [i(:) j(:) k(:)]'-1; d(4,:) = 1; % ijk in 4 by nVox
+% ROI_img = xyzr2roi(center, radius, hdr)
+% Return an ROI img based on the dim info in NIfTI hdr. The center and radius
+% are in unit of mm. 
+d = single(hdr.dim(2:4));
+I = ones([d 4], 'single');
+[I(:,:,:,1), I(:,:,:,2), I(:,:,:,3)] = ndgrid(0:d(1)-1, 0:d(2)-1, 0:d(3)-1);
+I = permute(I, [4 1 2 3]);
+I = reshape(I, [4 prod(d)]); % ijk in 4 by nVox
 R = nii_xform_mat(hdr);
-d = R * d; % xyz in 4 by nVox
+I = R * I; % xyz in 4 by nVox
 
-d = bsxfun(@minus, d(1:3,:), c(:)); % dist in x y z direction from center
-d = sum(d .* d); % dist to center squared, 1 by nVox
+I = bsxfun(@minus, I(1:3,:), c(:)); % dist in x y z direction from center
+I = sum(I .* I); % dist to center squared, 1 by nVox
 
-b = d <= r*r; % within sphere
-b = reshape(b, dim);
+b = I <= r*r; % within sphere
+b = reshape(b, d);
 
 %% Return center of gravity of an image
 function c = img_cog(img)
+% center_ijk = img_cog(img)
+% Return the index of center of gravity in the input img (must be 3D).
 img(isnan(img)) = 0;
 img = double(abs(img));
 gs = sum(img(:));

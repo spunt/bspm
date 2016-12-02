@@ -1,4 +1,4 @@
-function varargout = nii_stc(in, out, timing)
+function varargout = nii_stc(nii, out, timing)
 % Perform slice timing correction to the input NIfTI data.
 % 
 % Syntax:
@@ -41,12 +41,9 @@ if ~toSave && nargout<1
     toSave = true;
 end
 
-if ischar(in) % file name
-    nii = nii_tool('load', in);
-elseif isstruct(in) && all(isfield(in, {'hdr' 'img'}))
-    nii = in;
-else
-    error('Input must be nii struct or nii file name.');
+if ischar(nii), nii = nii_tool('load', nii); end % file name
+if ~isstruct(nii) || ~all(isfield(nii, {'hdr' 'img'}))
+    error('Input must be nii struct or existing nii file name.');
 end
 
 nSL = nii.hdr.dim(4);

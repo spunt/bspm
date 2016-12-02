@@ -80,6 +80,7 @@ function [s, info, dict] = dicm_hdr(fname, dict, iFrames)
 % 160825 can read dcm without PixelData, by faking p.iPixelData=fSize+1.
 % 160829 no make-up SeriesNumber/InstanceUID in afni_head/philips_par/bv_file.
 % 160928 philips_par: fix para table ind; treat type 17 as phase img. Thx SS.
+% 161130 check i+n-1<=p.iPixelData in search method to avoid error. Thx xLei.
 
 persistent dict_full;
 s = []; info = '';
@@ -229,6 +230,7 @@ if toSearch % search each tag if header is short and not many tags asked
         [n, nvr] = val_len(vr, b8(i+(0:5)), hasVR, swap); i = i+nvr;
         if n==0, continue; end % dont assign empty tag
 
+        if i+n-1>p.iPixelData, break; end
         [dat, info] = read_val(b8(i+(0:n-1)), vr, swap);
         if ~isempty(info), toSearch = false; break; end % re-do in regular way
         if ~isempty(dat), s1.(p.dict.name{k}) = dat; end
