@@ -22,6 +22,7 @@ DOONEOUTZSCORE = false;
 def = { 'dvars_thresh',     2.5,  ...
         'framewise_thresh', 0.5,  ...
         'include_rp',       1,    ...
+        'makeplot',         0,    ...
         'prefix',           'badscan', ...
         'maskfile',         []};
 vals = setargs(def, varargin);
@@ -38,10 +39,10 @@ maskthresh  = 0.8;
 [v,h]       = bnii_read(epi, 'reshape', 1);
 [nvox nvol] = size(v);
 if isempty(maskfile)
-    v(v < repmat(mean(v)*maskthresh, nvox, 1)) = 0;
+    v(v < repmat(mean(v)*maskthresh, nvox, 1)) = NaN;
 else
     m = bspm_reslice(maskfile, strcat(epi, ',1'), 0, 1);
-    v(m(:)==0,:) = 0; 
+    v(m(:)==0,:) = NaN; 
 end
 cfg.vol     = reshape(v, h.dim(2:5));
 
@@ -57,7 +58,7 @@ framewise(2:end)    = max(abs(diff(rp)), [], 2);
 
 % | use BRAMILA tools to compute dvars and framewise displacement
 fprintf('\n | - Identifying Scans with DVARS > %2.2f and framewise displacement > %2.2f\n', dvars_thresh, framewise_thresh);
-cfg.plot            = 0;
+cfg.plot            = makeplot;
 dvars               = bramila_dvars(cfg);
 
 % | get indices of bad timepoints

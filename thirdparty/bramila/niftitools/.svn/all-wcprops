@@ -1,0 +1,233 @@
+K 25
+svn:wc:ra_dav:version-url
+V 33
+/svn/!svn/ver/20/trunk/niftitools
+END
+make_ana.m
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/20/trunk/niftitools/make_ana.m
+END
+view_nii_menu.m
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/20/trunk/niftitools/view_nii_menu.m
+END
+unxform_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/!svn/ver/20/trunk/niftitools/unxform_nii.m
+END
+load_untouch0_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/!svn/ver/20/trunk/niftitools/load_untouch0_nii_hdr.m
+END
+bresenham_line3d.m
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/20/trunk/niftitools/bresenham_line3d.m
+END
+license.txt
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/20/trunk/niftitools/license.txt
+END
+mat_into_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/20/trunk/niftitools/mat_into_hdr.m
+END
+load_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/20/trunk/niftitools/load_nii_hdr.m
+END
+rri_orient.m
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/20/trunk/niftitools/rri_orient.m
+END
+load_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/20/trunk/niftitools/load_nii.m
+END
+extra_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/20/trunk/niftitools/extra_nii_hdr.m
+END
+load_untouch_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/!svn/ver/20/trunk/niftitools/load_untouch_nii_hdr.m
+END
+load_untouch_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/20/trunk/niftitools/load_untouch_nii.m
+END
+rri_zoom_menu.m
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/20/trunk/niftitools/rri_zoom_menu.m
+END
+reslice_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/!svn/ver/20/trunk/niftitools/reslice_nii.m
+END
+rri_xhair.m
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/20/trunk/niftitools/rri_xhair.m
+END
+bipolar.m
+K 25
+svn:wc:ra_dav:version-url
+V 43
+/svn/!svn/ver/20/trunk/niftitools/bipolar.m
+END
+xform_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/20/trunk/niftitools/xform_nii.m
+END
+save_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/20/trunk/niftitools/save_nii_hdr.m
+END
+save_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/20/trunk/niftitools/save_nii.m
+END
+load_nii_ext.m
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/20/trunk/niftitools/load_nii_ext.m
+END
+save_untouch_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/!svn/ver/20/trunk/niftitools/save_untouch_nii_hdr.m
+END
+examples.txt
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/20/trunk/niftitools/examples.txt
+END
+save_untouch_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/20/trunk/niftitools/save_untouch_nii.m
+END
+collapse_nii_scan.m
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/!svn/ver/20/trunk/niftitools/collapse_nii_scan.m
+END
+rri_orient_ui.m
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/20/trunk/niftitools/rri_orient_ui.m
+END
+view_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/20/trunk/niftitools/view_nii.m
+END
+load_nii_img.m
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/20/trunk/niftitools/load_nii_img.m
+END
+make_nii.m
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/20/trunk/niftitools/make_nii.m
+END
+save_nii_ext.m
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/20/trunk/niftitools/save_nii_ext.m
+END
+load_untouch_nii_img.m
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/!svn/ver/20/trunk/niftitools/load_untouch_nii_img.m
+END
+save_untouch0_nii_hdr.m
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/!svn/ver/20/trunk/niftitools/save_untouch0_nii_hdr.m
+END
+rri_file_menu.m
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/20/trunk/niftitools/rri_file_menu.m
+END
+expand_nii_scan.m
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/!svn/ver/20/trunk/niftitools/expand_nii_scan.m
+END
+verify_nii_ext.m
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/!svn/ver/20/trunk/niftitools/verify_nii_ext.m
+END
+flip_lr.m
+K 25
+svn:wc:ra_dav:version-url
+V 43
+/svn/!svn/ver/20/trunk/niftitools/flip_lr.m
+END
+affine.m
+K 25
+svn:wc:ra_dav:version-url
+V 42
+/svn/!svn/ver/20/trunk/niftitools/affine.m
+END
+get_nii_frame.m
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/20/trunk/niftitools/get_nii_frame.m
+END

@@ -1,7 +1,7 @@
 function overlap = bspm_save_count_map(images, heightThresh, sizeThresh, outname, pctflag)
 % BSPM_SAVE_COUNT_MAP
 %
-% USAGE: bspm_save_count_map(images, heightThresh, sizeThresh, outname)
+% USAGE: bspm_save_count_map(images, heightThresh, sizeThresh, outname, pctflag)
 %
 %   ARGUMENTS
 %       images:             input image name (full path if not in current directory)

@@ -52,7 +52,7 @@ def = { ...
 'ylab',                 'Percent Signal Change'             , ...
 	};
 vals = setargs(def, varargin);
-if nargin < 4, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
+if nargin < 3, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
 
 % | CHECK REQUIRED INPUTS
 % | ======================================================================================
