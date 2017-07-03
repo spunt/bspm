@@ -15,7 +15,7 @@ defaults = {
           'armethod',    2,                                                  ...
           'basename',    'LOI_SOCNS_lis8w3',                                 ...
           'behavid',     'lois_*mat',                                        ...
-          'brainmask',   bspm_greymask,                                      ...
+          'brainmask',   bspm_brainmask,                                      ...
           'epifname',    [],                                                 ...
           'epipat',      'w3bua*nii',                                        ...
           'fcontrast',   0,                                                  ...
@@ -121,7 +121,7 @@ for s = 1:length(subdir)
         % | =====================================================================
         b = get_behavior(behav{r}, model, yesnokeys);
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
-        
+
         % | Sort by condlabel so betas refer to same block for all subjects
         % | =====================================================================
         data = [b.condlabels num2cell(b.blockwise)];
@@ -186,13 +186,17 @@ for s = 1:length(subdir)
     % | ========================================================================
     ncond   = length(b.condlabels);
     cond    = b.blockwise(:,2)';
-    w1      = (ismember(cond, [1 2 3]) - ismember(cond, [4 5 6]))/3;
     w2      = (ismember(cond, [1]) - ismember(cond, [4]));
     w3      = (ismember(cond, [2]) - ismember(cond, [5]));
     w4      = (ismember(cond, [3]) - ismember(cond, [6]));
-    weights = [w1; w2; w3; w4];
+    w1      = (ismember(cond, [2 3]) - ismember(cond, [5 6]));
+    w       = [w1; w2; w3; w4];
+    wpos = w; wpos(w<0) = 0;
+    wscale = sum(wpos, 2);
+    w = w./repmat(wscale, 1, size(w, 2));
+    weights = w;
     ncon    = size(weights,1);
-    conname = {'Why_-_How' 'NS_Why_-_How' 'Face_Why_-_How' 'Hand_Why_-_How'};
+    conname = {'NS_Why_-_How' 'Face_Why_-_How' 'Hand_Why_-_How' 'SOC_Why_-_How'};
     for c = 1:ncon
         contrasts(c).type       = 'T';
         contrasts(c).weights    = weights(c,:);
@@ -206,6 +210,7 @@ for s = 1:length(subdir)
 
     % | Make Job
     % | ========================================================================
+    allinput{s} = bspm_level1(images, general_info, runs, contrasts);
 
     % | Cleanup Workspace
     % | ========================================================================
@@ -252,7 +257,7 @@ if ismember({'result'},fieldnames(d))
 else
     data        = d.trialSeeker;
     blockwise   = d.blockSeeker;
-    questions   = d.ordered_questions; 
+    questions   = d.ordered_questions;
 end
 strrm = {'Is the photo ' 'Is it a result of a ' 'Is it a result of ' 'Is it going to result in a ' 'Is the person '};
 for i = 1:length(strrm)
@@ -260,7 +265,7 @@ for i = 1:length(strrm)
 end
 questions = regexprep(questions, ' ', '_');
 questions = regexprep(questions, '?', '');
-questions = regexprep(questions, '-', '_'); 
+questions = regexprep(questions, '-', '_');
 
 % | blockwise accuracy and durations
 % | ========================================================================
@@ -293,7 +298,7 @@ err = blockwise(:,5);
 b.condlabels = strcat(upper(qcond), '-', upper(questions), '-', num2str(rt), 'ms', '-', num2str(err), 'error');
 b.condlabels = regexprep(b.condlabels, ' ', '');
 b.blockwise = blockwise;
-    
+
 b.varlabels = {'Block' 'Cond' 'Onset' 'Duration' 'Total_Errors' 'Foil_Errors'};
 end
 function mfile_showhelp(varargin)

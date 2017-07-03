@@ -43,7 +43,7 @@ matlabbatch{1}.spm.tools.dartel.mni_norm.preserve = 0;
 matlabbatch{1}.spm.tools.dartel.mni_norm.fwhm = fwhm;
 
 if nargout==0
-    spm_jobman('initcfg'); spm_jobman('run',matlabbatch);
+    bspm_runbatch(matlabbatch);
     for s = 1:nsubs
         cc = cnames{s};
         basename = sprintf('%s/s%dw%d', analysisdirs{s}, fwhm(1), voxsize(1));
@@ -53,7 +53,7 @@ if nargout==0
             h = spm_vol(wim{i});
             d = spm_read_vols(h);
             h.descrip = cc{i};
-            [p n e] = fileparts(wim{i});
+            [p, n, e] = fileparts(wim{i});
             h.fname = regexprep(h.fname, 'sw', sprintf('s%dw%d', fwhm(1), voxsize(1)));
             spm_write_vol(h, d);
         end

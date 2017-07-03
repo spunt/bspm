@@ -25,7 +25,7 @@ defaults = {
             'brainmask',        bspm_greymask,  ...
             'model',            'LSS',          ...
             'fcontrast',        0,              ...
-            'maskthresh',       0.25,            ...
+            'maskthresh',       0.25,           ...
             'nskip',            4,              ...
             'runtest',          0,              ...
             'is4D',             1,              ...
@@ -120,7 +120,7 @@ for s = 1:length(subdir)
 
     % | General Information
     % | ========================================================================
-    
+
     general_info.is4D               = is4D;
     general_info.TR                 = TR;
     general_info.hpf                = HPF;
@@ -140,14 +140,14 @@ for s = 1:length(subdir)
         % | =====================================================================
         b = get_behavior(behav{r}, model, yesnokeys);
         b.blockwise(:,3) = b.blockwise(:,3) - adjons;
-        
+
         % | Sort by condlabel so betas refer to same block for all subjects
         % | =====================================================================
         data = [b.condlabels num2cell(b.blockwise)];
         data = sortrows(data, -1);
         b.condlabels = data(:,1);
         b.blockwise = cell2mat(data(:,2:end));
-        blockwisedirs = fullfile(analysisdir, b.condlabels); 
+        blockwisedirs = fullfile(analysisdir, b.condlabels);
         cellfun(@mkdir, blockwisedirs);
         % | Columns for b.blockwise
         % | =====================================================================
@@ -160,14 +160,14 @@ for s = 1:length(subdir)
 
         % | Conditions
         % | =====================================================================
-        subjob = cell(length(b.condlabels), 1); 
+        subjob = cell(length(b.condlabels), 1);
         for c = 1:length(b.condlabels)
 
-            
+
             general_info.analysis           = blockwisedirs{c};
-            
-            other = b.blockwise; 
-            other(c,:) = []; 
+
+            other = b.blockwise;
+            other(c,:) = [];
 
             runs(r).conditions(1).name      = b.condlabels{c};
             runs(r).conditions(1).onsets    = b.blockwise(c, 3);
@@ -177,11 +177,11 @@ for s = 1:length(subdir)
             runs(r).conditions(2).durations = other(:, 4);
 
             subjob{c} = bspm_level1(images, general_info, runs);
-            
-            
+
+
         end
 
-        allinput{s} = horzcat(subjob{:})'; 
+        allinput{s} = horzcat(subjob{:})';
         % % | Floating Parametric Modulators
         % % | =====================================================================
         % if ~isempty(covidx)
@@ -225,7 +225,7 @@ for s = 1:length(subdir)
 
     % | Make Job
     % | ========================================================================
-    
+
 
     % | Cleanup Workspace
     % | ========================================================================
@@ -275,7 +275,7 @@ qidx = blockwise(:, end);
 questions = regexprep(d.result.preblockcues(qidx), 'Is the person ', '');
 questions = regexprep(questions, ' ', '_');
 questions = regexprep(questions, '?', '');
-questions = regexprep(questions, '-', '_'); 
+questions = regexprep(questions, '-', '_');
 
 % | blockwise accuracy and durations
 % | ========================================================================

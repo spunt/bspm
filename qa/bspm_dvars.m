@@ -1,4 +1,4 @@
-function [dvars framewise] = bspm_dvars(epi, varargin)
+function [dvars, framewise] = bspm_dvars(epi, varargin)
 % BSPM_DVARS
 %
 % USAGE: TS = bspm_dvars(epi, cutoff, maskfn, nosave)

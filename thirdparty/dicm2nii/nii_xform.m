@@ -13,12 +13,12 @@ function varargout = nii_xform(src, target, rst, intrp, missVal)
 % has the same dimension and resolution as the template NIfTI.
 % 
 % Input (first two mandatory):
-%  1. source file (nii, hdr or gz versions) or nii struct to be transformed.
+%  1. source file (nii, hdr/img or gz versions) or nii struct to be transformed.
 %  2. The second input determines how to transform the source file:
-%    (1) If it is a vector of length 3, [2 2 2] for example, it will be treated
-%         as requested resolution in millimeter. The result will be in the same
-%         coordinate system as the source file.
-%    (2) If it is a nii file name, a nii struct, or ni hdr struct, it will be
+%    (1) If it is numeric and length is 1 or 3, [2 2 2] for example, it will be
+%         treated as requested resolution in millimeter. The result will be in
+%         the same coordinate system as the source file.
+%    (2) If it is a nii file name, a nii struct, or nii hdr struct, it will be
 %        used as the template. The result will have the same dimension and
 %        resolution as the template. The source file and the template must have
 %        at least one common coordinate system, otherwise the transformation
@@ -59,15 +59,17 @@ function varargout = nii_xform(src, target, rst, intrp, missVal)
 % 160907 allow src to be nii struct.
 % 160923 allow target to be nii struct or hdr; Take care of logical src img.
 % 161002 target can also be {tempFile warpFile}.
+% 170119 resolution can be singular.
 
 if nargin<2 || nargin>5, help('nii_xform'); error('Wrong number of input.'); end
 if nargin<3, rst = []; end
 if nargin<4 || isempty(intrp), intrp = 'linear'; end
 if nargin<5 || isempty(missVal), missVal = nan; end
 intrp = lower(intrp);
+quat2R = nii_viewer('func_handle', 'quat2R');
     
 if isstruct(src), nii = src;
-else nii = nii_tool('load', src);
+else, nii = nii_tool('load', src);
 end
 
 if isstruct(target) || ischar(target) || (iscell(target) && numel(target)==1)
@@ -97,10 +99,10 @@ elseif iscell(target)
     end
 
     % I thought it is something like R = R0 \ R * R1; but it is way off. It
-    % seems the translation info in src nii is irrevelant, but direction must be
-    % used: Left-handed storage and Right-handed storage give exactly the same
-    % alignment R with the same target nii (left-handed). Alignment R may not be
-    % diag-major, and can be negative for major axes (e.g. cor/sag slices).
+    % seems the transform info in src nii is irrevelant, but direction must be
+    % used: Left/right-handed storage of both src and target img won't affect
+    % FSL alignment R. Alignment R may not be diag-major, and can be negative
+    % for major axes (e.g. cor/sag slices).
 
     % Following works for tested FSL .mat and warp.nii files: Any better way?
     % R0: target;   R1: source;  R: xform;  result is also R
@@ -113,7 +115,8 @@ elseif iscell(target)
         rotM(1:3,4) = (nii.hdr.dim(2:4)-1) .* flp;
         R = R / rotM;
     end
-elseif isnumeric(target) && numel(target)==3 % new resolution in mm
+elseif isnumeric(target) && any(numel(target)==[1 3]) % new resolution in mm
+    if numel(target)==1, target = target * [1 1 1]; end
     hdr = nii.hdr;
     ratio = target(:)' ./ hdr.pixdim(2:4);
     hdr.pixdim(2:4) = target;
@@ -170,7 +173,7 @@ if islogical(nii.img)
     intrp = 'nearest'; missVal = 0;
 elseif strcmp(intrp, 'nearest')
     img = nii.img;
-    nii.img = zeros([d d48], class(img)); %#ok
+    nii.img = zeros([d d48], class(img));
 else
     img = single(nii.img);
     nii.img = zeros([d d48], 'single');
@@ -178,11 +181,6 @@ end
 for i = 1:prod(d48)
     nii.img(:,:,:,i) = interp3(img(:,:,:,i), I(:,:,:,2), I(:,:,:,1), I(:,:,:,3), intrp, missVal);
 end
-
-% for i8 = 1:d48(5); for i7=1:d48(4); for i6=1:d48(3); for i5=1:d48(2); for i4=1:d48(1) %#ok
-%     nii.img(:,:,:,i4,i5,i6,i7,i8) = interp3(img(:,:,:,i4,i5,i6,i7,i8), ...
-%         I(:,:,:,2), I(:,:,:,1), I(:,:,:,3), intrp, missVal);
-% end; end; end; end; end
 
 % copy xform info from template to rst nii
 nii.hdr.pixdim(1:4) = hdr.pixdim(1:4);
@@ -192,19 +190,6 @@ for i = 1:numel(flds), nii.hdr.(flds{i}) = hdr.(flds{i}); end
 
 if ~isempty(rst), nii_tool('save', nii, rst); end
 if nargout || isempty(rst), varargout{1} = nii_tool('update', nii); end
-
-%% quatenion to xform_mat
-function R = quat2R(hdr)
-b = hdr.quatern_b;
-c = hdr.quatern_c;
-d = hdr.quatern_d;
-a = sqrt(1-b*b-c*c-d*d);
-R = [1-2*(c*c+d*d)  2*(b*c-d*a)     2*(b*d+c*a);
-     2*(b*c+d*a)    1-2*(b*b+d*d)   2*(c*d-b*a);
-     2*(b*d-c*a )   2*(c*d+b*a)     1-2*(b*b+c*c)];
-R = R * diag(hdr.pixdim(2:4));
-if hdr.pixdim(1)<0, R(:,3) = -R(:,3); end % qfac
-R = [R [hdr.qoffset_x hdr.qoffset_y hdr.qoffset_z]'; 0 0 0 1];
 
 %% 
 function hdr = get_hdr(in)

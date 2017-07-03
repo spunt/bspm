@@ -65,7 +65,7 @@ catch % get it fro hdr, but no valid code for multiband sequence
     t = 0.5 - (0:nSL-1)' * dur / TR;
     
     switch nii.hdr.slice_code
-        case 1,                               % ascending
+        case 1                                % ascending
         case 2,	t(nSL:-1:1) = t;              % descending
         case 3,	t([1:2:nSL 2:2:nSL]) = t;     % interleaved ascending, start 1
         case 4, t([nSL:-2:1 nSL-1:-2:1]) = t; % interleaved descending, start n

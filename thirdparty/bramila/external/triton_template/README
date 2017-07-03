@@ -1,0 +1,16 @@
+This are just two simple templates on how to run parallel jobs on triton. There is large space for improvement.
+To use it: 
+	- copy the folder on your subfolder
+	- use bramila_runtheblock.m as a template and make your own "block function": this function will be run in parallel
+		by each instance/job
+	- Open matlab from triton and simply run:
+
+for blockID=1:10
+    bramila_run_slurm_scripts(blockID,'/triton/becs/scratch/braindata/foldername/');
+end
+
+Then you can quit matlab and check the queue using
+
+slurm q
+
+

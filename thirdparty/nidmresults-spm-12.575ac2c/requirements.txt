@@ -1,4 +1,0 @@
-rdflib>=4.2.0
-vcrpy>=1.4.1
-ddt
-nidmresults>=0.3.2

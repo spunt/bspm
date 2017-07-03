@@ -1,7 +1,0 @@
-
-{
-"software": "spm",
-"ground_truth": ["spm_full_example001/example001_spm_results.ttl"],
-"inclusive": false,
-"versions": ["1.3.0-rc2"]
-}

@@ -1,13 +1,14 @@
 function matlabbatch = bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag, connames)
 % BSPM_CONTRASTS
 %
-%   USAGE: bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag)
+%   USAGE: bspm_contrasts(analysis_dir, weights, delete_tag, repl_tag, connames)
 %
 %   ARGUMENTS:
 %       analysis_dir: directory containing SPM.mat
 %       weights: contrast weights
 %       delete_tag: tag for deleting existing contrasts: 0 for no (default), 1 for yes
 %       repl_tag: tag for replicating across sessions: 0 for no, 1 for yes (default)
+%       connames: custom contrast names
 %
 
 % -------------------------------- Copyright (C) 2014 --------------------------------
@@ -16,13 +17,14 @@ function matlabbatch = bspm_contrasts(analysis_dir, weights, delete_tag, repl_ta
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
+if nargin<2, mfile_showhelp; return; end
 if nargin<5, connames = []; end
 if nargin<4, repl_tag = 1; end
 if nargin<3, delete_tag = 0; end
-if nargin<2, mfile_showhelp; return; end
 if ischar(analysis_dir), analysis_dir = cellstr(analysis_dir); end
 if repl_tag, repl_choice = 'repl'; else repl_choice = 'none'; end
 for s = 1:length(analysis_dir)
+    
 spmmat = [analysis_dir{s} filesep 'SPM.mat'];
 ncon = size(weights,1);
 

@@ -8,8 +8,8 @@ function p = addgenpath(d, varargin)
         'excl_pattern',     [],             ...
         'maxdepth',         1,              ...
         'verbose',          0               ...
-          }; 
-       
+          };
+
 
     % Check Varargin
     % ========================================================================
@@ -20,7 +20,7 @@ function p = addgenpath(d, varargin)
     if ischar(excl_pattern)
         excl_pattern = cellstr(excl_pattern);
     elseif size(excl_pattern, 1) > 1
-        excl_pattern = excl_pattern'; 
+        excl_pattern = excl_pattern';
     end
     if any(cellfun(@exist, d)==0)
         ME  = MException('addgenpath:dirNotFound', 'Directory not found.');
@@ -31,14 +31,14 @@ function p = addgenpath(d, varargin)
     % ========================================================================
 
     p           = [];
-    full_path   = []; 
+    full_path   = [];
     npath       = length(d);
     for i = 1:npath
         if any([maxdepth==0 isinf(maxdepth)])
             cfull_path = genpath(d{i});  % Use the built-in genpath to get a full subdirectory list
             cfull_path = regexp(cfull_path, ':', 'split')';
         else
-            cfull_path = d{i}; 
+            cfull_path = d{i};
             for ii = 1:maxdepth
                 fstr = fullfile(d{i}, repmat(['*' filesep], 1, ii));
                 cfull_path = [cfull_path; files(fstr(1:end-1), 'dironly', 1)];
@@ -48,7 +48,7 @@ function p = addgenpath(d, varargin)
     end
     path_array = regexp(full_path, pathsep, 'split');
     path_array(cellfun('isempty', path_array)) = [];
-    path_array = vertcat(path_array{:}); 
+    path_array = vertcat(path_array{:});
 
     % Define the "illegal" patterns to look for at the start of a directory or file name
     % ===================================================================================
@@ -58,10 +58,10 @@ function p = addgenpath(d, varargin)
     end
 
     if verbose, cellprint(path_array, 0, 0, 1); end
-        
+
     % Put everything back together again.
-    p       = sprintf(['%s', pathsep], path_array{:}); 
-    p(end)  = []; 
+    p       = sprintf(['%s', pathsep], path_array{:});
+    p(end)  = [];
 
     % Add the path
     if nargout==0, addpath(p); end
@@ -74,27 +74,27 @@ end
 % ==========================================================================
 function argstruct = setargs(defaultargs, varargs)
 % SETARGS Name/value parsing and assignment of varargin with default values
-% 
+%
 % This is a utility for setting the value of optional arguments to a
 % function. The first argument is required and should be a cell array of
 % "name, default value" pairs for all optional arguments. The second
 % argument is optional and should be a cell array of "name, custom value"
 % pairs for at least one of the optional arguments.
-% 
+%
 %   USAGE: argstruct = setargs(defaultargs, varargs)
 % __________________________________________________________________________
 % OUTPUT
-% 
+%
 % 	ARGSTRUCT
 %    structure containing the final argument values
 % __________________________________________________________________________
 % INPUTS
-% 
-% 	DEFAULTARGS  
+%
+% 	DEFAULTARGS
 %     cell array of "'Name', value" pairs for all variables with default
 %     values
-% 
-% 	VARARGS [optional]     
+%
+% 	VARARGS [optional]
 %     cell array of user-specified "'Name', value" pairs for one or more of
 %     the variables with default values. this will typically be the
 %     "varargin" cell array. for each pair, SETARGS determines if the
@@ -109,8 +109,8 @@ function argstruct = setargs(defaultargs, varargs)
 %     problem.
 % __________________________________________________________________________
 % USAGE EXAMPLE (TO BE USED AT TOP OF FUNCTION WITH VARARGIN)
-% 
-%     defaultargs = {'arg1', 0, 'arg2', 'words', 'arg3', rand}; 
+%
+%     defaultargs = {'arg1', 0, 'arg2', 'words', 'arg3', rand};
 %     argstruct   = setargs(defaultargs, varargin)
 %
 
@@ -118,7 +118,7 @@ function argstruct = setargs(defaultargs, varargs)
 % ---------------------- Copyright (C) 2015 Bob Spunt -----------------------
 %	Created:  2015-03-11
 %	Email:    spunt@caltech.edu
-% 
+%
 %   This program is free software: you can redistribute it and/or modify
 %   it under the terms of the GNU General Public License as published by
 %   the Free Software Foundation, either version 3 of the License, or (at
@@ -129,13 +129,13 @@ function argstruct = setargs(defaultargs, varargs)
 %   General Public License for more details.
 %       You should have received a copy of the GNU General Public License
 %   along with this program.  If not, see: http://www.gnu.org/licenses/.
-% 
+%
 if nargin < 1, mfile_showhelp; return; end
 if nargin < 2, varargs = []; end
-defaultargs = reshape(defaultargs, 2, length(defaultargs)/2)'; 
+defaultargs = reshape(defaultargs, 2, length(defaultargs)/2)';
 if ~isempty(varargs)
     if mod(length(varargs), 2)
-        error('Optional inputs must be entered as "''Name'', Value" pairs, e.g., myfunction(''arg1'', val1, ''arg2'', val2)'); 
+        error('Optional inputs must be entered as "''Name'', Value" pairs, e.g., myfunction(''arg1'', val1, ''arg2'', val2)');
     end
     arg = reshape(varargs, 2, length(varargs)/2)';
     for i = 1:size(arg,1)
@@ -153,16 +153,16 @@ for i = 1:size(defaultargs,1), assignin('caller', defaultargs{i,1}, defaultargs{
 if nargout>0, argstruct = cell2struct(defaultargs(:,2), defaultargs(:,1)); end
 end
 function mfile_showhelp(varargin)
-% MFILE_SHOWHELP
-ST = dbstack('-completenames');
-if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; end
-eval(sprintf('help %s', ST(2).file));  
+    % MFILE_SHOWHELP
+    ST = dbstack('-completenames');
+    if isempty(ST), fprintf('\nYou must call this within a function\n\n'); return; end
+    eval(sprintf('help %s', ST(2).file));
 end
 function outcell = cellprint(incell, rmpath, forcenumber, nonumber)
 % CELLPRINT Show cell array
 %
 %       USAGE: cellprint(incell, [rmpath], [forcenumber], [nonumber])
-%           
+%
 % -------------------------------------------------------------------
 if nargin<4, nonumber = 0; end
 if nargin<3, forcenumber = 0; end
@@ -171,7 +171,7 @@ if nargin<1, mfile_showhelp; return; end
 if ischar(incell), incell = cellstr(incell); end
 if rmpath, [~,incell,~] = cellfun(@fileparts, incell, 'Unif', false); end
 if size(incell,1)==1, incell = incell'; end
-[nrow, ncol] = size(incell); 
+[nrow, ncol] = size(incell);
 if ~nonumber & (ncol==1 | forcenumber)
     % | Number
     N           = cell(length(incell), 1);
@@ -186,7 +186,7 @@ if ncol>1
     npad    = repmat(max(ln), nrow, 1) - ln + 1;
     for i = 1:nrow
         for c = 1:ncol
-            incell{i,c} = [incell{i,c} repmat(' ', 1, npad(i,c))]; 
+            incell{i,c} = [incell{i,c} repmat(' ', 1, npad(i,c))];
         end
     end
 end
@@ -211,7 +211,7 @@ function [fullpath, filename] = files(pattern, varargin)
 %   OUTPUTS
 %       fullpath:   full path to filenames (char by default)
 %       filename:   filename only (char by default)
-% 
+%
 %   This is a wrapper function for RDIR.m, which is included below as a
 %   subfunction. RDIR.m was downloaded from the MATLAB File Exchange
 %       www.mathworks.com/matlabcentral/fileexchange/
@@ -221,7 +221,7 @@ function [fullpath, filename] = files(pattern, varargin)
 % ---------------------- Copyright (C) 2014 Bob Spunt ----------------------
 % 	Created:  2015-03-09
 % 	Email:    spunt@caltech.edu
-% 
+%
 %   This program is free software: you can redistribute it and/or modify
 %   it under the terms of the GNU General Public License as published by
 %   the Free Software Foundation, either version 3 of the License, or (at
@@ -247,7 +247,7 @@ def =   {                       ...
             'celloutput',   1,  ...
             'dironly',      0,  ...
             'fileonly',     0,  ...
-            'lastndays',    0,  ...           
+            'lastndays',    0,  ...
             'rmhidden',     1   ...
         };
 vals = setargs(def, varargin);
@@ -263,9 +263,9 @@ else
     pattern = regexprep(pattern, '\\', '/');
 end
 if lastndays
-    d = rdir(pattern, sprintf('datenum > now - %d', lastndays)); 
+    d = rdir(pattern, sprintf('datenum > now - %d', lastndays));
 else
-    d = rdir(pattern); 
+    d = rdir(pattern);
 end
 if isempty(d), filename = []; fullpath = []; return; end
 if dironly || fileonly
@@ -275,17 +275,17 @@ if dironly || fileonly
     if isempty(d), filename = []; fullpath = []; return; end
 end
 if isempty(regexp(pattern, pwd, 'once')) && exist(fullfile(pwd, d(1).name), 'file')
-    fullpath = strcat(pwd, filesep, {d.name}'); 
+    fullpath = strcat(pwd, filesep, {d.name}');
 else
-    fullpath = {d.name}'; 
+    fullpath = {d.name}';
 end
 [~,filename,ext] = cellfun(@fileparts, fullpath, 'Unif', false);
 filename = strcat(filename,ext);
 if rmhidden
-    nothiddenidx = cellfun('isempty', regexp(filename, '^\.')); 
+    nothiddenidx = cellfun('isempty', regexp(filename, '^\.'));
     if ~any(nothiddenidx), filename = []; fullpath = []; return; end
     filename = filename(nothiddenidx);
-    fullpath = fullpath(nothiddenidx); 
+    fullpath = fullpath(nothiddenidx);
 end
 if ~celloutput
     fullpath = char(fullpath);
@@ -294,7 +294,7 @@ end
 end
 function [varargout] = rdir(rootdir,varargin)
 % RDIR - Recursive directory listing
-% 
+%
 %  D = rdir(ROOT)
 %  D = rdir(ROOT, TEST)
 %  D = rdir(ROOT, TEST, RMPATH)
@@ -316,21 +316,21 @@ function [varargout] = rdir(rootdir,varargin)
 % One can also use a double wildcard (**) to match multiple directory
 % levels. For example ROOT = 'path\**\*.m' will match all ".m" files in
 % "path" and all subdirectories of "path".
-% 
+%
 % NOTE : ".svn" directories created by SubVersion (SVN) are excluded from
 % the recursive listing.
 %
 % * TEST
 %
-% Optional test that can be performed on the returned files. 
+% Optional test that can be performed on the returned files.
 %
 % TEST is a string indicating expression to be evaluated on selected field
 % of rdir output.
 % All fields (ie name, date, bytes, isdir and datenum) can be used.
 %
 % Tests are strings similar to what one would use in a "if" statement e.g.
-%  'bytes>1024 & datenum>now-7' 
-% 
+%  'bytes>1024 & datenum>now-7'
+%
 % One can also use function like "regexp" or "strfind" with string fields
 % like "name" and "date" e.g 'regexp(name, 'expr')'. In that case, tests
 % that return a non empty value are considered as true.
@@ -346,18 +346,18 @@ function [varargout] = rdir(rootdir,varargin)
 % output. Specified path must be common to all items found.
 %
 % If RMPATH = 1 or true, path to remove is part of ROOT before the first
-% wildcard. 
+% wildcard.
 %
 %
 % *Outputs*
 %
 % * D
 %
-% D is a structure with the same fields as Matlab DIR output. 
+% D is a structure with the same fields as Matlab DIR output.
 %
 % The "name" field includes the relative path as well as the name to the
 % file that was found. Path can be shorten or ommited when using 3rd
-% argument RMPATH. 
+% argument RMPATH.
 %
 % * P
 %
@@ -366,21 +366,21 @@ function [varargout] = rdir(rootdir,varargin)
 % * Screen output
 %
 % If not output variable is specified then the output is sent to the
-% screen. 
+% screen.
 %
 %
 % *Versions*
 %
 % * 1.0 - 2009, Gus Brown
 % * 2.0 - 26/05/2011 Thomas Vanaret
-%         No longer exclude all directories from a simple search (no *); 
-%         Fixing bug on returned path; 
-%         Exclude ".svn" directories; 
-%         Extended test possibilies; 
-%         Subfunctions created; 
+%         No longer exclude all directories from a simple search (no *);
+%         Fixing bug on returned path;
+%         Exclude ".svn" directories;
+%         Extended test possibilies;
+%         Subfunctions created;
 % * 2.1 - 14/07/2011 Thomas Vanaret
-%         New argument allowing to remove common path from name; 
-%         Comments review; 
+%         New argument allowing to remove common path from name;
+%         Comments review;
 % * 2.2 - 20/12/2011 Thomas Vanaret
 %         Fixing bug on display with 0b files;
 %         Specific display when no file match filter;
@@ -391,7 +391,7 @@ function [varargout] = rdir(rootdir,varargin)
 %         Fixing possible bug when using a wildcard at the beginning;
 %         Common path as 2nd optionnal output;
 %
-% 
+%
 % *Examples*
 %
 %   D = rdir('*.m');
@@ -400,7 +400,7 @@ function [varargout] = rdir(rootdir,varargin)
 %   % to find all files in the current directory and sub directories
 %   D = rdir('**\*')
 %
-%   % If no output is specified then the files are sent to 
+%   % If no output is specified then the files are sent to
 %   % the screen.
 %   rdir('c:\program files\windows *\*.exe');
 %   rdir('c:\program files\windows *\**\*.dll');
@@ -429,10 +429,10 @@ if ~exist('rootdir','var'), rootdir = '*'; end
 
 %% ADDED THIS BIT 2014-09-09
 
-levels = regexp(rootdir, filesep, 'split'); 
+levels = regexp(rootdir, filesep, 'split');
 if isempty(regexp(levels{end}, '*', 'once'))
-    levels{end} = strcat('*', levels{end}); 
-    rootdir = fullfile(filesep, levels{:}); 
+    levels{end} = strcat('*', levels{end});
+    rootdir = fullfile(filesep, levels{:});
 end
 
 %% MORE INPUT VALIDATION
@@ -480,14 +480,14 @@ end;
 % disp([' "' prepath '" ~ "' wildpath '" ~ "' postpath '" ']);
 
 
-    
+
 %--------------------------------------------------------------------------
 %% Recursive listing
 % Search for matching files until all wildcards have been considered.
 
 if isempty(wildpath)
   % If no directory wildcards then just get files and directories list
-  
+
   D = dir([prepath postpath]);
 
   % Exclude ".", ".." and ".svn" directories from the list
@@ -499,18 +499,18 @@ if isempty(wildpath)
   else
     fullpath = prepath;
   end
-  
+
   % Place directories on the top of the list
   is_dir = [D.isdir]';
   D = [D(is_dir); D(~is_dir)];
-  
+
   % Add path before name
   for ii = 1:length(D)
     D(ii).name = fullfile(fullpath, D(ii).name);
   end
 
   % disp(sprintf('Scanning "%s"   %g files found',[prepath postpath],length(D)));
-  
+
 elseif strcmp(wildpath,'**')
   % A double wildcards directory means recurs down into sub directories
 
@@ -528,18 +528,18 @@ elseif strcmp(wildpath,'**')
   % Performance tweak: avoid growing array within loop (X. Mo)
   c_D = arrayfun(@(x) rdir([prepath x.name filesep wildpath postpath]),...
     D_sd, 'UniformOutput', false);
-  
+
   D = [D; cell2mat( c_D ) ];
-  
+
 else
   % Process directory wild card looking for sub directories that match
-  
+
   D_sd = dir([prepath wildpath]);
 
   % Exclude ".", "..", ".svn" directories and files from the list
   excl = isdotdir(D_sd) | issvndir(D_sd) | ~([D_sd.isdir]');
   D_sd(excl) = [];
-    
+
   if ~isdir(prepath) || ( numel(D_sd)==1 && strcmp(D_sd.name, prepath))
     % Fix case like rdir('path*\...') where prepath is not a full directoty
     % name OR case were prepath match a unique directory.
@@ -549,15 +549,15 @@ else
     % In else case, prepath is a valid path which must be kept.
     prepath = '';
   end
-  
-  % Process each directory found  
+
+  % Process each directory found
   Dt = dir('');
 
   c_D = arrayfun(@(x) rdir([prepath x.name postpath]),...
     D_sd, 'UniformOutput', false);
 
   D = [Dt; cell2mat( c_D ) ];
-  
+
 end
 
 
@@ -575,16 +575,16 @@ if (nargin>=2 && ~isempty(varargin{1})),
     else
         test_tf = evaluate(D, varargin{1});
     end
-    
+
     D = D(test_tf);
-    
+
   catch
     if isa(varargin{1}, 'function_handle')
       test_expr = func2str(varargin{1});
     else
       test_expr = varargin{1};
     end
-    
+
     warning_msg = sprintf('Invalid TEST "%s" : %s', test_expr, lasterr);
   end
 end
@@ -599,16 +599,16 @@ if (nargin>=3 && ~isempty(varargin{2})),
 
   arg2 = varargin{2};
   if ischar(arg2)
-    common_path = arg2;    
+    common_path = arg2;
   elseif (isnumeric(arg2) || islogical(arg2)) && arg2
-    common_path = prepath;    
+    common_path = prepath;
   end
-  
+
   rm_path = regexptranslate('escape', common_path);
 
-  % Check that path is common to all 
+  % Check that path is common to all
   start = regexp({D.name}', ['^', rm_path]);
-  
+
   % Convert to a logical.
   is_common = not( cellfun(@isempty, start) );
 
@@ -616,13 +616,13 @@ if (nargin>=3 && ~isempty(varargin{2})),
     for k = 1:length(D)
       D(k).name = regexprep(D(k).name, ['^', rm_path], '');
     end
-    
+
   else
     common_path = '';
   end
-  
+
   % 19/07/2012 : ajouter common_path en sortie optionnelle
-  
+
 end
 
 
@@ -640,11 +640,11 @@ if nout == 0
       fprintf('No item matching filter.\n')
     end
   else
-    
+
     if ~isempty(common_path)
-     fprintf('All in : %s\n', common_path) 
+     fprintf('All in : %s\n', common_path)
     end
-    
+
     pp = {'' 'k' 'M' 'G' 'T'};
     for ii = 1:length(D)
       if D(ii).isdir
@@ -685,7 +685,7 @@ function tf = issvndir(d)
 is_dir = [d.isdir]';
 
 is_svn = strcmp({d.name}, '.svn')';
-%is_svn = false; % uncomment to disable ".svn" filtering 
+%is_svn = false; % uncomment to disable ".svn" filtering
 
 tf = (is_dir & is_svn);
 end

@@ -68,6 +68,7 @@ switch type
 		trend=sgolayfilt(tempdata,3,SGlen);
 		for v=1:size(tempdata,2) % foreach voxel
 			if(var(trend(:,v))==0) continue; end
+            if(var(tempdata(:,v))==0) continue; end
 			[aa bb res]=regress(tempdata(:,v),[trend(:,v)  ones(T,1)]);
 			tempdata(:,v)=res;
 		end

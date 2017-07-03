@@ -30,7 +30,7 @@ for s = 1:nsubs
     cim = files([analysisdirs{s} filesep 'spmT*img']);
     if isempty(cim), cim = files([analysisdirs{s} filesep 'spmT*nii']); end
     if isempty(cim), error('No spmT images found in %s', analysisdirs{s}); end
-    cim = strcat(cim, ',1');
+%     cim = strcat(cim, ',1');
     matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).flowfield = flowfields(s);
     matlabbatch{1}.spm.tools.dartel.mni_norm.data.subj(s).images = cim;
 end
@@ -38,5 +38,7 @@ matlabbatch{1}.spm.tools.dartel.mni_norm.vox = voxsize;
 matlabbatch{1}.spm.tools.dartel.mni_norm.bb = [-78 -112 -50; 78 76 85];
 matlabbatch{1}.spm.tools.dartel.mni_norm.preserve = 0;
 matlabbatch{1}.spm.tools.dartel.mni_norm.fwhm = fwhm;
-if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
+if nargout==0
+    bspm_runbatch(matlabbatch); 
+end
 end
