@@ -1,5 +1,5 @@
-function allinput = wrapper_level1_tom(covidx, varargin)
-    % matlabbatch = wrapper_level1_tom(covidx, varargin)
+function allinput = wrapper_level1_tom_blockwise(covidx, varargin)
+    % matlabbatch = wrapper_level1_tom_blockwise(covidx, varargin)
     %
     % To show default settings, run without any arguments.
     %
@@ -21,6 +21,7 @@ function allinput = wrapper_level1_tom(covidx, varargin)
                 'runid',       'EP*False*',                                        ...
                 'behavid',     'tom_*mat',                                         ...
                 'basename',    'fbloc',                                            ...
+                'model',       'BLOCKWISE',    ...
                 'brainmask',   bspm_brainmask,                                     ...
                 'fcontrast',   0,                                                  ...
                 'nskip',       4,                                                  ...
@@ -34,7 +35,7 @@ function allinput = wrapper_level1_tom(covidx, varargin)
 
     % | PATHS
     % | ===========================================================================
-    if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/asd'; end
+    if strfind(pwd,'/home/spunt'), studydir = '/home/spunt/data/conte'; end
     [subdir, subnam] = files([studydir filesep subid]);
 
     % | ANALYSIS NAME
@@ -42,9 +43,14 @@ function allinput = wrapper_level1_tom(covidx, varargin)
     armethodlabels  = {'NoAR1' 'AR1' 'WLS'};
     covnames        = {'Duration' 'NR'};
     pmnames         = regexprep(covnames(covidx), '_', '');
-    pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
-    analysisname    = sprintf('%s_Pmodby_%s_%s_%ds_%s', basename, ...
-                            pmstr, armethodlabels{armethod + 1}, HPF, bob_timestamp);
+    if ~isempty(covidx)
+        pmnames         = regexprep(covnames(covidx), '_', '');
+        pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
+    else
+        pmstr = 'None';
+    end
+    analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_ImpT%d_%s', basename, model, ...
+                        pmstr, armethodlabels{armethod + 1}, HPF, maskthresh*100, bob_timestamp);
     printmsg(analysisname, 'msgtitle', 'Analysis Name');
 
     % | IMAGING PARAMETERS
@@ -88,7 +94,19 @@ function allinput = wrapper_level1_tom(covidx, varargin)
             end
             load(behav{r});
             Seeker(:,6:7) = Seeker(:,6:7) - adjons;
+            ntrials = size(Seeker, 1);
             condlabels = {'Belief' 'Photo'};
+            blocklabels = cell(ntrials, 1);
+            for c = 1:length(condlabels) 
+                blocklabels(Seeker(:,2)==c) = condlabels(c); 
+            end
+            stimidx = cellfun(@sprintf, repmat({'_%02d'}, ntrials, 1), num2cell(Seeker(:,5)), 'Unif', false);
+            blocklabels = upper(strcat(blocklabels, stimidx));
+            data = [blocklabels num2cell(Seeker)];
+            data = sortrows(data, -1); 
+            b.condlabels = data(:,1);
+            b.blockwise = cell2mat(data(:,2:end));
+            
             % | Columns for Seeker
             % | =====================================================================
             % 1 - TRIAL #
@@ -102,26 +120,28 @@ function allinput = wrapper_level1_tom(covidx, varargin)
 
             % | Conditions
             % | =====================================================================
-            for c = 1:length(condlabels)
-                runs(r).conditions(c).name      = condlabels{c};
-                runs(r).conditions(c).onsets    = Seeker(Seeker(:,2)==c,6);
-                runs(r).conditions(c).durations = Seeker(Seeker(:,2)==c,10);
+            for c = 1:length(b.condlabels)
+                runs(r).conditions(c).name      = b.condlabels{c};
+                runs(r).conditions(c).onsets    = b.blockwise(c,6);
+                runs(r).conditions(c).durations = b.blockwise(c,10);
             end
 
             % | Floating Parametric Modulators
             % | =====================================================================
-            allpm           = [Seeker(:,10) double(Seeker(:,8)==0)];
-            modelpm         = allpm(:,covidx);
-            modelpmnames    = pmnames;
-            novaridx = find(nanstd(modelpm)==0);
-            if ~isempty(novaridx), modelpm(:,novaridx) = []; modelpmnames(novaridx) = []; end
-            for p = 1:length(modelpmnames)
-                runs(r).floatingpm(p).name      = modelpmnames{p};
-                runs(r).floatingpm(p).onsets    = Seeker(:,6);
-                runs(r).floatingpm(p).durations = Seeker(:,10);
-                runs(r).floatingpm(p).values    = modelpm(:,p);
+            if ~isempty(covidx)
+                allpm           = [Seeker(:,10) double(Seeker(:,8)==0)];
+                modelpm         = allpm(:,covidx);
+                modelpmnames    = pmnames;
+                novaridx = find(nanstd(modelpm)==0);
+                if ~isempty(novaridx), modelpm(:,novaridx) = []; modelpmnames(novaridx) = []; end
+                for p = 1:length(modelpmnames)
+                    runs(r).floatingpm(p).name      = modelpmnames{p};
+                    runs(r).floatingpm(p).onsets    = Seeker(:,6);
+                    runs(r).floatingpm(p).durations = Seeker(:,10);
+                    runs(r).floatingpm(p).values    = modelpm(:,p);
+                end
             end
-
+            
         end
         if length(rundir)==1
             images = images{1};
@@ -144,15 +164,18 @@ function allinput = wrapper_level1_tom(covidx, varargin)
 
         % | Contrasts
         % | ========================================================================
-        ncond   = length(condlabels);
-        w1      = eye(ncond);
-        w2      = [1 -1];
-        weights = [w1; w2];
+        ncond   = length(b.condlabels);
+        cond    = b.blockwise(:,2)';
+        w1      = ismember(cond, 1)/sum(ismember(cond, 1));
+        w2      = ismember(cond, 2)/sum(ismember(cond, 2));
+        w3      = w1 - w2;
+        weights = [w1; w2; w3];
         ncon    = size(weights,1);
+        conname = {'Belief_-_Base' 'Photo_-_Base' 'Belief_-_Photo'};
         for c = 1:ncon
             contrasts(c).type       = 'T';
             contrasts(c).weights    = weights(c,:);
-            contrasts(c).name       = bspm_conweights2names(weights(c,:), condlabels);
+            contrasts(c).name       = conname{c};
         end
         if fcontrast
             contrasts(ncon+1).type      = 'F';

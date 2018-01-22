@@ -62,6 +62,7 @@ if ~isempty(covidx)
     pmnames         = regexprep(covnames(covidx), '_', '');
     pmstr           = sprintf(repmat('_%s', 1, length(pmnames)), pmnames{:}); pmstr(1)= [];
 else
+    pmnames = {''};
     pmstr = 'None';
 end
 analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_%s', basename, model, ...

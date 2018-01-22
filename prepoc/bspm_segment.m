@@ -9,8 +9,8 @@ function matlabbatch = bspm_segment(in, varargin)
 %      1 - dartel_imported      [1 1 0 0 0 0]
 %      2 - native_space         [0 0 0 0 0 0]
 %      3 - ngaus                [1 1 2 3 4 2]
-%      4 - forward_deform       0       (native -> MNI)
-%      5 - backward_deform      0       (MNI -> native)
+%      4 - forward_deform (iy)  0       (native -> MNI)
+%      5 - backward_deform (y)  0       (MNI -> native)
 %      6 - sampling_dist        3       (smaller -> uses more data, slower speed)
 %      7 - biasfield            0
 %      8 - biascorrected        0
@@ -32,7 +32,7 @@ function matlabbatch = bspm_segment(in, varargin)
 %
 %	$Revision Date: Aug_20_2014
 def = { 'dartel_imported',  [1 1 0 0 0 0], ...
-        'native_space',     [1 1 1 0 0 0], ...
+        'native_space',     [0 0 0 0 0 0], ...
         'ngaus',            [1 1 2 3 4 2], ...
         'forward_deform',   0, ...
         'backward_deform',  0, ...
@@ -63,7 +63,7 @@ matlabbatch{1}.spm.spatial.preproc.warp.cleanup = 1;
 matlabbatch{1}.spm.spatial.preproc.warp.reg     = [0 0.001 0.5 0.05 0.2];
 matlabbatch{1}.spm.spatial.preproc.warp.affreg  = 'mni';
 matlabbatch{1}.spm.spatial.preproc.warp.samp    = sampling_dist;
-matlabbatch{1}.spm.spatial.preproc.warp.write   = [backward_deform forward_deform]; 
+matlabbatch{1}.spm.spatial.preproc.warp.write   = [forward_deform backward_deform]; 
 
 % | RUN
 if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end

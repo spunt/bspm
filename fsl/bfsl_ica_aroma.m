@@ -46,7 +46,7 @@ function cmd = bfsl_ica_aroma(infile, TR, varargin)
     if isempty(rpfile), disp('Motion Correction file not found!'); return; end
     % | - Configure Path
     gitdir      = fullfile(getenv('HOME'), 'Github');
-    aromadir    = fullfile(gitdir, 'thirdparty-matlab', 'ICA-AROMA');
+    aromadir    = fullfile(gitdir, 'thirdparty-fmri', 'ICA-AROMA');
     icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
     if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
     % | - Construct Command

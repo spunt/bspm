@@ -1,7 +1,7 @@
 function result = bspm_imcompare(in, labels, sdcut)
 % BSPM_IMCOMPARE  Imcalc without writing image
 %
-%   USAGE: bspm_imcompare(in, labels, sdcut)
+%   USAGE: result = bspm_imcompare(in, labels, sdcut)
 %       
 %       in  =  array of images
 %       labels = string specifying option
@@ -60,13 +60,14 @@ else
     end
     zout = abs(oneoutzscore(out));
     flag = zout>sdcut;
-    result = [out(:,1) flag(:,1) out(:,2) flag(:,2)];
+    result.data = [out(:,1) flag(:,1) out(:,2) flag(:,2)];
+    result.collabels = {'MSS' 'FLAG' 'MDISS' 'FLAG'};
+    result.rowlabels = labels;
     fprintf('\nCOMPARING %d IMAGES\n', length(in));
-    disptable(result,{'MSS' 'FLAG' 'MDISS' 'FLAG'},labels,'%2.2f');
+    disptable(result.data,result.collabels,result.rowlabels,'%2.2f');
     bad = find(flag(:,1) | flag(:,2));
     disp(bad);
     disp(char(in(bad)));
-    result.out = out; 
     result.idx = in(bad); 
 end
 

@@ -65,7 +65,6 @@ if ~isempty(covidx)
 else
     pmstr = 'None';
 end
-
 analysisname  = sprintf('%s_%s_Pmodby_%s_%s_%ds_ImpT%d_%s', basename, model, ...
                         pmstr, armethodlabels{armethod + 1}, HPF, maskthresh*100, bob_timestamp);
 printmsg(analysisname, 'msgtitle', 'Analysis Name');
@@ -80,7 +79,7 @@ if runtest, subdir = subdir(1); end
 
 % | SUBJECT LOOP
 % | ===========================================================================
-allinput = [];
+allinput = cell(size(subdir));
 for s = 1:length(subdir)
 
     % | Check Subject and Define Folders

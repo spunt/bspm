@@ -72,7 +72,6 @@ function cmd = bfsl_motion_outliers(epi, TR, varargin)
     save(fullfile(epidir, outfile), 'scrubmat', '-ascii');
     fprintf('\n | - Nuisance regressors written to:  %s\n\n', outfile);
     delete(tmpfile);
-
 function argstruct = setargs(defaultargs, varargs)
     if nargin < 1, mfile_showhelp; return; end
     if nargin < 2, varargs = []; end

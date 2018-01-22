@@ -1,11 +1,12 @@
-function matlabbatch = bspm_reorient2acpc(images, opt)
+function matlabbatch = bspm_reorient2acpc(images, opt, is4D)
 % BSPM_REORIENT2ACPC
 %
-% USAGE:  matlabbatch = bspm_reorient2acpc(images, opt)
+% USAGE:  matlabbatch = bspm_reorient2acpc(images, opt, is4D)
 %
 % ARGUMENTS
 %   images
 %   opt: 1 for T1, 2 for T2
+%   is4D: 
 %
 
 % ---------------------- Copyright (C) 2014 ----------------------
@@ -14,9 +15,14 @@ function matlabbatch = bspm_reorient2acpc(images, opt)
 %	Email: spunt@caltech.edu
 %
 %	$Revision Date: Aug_20_2014
+if nargin<3, is4D = 0; end
 if nargin<2, mfile_showhelp; return; end
 if ischar(images), images = cellstr(images); end
-images = strcat(images, ',1');
+if is4D
+    images = bspm_expand4D(images); 
+else
+    images = strcat(images, ',1');
+end
 spmdir = fileparts(which('spm'));
 if opt==1
     ref = fullfile(spmdir, 'templates', 'T1.nii,1');
@@ -31,7 +37,7 @@ if opt==1
     end
 else
     ref = fullfile(spmdir, 'templates', 'EPI.nii,1');
-    if length(images) > 1, other = cellstr(images(2:end)); else other = {''}; end
+    if length(images) > 1, other = cellstr(images(2:end)); else, other = {''}; end
     matlabbatch{1}.spm.spatial.coreg.estimate.ref =     cellstr(ref);
     matlabbatch{1}.spm.spatial.coreg.estimate.source =  cellstr(images(1));
     matlabbatch{1}.spm.spatial.coreg.estimate.other =   other;

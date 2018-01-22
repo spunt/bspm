@@ -14,7 +14,7 @@ function matlabbatch = bspm_realign(epi_images, resliceflag)
 %	$Revision Date: Aug_20_2014
 
 if nargin<1, mfile_showhelp; return; end
-if nargin<2, resliceflag=0; end
+if nargin<2, resliceflag = 0; end
 
 resliceflag = resliceflag*2;
 
@@ -55,10 +55,9 @@ matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which = [resliceflag 1];
 matlabbatch{1}.spm.spatial.realign.estwrite.roptions.interp = 4;
 matlabbatch{1}.spm.spatial.realign.estwrite.roptions.wrap = [0 0 0];
 matlabbatch{1}.spm.spatial.realign.estwrite.roptions.mask = 1;
-matlabbatch{1}.spm.spatial.realign.estwrite.roptions.prefix = '';
+matlabbatch{1}.spm.spatial.realign.estwrite.roptions.prefix = 'r';
 
 % run job
-if nargout==0,  spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
-
+if nargout==0, spm_jobman('initcfg'); spm_jobman('run',matlabbatch); end
 
 end

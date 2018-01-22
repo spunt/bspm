@@ -20,6 +20,7 @@ function tsinfo = bspm_badscan(epi, varargin)
     % ========================================================================%
     DOONEOUTZSCORE = false;
     def = { 'dvars_thresh',     2.5,  ...
+            'incl_framewise_thresh', 1, ...
             'framewise_thresh', 0.5,  ...
             'include_rp',       1,    ...
             'makeplot',         0,    ...
@@ -47,7 +48,12 @@ function tsinfo = bspm_badscan(epi, varargin)
     cfg.vol     = reshape(v, h.dim(2:5));
 
     % | create output filename
-    outfile     = sprintf('%s_dvars%dframewise%d_%s.txt', prefix, dvars_thresh*100, framewise_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
+    if incl_framewise_thresh
+        outfile     = sprintf('%s_dvars%dframewise%d_%s.txt', prefix, dvars_thresh*100, framewise_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
+    else
+        outfile     = sprintf('%s_dvars%d_%s.txt', prefix, dvars_thresh*100, strtrim(datestr(now,'mmm_DD_YYYY')));
+    end
+
     epidir      = fileparts(epi{1});
 
     % | motion parameters
@@ -69,7 +75,9 @@ function tsinfo = bspm_badscan(epi, varargin)
     end
     badidx          = zeros(nvol, 2);
     badidx(2:end,1) = zdvars > dvars_thresh;
-    badidx(:,2)     = framewise > framewise_thresh;
+    if incl_framewise_thresh
+        badidx(:,2)     = framewise > framewise_thresh;
+    end
     badidx          = find(any(badidx, 2));
     nbad            = length(badidx);
     tsinfo.pctbad   = round(100*(nbad/nvol));

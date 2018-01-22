@@ -1,4 +1,4 @@
-function bspm_checkreg_batch(in)
+function bspm_checkreg_batch(in, addmniref)
 % BSPM_CHECKREG_BATCH Wrapper for Checking Registration
 %
 % USAGE: bspm_checkreg_batch(in)
@@ -16,10 +16,11 @@ function bspm_checkreg_batch(in)
 %	$Revision Date: Aug_20_2014
 
 if nargin<1, mfile_showhelp; return; end
-if ~iscell(in), in1 = cellstr(in); end
+if nargin<2, addmniref = 0; end
+if ~iscell(in), in = cellstr(in); end
 nim = length(in);
 for i = 1:nim
-    bspm_checkreg(in{i})
+    bspm_checkreg(in{i}, addmniref)
     input(sprintf('%d of %d -- Press any key to move on.', i, nim));
 end
  

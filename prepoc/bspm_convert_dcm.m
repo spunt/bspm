@@ -59,13 +59,16 @@ for sub = 1:nsubs
         save(fullfile(outputDIR, 'dicominfo.mat'), 'dcminfo');
         nii         = files(fullfile(outputDIR, '*nii'));
         
-        if strcmp(tmp.type, 'EP')
+        if strcmp(tmp.type, 'EP') && length(nii) > omitfirstN
+            
            if omitfirstN, delete(nii{1:omitfirstN}); nii(1:omitfirstN) = []; end
            if ~isempty(funcprefix)
                 [pth, fn, fe] = cellfileparts(nii);
                 outfn = strcat(pth, filesep, sprintf('%s_%03d_', funcprefix, dcminfo.sequenceinfo.order), lower(fn), fe);
                 cellfun(@movefile, nii, outfn)
+                nii = outfn;
            end
+           
            if do3dto4d, bnii_3dto4d(nii, 'compress', 1, 'delete3d', 1, 'delimiter', '_'); end
         elseif all(strncmp(tmp.type, 'GR', 2), ~isempty(anatprefix))
             [pth, fn, fe] = cellfileparts(nii);
