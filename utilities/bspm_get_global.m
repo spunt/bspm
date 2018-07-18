@@ -1,8 +1,8 @@
 function TS = bspm_get_global(epifiles, rpfile, maskfile, plotit)
-% BSPM_GET_GLOBAL  
+% BSPM_GET_GLOBAL
 %
 % USAGE: TS = bspm_get_global(epifiles, rpfile, maskfile, plotit)
-%       
+%
 %
 
 % ------------------------ Copyright (C) 2014 ------------------------
@@ -15,7 +15,7 @@ if nargin<1, mfile_showhelp; return; end
 if ischar(epifiles), epifiles = cellstr(epifiles); end
 if nargin<2 || isempty(rpfile)
     tmp = fileparts(epifiles{1});
-    rpfile = files(fullfile(tmp, 'rp*txt')); 
+    rpfile = files(fullfile(tmp, 'rp*txt'));
     if isempty(rpfile), error('TS = bspm_get_global(epifiles, rpfile, maskfile)'); end
 end
 if nargin<3, maskfile = []; maskfile = 'none'; end
@@ -24,15 +24,15 @@ if iscell(rpfile), rpfile = char(rpfile); end
 if iscell(maskfile), maskfile = char(maskfile); end
 rp          = load(rpfile);
 rp(:,4:6)   = rp(:,4:6)*57.3;
-TS.rp       = rp; 
+TS.rp       = rp;
 hdr         = spm_vol(char(epifiles));
 data        = spm_read_vols(hdr);
-datadim     = size(data); 
+datadim     = size(data);
 fprintf('Realignment parameter file: %s\n', rpfile);
 fprintf('Processing %d functional volumes...\n', size(data,4));
 if ~isempty(maskfile), cfg.mask = bspm_reslice(maskfile, epifiles{1}, 1, 1); end
-cfg.vol     = data; 
-cfg.plot    = plotit; 
+cfg.vol     = data;
+cfg.plot    = plotit;
 TS.dvars    = bramila_dvars(cfg);
 TS.zdvars   = abs(oneoutzscore(TS.dvars));
 TS.global   = nanmean(reshape(data, prod(datadim(1:3)), datadim(4)))';
@@ -46,9 +46,9 @@ end
 function zout = oneoutzscore(in)
 % leave-one-out zscore
 if size(in,1)==1, in=in'; end
-n = length(in); 
-in = repmat(in, 1, n); 
-theoneout = in(logical(eye(n)))';  
+n = length(in);
+in = repmat(in, 1, n);
+theoneout = in(logical(eye(n)))';
 theleftin = reshape(in(logical(~eye(n))),n-1,n);
 zout = (theoneout-mean(theleftin))./std(theleftin);
 zout = zout';
@@ -135,7 +135,7 @@ di=[
     zeros(1,size(di,2)) % adding a zero as first sample of the derivate
     di
     ];
-    
+
 if hasmask==1
     mask_ids=find(mask>0);
     dvars=sqrt(mean(di(:,mask_ids).^2,2)); % Root Mean Square across voxels
@@ -170,7 +170,7 @@ function [y, m]=bramila_bold2perc(ts)
 %	EG 2014-10-01
     m=mean(ts,1);
     T=size(ts,1);
-    
+
     % if we have a signal with zero mean, we need to treat it in a special
     % way. Zero in our case is 1e5*eps i.e. roughly 10^-11
     if(any(m<1e5*eps))
@@ -180,7 +180,7 @@ function [y, m]=bramila_bold2perc(ts)
     end
     y=100*(ts./repmat(m,T,1))-100;
     y(find(isnan(y)))=0;
-end   
+end
 function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
 			old_RGB, tolerance, preferredForm)
 %  Load NIFTI or ANALYZE dataset. Support both *.nii and *.hdr/*.img
@@ -194,16 +194,16 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
 %  nii will be in RAS orientation, i.e. X axis from Left to Right,
 %  Y axis from Posterior to Anterior, and Z axis from Inferior to
 %  Superior.
-%  
+%
 %  Usage: nii = load_nii(filename, [img_idx], [dim5_idx], [dim6_idx], ...
 %			[dim7_idx], [old_RGB], [tolerance], [preferredForm])
-%  
+%
 %  filename  - 	NIFTI or ANALYZE file name.
-%  
+%
 %  img_idx (optional)  -  a numerical array of 4th dimension indices,
 %	which is the indices of image scan volume. The number of images
 %	scan volumes can be obtained from get_nii_frame.m, or simply
-%	hdr.dime.dim(5). Only the specified volumes will be loaded. 
+%	hdr.dime.dim(5). Only the specified volumes will be loaded.
 %	All available image volumes will be loaded, if it is default or
 %	empty.
 %
@@ -223,32 +223,32 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
 %	from old RGB24. New RGB24 uses RGB triple sequentially for each
 %	voxel, like [R1 G1 B1 R2 G2 B2 ...]. Analyze 6.0 from AnalyzeDirect
 %	uses old RGB24, in a way like [R1 R2 ... G1 G2 ... B1 B2 ...] for
-%	each slices. If the image that you view is garbled, try to set 
+%	each slices. If the image that you view is garbled, try to set
 %	old_RGB variable to 1 and try again, because it could be in
 %	old RGB24. It will be set to 0, if it is default or empty.
 %
 %  tolerance (optional) - distortion allowed in the loaded image for any
-%	non-orthogonal rotation or shearing of NIfTI affine matrix. If 
-%	you set 'tolerance' to 0, it means that you do not allow any 
-%	distortion. If you set 'tolerance' to 1, it means that you do 
+%	non-orthogonal rotation or shearing of NIfTI affine matrix. If
+%	you set 'tolerance' to 0, it means that you do not allow any
+%	distortion. If you set 'tolerance' to 1, it means that you do
 %	not care any distortion. The image will fail to be loaded if it
 %	can not be tolerated. The tolerance will be set to 0.1 (10%), if
 %	it is default or empty.
 %
 %  preferredForm (optional)  -  selects which transformation from voxels
 %	to RAS coordinates; values are s,q,S,Q.  Lower case s,q indicate
-%	"prefer sform or qform, but use others if preferred not present". 
+%	"prefer sform or qform, but use others if preferred not present".
 %	Upper case indicate the program is forced to use the specificied
 %	tranform or fail loading.  'preferredForm' will be 's', if it is
 %	default or empty.	- Jeff Gunter
 %
 %  Returned values:
-%  
+%
 %  nii structure:
 %
 %	hdr -		struct with NIFTI header fields.
 %
-%	filetype -	Analyze format .hdr/.img (0); 
+%	filetype -	Analyze format .hdr/.img (0);
 %			NIFTI .hdr/.img (1);
 %			NIFTI .nii (2)
 %
@@ -259,12 +259,12 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
 %	img - 		3D (or 4D) matrix of NIFTI data.
 %
 %	original -	the original header before any affine transform.
-%  
+%
 %  Part of this file is copied and modified under GNU license from
 %  MRI_TOOLBOX developed by CNSP in Flinders University, Australia
-%  
+%
 %  NIFTI data format can be found on: http://nifti.nimh.nih.gov
-%  
+%
 %  - Jimmy Shen (jimmy@rotman-baycrest.on.ca)
 %
    if ~exist('filename','var')
@@ -321,23 +321,23 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
 end
 function [hdr, filetype, fileprefix, machine] = load_nii_hdr(fileprefix)
 %  Load NIFTI dataset header. Support both *.nii and *.hdr/*.img file
-%  extension. If file extension is not provided, *.hdr/*.img will be 
+%  extension. If file extension is not provided, *.hdr/*.img will be
 %  used as default.
-%  
+%
 %  Usage: [hdr, filetype, fileprefix, machine] = load_nii_hdr(filename)
-%  
+%
 %  filename - NIFTI file name.
-%  
+%
 %  Returned values:
-%  
+%
 %  hdr - struct with NIFTI header fields.
-%  
+%
 %  filetype	- 0 for Analyze format (*.hdr/*.img);
 %		  1 for NIFTI format in 2 files (*.hdr/*.img);
 %		  2 for NIFTI format in 1 file (*.nii).
-%  
+%
 %  fileprefix - NIFTI file name without extension.
-%  
+%
 %  machine    - a string, see below for details. The default here is 'ieee-le'.
 %
 %    'native'      or 'n' - local machine format - the default
@@ -353,7 +353,7 @@ function [hdr, filetype, fileprefix, machine] = load_nii_hdr(fileprefix)
 %                           byte ordering and 64 bit long data type
 %    'ieee-be.l64' or 's' - IEEE floating point with big-endian byte
 %                           ordering and 64 bit long data type.
-%  
+%
 %  Number of scanned images in the file can be obtained by:
 %  num_scan = hdr.dime.dim(5)
 %
@@ -401,7 +401,7 @@ function [hdr, filetype, fileprefix, machine] = load_nii_hdr(fileprefix)
    end
 
    fid = fopen(fn,'r',machine);
-    
+
    if fid < 0,
       msg = sprintf('Cannot open file %s.',fn);
       error(msg);
@@ -457,7 +457,7 @@ function [ dsr ] = read_header(fid)
 
         %  Original header structures
 	%  struct dsr
-	%       { 
+	%       {
 	%       struct header_key hk;            /*   0 +  40       */
 	%       struct image_dimension dime;     /*  40 + 108       */
 	%       struct data_history hist;        /* 148 + 200       */
@@ -479,9 +479,9 @@ end
 function [ hk ] = header_key(fid)
 
     fseek(fid,0,'bof');
-    
-	%  Original header structures	
-	%  struct header_key                     /* header key      */ 
+
+	%  Original header structures
+	%  struct header_key                     /* header key      */
 	%       {                                /* off + size      */
 	%       int sizeof_hdr                   /*  0 +  4         */
 	%       char data_type[10];              /*  4 + 10         */
@@ -493,9 +493,9 @@ function [ hk ] = header_key(fid)
 	%       };                               /* total=40 bytes  */
 	%
 	% int sizeof_header   Should be 348.
-	% char regular        Must be 'r' to indicate that all images and 
-	%                     volumes are the same size. 
-	
+	% char regular        Must be 'r' to indicate that all images and
+	%                     volumes are the same size.
+
     hk.sizeof_hdr    = fread(fid, 1,'int32')';	% should be 348!
     hk.data_type     = deblank(fread(fid,10,'*char')');
     hk.db_name       = deblank(fread(fid,18,'*char')');
@@ -503,20 +503,20 @@ function [ hk ] = header_key(fid)
     hk.session_error = fread(fid, 1,'int16')';
     hk.regular       = fread(fid, 1,'*char')';
     hk.dim_info      = fread(fid, 1,'uchar')';
-    
+
     return					% header_key
 end
 function [ dime ] = image_dimension(fid)
 
-	%  Original header structures    
+	%  Original header structures
 	%  struct image_dimension
 	%       {                                /* off + size      */
 	%       short int dim[8];                /* 0 + 16          */
         %       /*
-        %           dim[0]      Number of dimensions in database; usually 4. 
-        %           dim[1]      Image X dimension;  number of *pixels* in an image row. 
-        %           dim[2]      Image Y dimension;  number of *pixel rows* in slice. 
-        %           dim[3]      Volume Z dimension; number of *slices* in a volume. 
+        %           dim[0]      Number of dimensions in database; usually 4.
+        %           dim[1]      Image X dimension;  number of *pixels* in an image row.
+        %           dim[2]      Image Y dimension;  number of *pixel rows* in slice.
+        %           dim[3]      Volume Z dimension; number of *slices* in a volume.
         %           dim[4]      Time points; number of volumes in database
         %       */
 	%       float intent_p1;   % char vox_units[4];   /* 16 + 4       */
@@ -548,7 +548,7 @@ function [ dime ] = image_dimension(fid)
 	%       int glmax;                       /* 100 + 4         */
 	%       int glmin;                       /* 104 + 4         */
 	%       };                               /* total=108 bytes */
-	
+
     dime.dim        = fread(fid,8,'int16')';
     dime.intent_p1  = fread(fid,1,'float32')';
     dime.intent_p2  = fread(fid,1,'float32')';
@@ -570,13 +570,13 @@ function [ dime ] = image_dimension(fid)
     dime.toffset    = fread(fid,1,'float32')';
     dime.glmax      = fread(fid,1,'int32')';
     dime.glmin      = fread(fid,1,'int32')';
-        
+
     return					% image_dimension
 end
 function [ hist ] = data_history(fid)
-        
+
 	%  Original header structures
-	%  struct data_history       
+	%  struct data_history
 	%       {                                /* off + size      */
 	%       char descrip[80];                /* 0 + 80          */
 	%       char aux_file[24];               /* 80 + 24         */
@@ -594,7 +594,7 @@ function [ hist ] = data_history(fid)
 	%       char intent_name[16];            /* 180 + 16        */
 	%       char magic[4];   % int smin;     /* 196 + 4         */
 	%       };                               /* total=200 bytes */
-    
+
     hist.descrip     = deblank(fread(fid,80,'*char')');
     hist.aux_file    = deblank(fread(fid,24,'*char')');
     hist.qform_code  = fread(fid,1,'int16')';
@@ -613,7 +613,7 @@ function [ hist ] = data_history(fid)
 
     fseek(fid,253,'bof');
     hist.originator  = fread(fid, 5,'int16')';
-    
+
     return					% data_history
 end
 function [img,hdr] = load_nii_img(hdr,filetype,fileprefix,machine,img_idx,dim5_idx,dim6_idx,dim7_idx,old_RGB)
@@ -748,26 +748,26 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
 
    %  Set bitpix according to datatype
    %
-   %  /*Acceptable values for datatype are*/ 
+   %  /*Acceptable values for datatype are*/
    %
-   %     0 None                     (Unknown bit per voxel) % DT_NONE, DT_UNKNOWN 
-   %     1 Binary                         (ubit1, bitpix=1) % DT_BINARY 
-   %     2 Unsigned char         (uchar or uint8, bitpix=8) % DT_UINT8, NIFTI_TYPE_UINT8 
-   %     4 Signed short                  (int16, bitpix=16) % DT_INT16, NIFTI_TYPE_INT16 
-   %     8 Signed integer                (int32, bitpix=32) % DT_INT32, NIFTI_TYPE_INT32 
-   %    16 Floating point    (single or float32, bitpix=32) % DT_FLOAT32, NIFTI_TYPE_FLOAT32 
+   %     0 None                     (Unknown bit per voxel) % DT_NONE, DT_UNKNOWN
+   %     1 Binary                         (ubit1, bitpix=1) % DT_BINARY
+   %     2 Unsigned char         (uchar or uint8, bitpix=8) % DT_UINT8, NIFTI_TYPE_UINT8
+   %     4 Signed short                  (int16, bitpix=16) % DT_INT16, NIFTI_TYPE_INT16
+   %     8 Signed integer                (int32, bitpix=32) % DT_INT32, NIFTI_TYPE_INT32
+   %    16 Floating point    (single or float32, bitpix=32) % DT_FLOAT32, NIFTI_TYPE_FLOAT32
    %    32 Complex, 2 float32      (Use float32, bitpix=64) % DT_COMPLEX64, NIFTI_TYPE_COMPLEX64
-   %    64 Double precision  (double or float64, bitpix=64) % DT_FLOAT64, NIFTI_TYPE_FLOAT64 
-   %   128 uint8 RGB                 (Use uint8, bitpix=24) % DT_RGB24, NIFTI_TYPE_RGB24 
-   %   256 Signed char            (schar or int8, bitpix=8) % DT_INT8, NIFTI_TYPE_INT8 
+   %    64 Double precision  (double or float64, bitpix=64) % DT_FLOAT64, NIFTI_TYPE_FLOAT64
+   %   128 uint8 RGB                 (Use uint8, bitpix=24) % DT_RGB24, NIFTI_TYPE_RGB24
+   %   256 Signed char            (schar or int8, bitpix=8) % DT_INT8, NIFTI_TYPE_INT8
    %   511 Single RGB              (Use float32, bitpix=96) % DT_RGB96, NIFTI_TYPE_RGB96
-   %   512 Unsigned short               (uint16, bitpix=16) % DT_UNINT16, NIFTI_TYPE_UNINT16 
-   %   768 Unsigned integer             (uint32, bitpix=32) % DT_UNINT32, NIFTI_TYPE_UNINT32 
+   %   512 Unsigned short               (uint16, bitpix=16) % DT_UNINT16, NIFTI_TYPE_UNINT16
+   %   768 Unsigned integer             (uint32, bitpix=32) % DT_UNINT32, NIFTI_TYPE_UNINT32
    %  1024 Signed long long              (int64, bitpix=64) % DT_INT64, NIFTI_TYPE_INT64
-   %  1280 Unsigned long long           (uint64, bitpix=64) % DT_UINT64, NIFTI_TYPE_UINT64 
-   %  1536 Long double, float128  (Unsupported, bitpix=128) % DT_FLOAT128, NIFTI_TYPE_FLOAT128 
-   %  1792 Complex128, 2 float64  (Use float64, bitpix=128) % DT_COMPLEX128, NIFTI_TYPE_COMPLEX128 
-   %  2048 Complex256, 2 float128 (Unsupported, bitpix=256) % DT_COMPLEX128, NIFTI_TYPE_COMPLEX128 
+   %  1280 Unsigned long long           (uint64, bitpix=64) % DT_UINT64, NIFTI_TYPE_UINT64
+   %  1536 Long double, float128  (Unsupported, bitpix=128) % DT_FLOAT128, NIFTI_TYPE_FLOAT128
+   %  1792 Complex128, 2 float64  (Use float64, bitpix=128) % DT_COMPLEX128, NIFTI_TYPE_COMPLEX128
+   %  2048 Complex256, 2 float128 (Unsupported, bitpix=256) % DT_COMPLEX128, NIFTI_TYPE_COMPLEX128
    %
    switch hdr.dime.datatype
    case   1,
@@ -786,13 +786,13 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
       hdr.dime.bitpix = 64; precision = 'float64';
    case 128,
       hdr.dime.bitpix = 24; precision = 'uint8';
-   case 256 
+   case 256
       hdr.dime.bitpix = 8;  precision = 'int8';
-   case 511 
+   case 511
       hdr.dime.bitpix = 96; precision = 'float32';
-   case 512 
+   case 512
       hdr.dime.bitpix = 16; precision = 'uint16';
-   case 768 
+   case 768
       hdr.dime.bitpix = 32; precision = 'uint32';
    case 1024
       hdr.dime.bitpix = 64; precision = 'int64';
@@ -801,7 +801,7 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
    case 1792,
       hdr.dime.bitpix = 128; precision = 'float64';
    otherwise
-      error('This datatype is not supported'); 
+      error('This datatype is not supported');
    end
 
    hdr.dime.dim(find(hdr.dime.dim < 1)) = 1;
@@ -825,8 +825,8 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
    if filetype == 0 | hdr.dime.datatype == 1 | isequal(hdr.dime.dim(5:8),ones(1,4)) | ...
 	(isempty(img_idx) & isempty(dim5_idx) & isempty(dim6_idx) & isempty(dim7_idx))
 
-      %  For each frame, precision of value will be read 
-      %  in img_siz times, where img_siz is only the 
+      %  For each frame, precision of value will be read
+      %  in img_siz times, where img_siz is only the
       %  dimension size of an image, not the byte storage
       %  size of an image.
       %
@@ -838,7 +838,7 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
       if hdr.dime.datatype == 32 | hdr.dime.datatype == 1792
          img_siz = img_siz * 2;
       end
-	 
+
       %MPH: For RGB24, voxel values include 3 separate color planes
       %
       if hdr.dime.datatype == 128 | hdr.dime.datatype == 511
@@ -874,8 +874,8 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
 
       img = [];
 
-      %  For each frame, precision of value will be read 
-      %  in img_siz times, where img_siz is only the 
+      %  For each frame, precision of value will be read
+      %  in img_siz times, where img_siz is only the
       %  dimension size of an image, not the byte storage
       %  size of an image.
       %
@@ -930,7 +930,7 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
                   if hdr.dime.datatype == 128 | hdr.dime.datatype == 511
 	             img_siz = img_siz * 3;
                   end
-         
+
                   if filetype == 2
                      fseek(fid, pos + hdr.dime.vox_offset, 'bof');
                   else
@@ -957,7 +957,7 @@ function [img,hdr] = read_image(hdr, filetype,fileprefix,machine,img_idx,dim5_id
 
    fclose(fid);
 
-   %  Update the global min and max values 
+   %  Update the global min and max values
    %
    hdr.dime.glmax = max(double(img(:)));
    hdr.dime.glmin = min(double(img(:)));
@@ -1000,8 +1000,8 @@ function nii = xform_nii(nii, tolerance, preferredForm)
 
 %  'xform_nii.m' is an internal function called by "load_nii.m", so
 %  you do not need run this program by yourself. It does simplified
-%  NIfTI sform/qform affine transform, and supports some of the 
-%  affine transforms, including translation, reflection, and 
+%  NIfTI sform/qform affine transform, and supports some of the
+%  affine transforms, including translation, reflection, and
 %  orthogonal rotation (N*90 degree).
 %
 %  For other affine transforms, e.g. any degree rotation, shearing
@@ -1012,7 +1012,7 @@ function nii = xform_nii(nii, tolerance, preferredForm)
 %
 %  Since 'xform_nii.m' does not involve any interpolation or any
 %  slice change, the original image volume is supposed to be
-%  untouched, although it is translated, reflected, or even 
+%  untouched, although it is translated, reflected, or even
 %  orthogonally rotated, based on the affine matrix in the
 %  NIfTI header.
 %
@@ -1028,7 +1028,7 @@ function nii = xform_nii(nii, tolerance, preferredForm)
 %
 %  Because 'reslice_nii.m' has to perform 3D interpolation, it can
 %  be slow depending on image size and affine matrix in the header.
-%  
+%
 %  After you perform the affine transform, the 'nii' structure
 %  generated from 'xform_nii.m' or new NIfTI file created from
 %  'reslice_nii.m' will be in RAS orientation, i.e. X axis from
@@ -1036,9 +1036,9 @@ function nii = xform_nii(nii, tolerance, preferredForm)
 %  from Inferior to Superior.
 %
 %  NOTE: This function should be called immediately after load_nii.
-%  
+%
 %  Usage: [ nii ] = xform_nii(nii, [tolerance], [preferredForm])
-%  
+%
 %  nii	- NIFTI structure (returned from load_nii)
 %
 %  tolerance (optional) - distortion allowed for non-orthogonal rotation
@@ -1047,11 +1047,11 @@ function nii = xform_nii(nii, tolerance, preferredForm)
 %
 %  preferredForm (optional)  -  selects which transformation from voxels
 %	to RAS coordinates; values are s,q,S,Q.  Lower case s,q indicate
-%	"prefer sform or qform, but use others if preferred not present". 
+%	"prefer sform or qform, but use others if preferred not present".
 %	Upper case indicate the program is forced to use the specificied
 %	tranform or fail loading.  'preferredForm' will be 's', if it is
 %	default or empty.	- Jeff Gunter
-%  
+%
 %  NIFTI data format can be found on: http://nifti.nimh.nih.gov
 %
 %  - Jimmy Shen (jimmy@rotman-baycrest.on.ca)
@@ -1270,7 +1270,7 @@ function [hdr, orient] = change_hdr(hdr, tolerance, preferredForm)
            useForm='q';
        end
    end						% Jeff
-   
+
    if isequal(preferredForm,'q')
        if hdr.hist.qform_code > 0
            useForm='q';
@@ -1345,10 +1345,10 @@ function [hdr, orient] = change_hdr(hdr, tolerance, preferredForm)
 
       %  qforms are expected to generate rotation matrices R which are
       %  det(R) = 1; we'll make sure that happens.
-      %  
+      %
       %  now we make the same checks as were done above for sform data
       %  BUT we do it on a transform that is in terms of voxels not mm;
-      %  after we figure out the angles and squash them to closest 
+      %  after we figure out the angles and squash them to closest
       %  rectilinear direction. After that, the voxel sizes are then
       %  added.
       %
@@ -1358,7 +1358,7 @@ function [hdr, orient] = change_hdr(hdr, tolerance, preferredForm)
 
          %  det(R) == 0 is not a common trigger for this ---
          %  R(find(R)) is a list of non-zero elements in R; if that
-         %  is straight (not oblique) then it should be the same as 
+         %  is straight (not oblique) then it should be the same as
          %  columnwise summation. Could just as well have checked the
          %  lengths of R(find(R)) and sum(R)' (which should be 3)
          %
@@ -1476,15 +1476,15 @@ function [space_unit, time_unit] = get_units(hdr)
 
    return;					% get_units
 end
- 
- 
 
 
 
 
- 
- 
- 
- 
- 
- 
+
+
+
+
+
+
+
+

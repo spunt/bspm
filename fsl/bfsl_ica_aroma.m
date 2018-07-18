@@ -1,67 +1,75 @@
 function cmd = bfsl_ica_aroma(infile, TR, varargin)
-    % BFSL_ICA_AROMA Run ICA-AROMA using FSL
-    %
-    %  USAGE: bfsl_ica_aroma(infile, TR, outdir)
-    % __________________________________________________________________________
-    %  INPUTS
-    %   infile:     4D timeseries to denoise
-    %   TR:         in seconds [optional]
-    %   outdir:     output directory [default = same as in]
-    %   dentype:    Type of denoising strategy (default is nonaggr):
-    %               no: only classification, no denoising
-    %               nonaggr: non-aggressive (partial component regression)
-    %               aggr: aggressive (full component regression)
-    %               both: aggressive and non-aggressive (two outputs)
-    %   affmat      File name of the mat-file describing the affine registration
-    %               (e.g. FSL FLIRT) of the functional data to structural space
-    %               (.mat file)
-    %   warpfile    name of the warp-file describing the non-linear registration
-    %               (e.g. FSL FNIRT) of the structural data to MNI152 space (.nii.gz)
-    %
-    % USAGE: ICA_AROMA.py [-h] -o OUTDIR [-i INFILE] [-mc MC] [-a AFFMAT] [-w WARP]
-    %                     [-m MASK] [-f INFEAT] [-tr TR] [-den DENTYPE] [-md MELDIR]
-    %                     [-dim DIM]
-    %
-    % EXAMPLE: ICA_AROMA.py -in filtered_func_data.nii.gz -out ICA_AROMA -mc rest_mcf.par
-    %                       -m mask_aroma.nii.gz -affmat func2highres.mat -warp
-    %                       highres2standard_warp.nii.gz -md filtered_func_data.ica
+% BFSL_ICA_AROMA Run ICA-AROMA using FSL
+%
+%  USAGE: bfsl_ica_aroma(infile, TR, outdir)
+% __________________________________________________________________________
+%  INPUTS
+%   infile:     4D timeseries to denoise
+%   TR:         in seconds [optional]
+%   outdir:     output directory [default = same as in]
+%   dentype:    Type of denoising strategy (default is nonaggr):
+%               no: only classification, no denoising
+%               nonaggr: non-aggressive (partial component regression)
+%               aggr: aggressive (full component regression)
+%               both: aggressive and non-aggressive (two outputs)
+%   affmat      File name of the mat-file describing the affine registration
+%               (e.g. FSL FLIRT) of the functional data to structural space
+%               (.mat file)
+%   warpfile    name of the warp-file describing the non-linear registration
+%               (e.g. FSL FNIRT) of the structural data to MNI152 space (.nii.gz)
+%
+% USAGE: ICA_AROMA.py [-h] -o OUTDIR [-i INFILE] [-mc MC] [-a AFFMAT] [-w WARP]
+%                     [-m MASK] [-f INFEAT] [-tr TR] [-den DENTYPE] [-md MELDIR]
+%                     [-dim DIM]
+%
+% EXAMPLE: ICA_AROMA.py -in filtered_func_data.nii.gz -out ICA_AROMA -mc rest_mcf.par
+%                       -m mask_aroma.nii.gz -affmat func2highres.mat -warp
+%                       highres2standard_warp.nii.gz -md filtered_func_data.ica
 
-    % ---------------------- Copyright (C) 2015 Bob Spunt ----------------------
-    %   Created:  2015-03-24
-    %   Email:    spunt@caltech.edu
-    % __________________________________________________________________________
-    def = { ...
-        'outdir',        [],                  ...
-        'dentype',       'nonaggr',                 ...
-        'affmat',        [],                 ...
-        'warpfile',      [],                  ...
-         };
-    vals = setargs(def, varargin);
-    if nargin < 2, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
-    if iscell(infile), infile = char(infile); end
-    [p,n,e] = fileparts(infile);
-    if ~strcmp(e, '.gz'), pigz(infile); infile = strcat(infile, '.gz'); end
-    if isempty(outdir), outdir = fileparts(infile); end
-    rpfile      = char(files(fullfile(fileparts(infile), 'rp*txt')));
-    if isempty(rpfile), disp('Motion Correction file not found!'); return; end
-    % | - Configure Path
-    gitdir      = fullfile(getenv('HOME'), 'Github');
-    aromadir    = fullfile(gitdir, 'thirdparty-fmri', 'ICA-AROMA');
-    icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
-    if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
-    % | - Construct Command
-    cmd = sprintf('python %s -i %s -o %s -mc %s -tr %d -den %s', icaaroma, infile, outdir, rpfile, TR, dentype);
-    if ~isempty(affmat)
-        if iscell(affmat), affmat = char(affmat); end
-        cmd = sprintf('%s -a %s', cmd, affmat);
-    end
-    if ~isempty(warpfile)
-        if iscell(warpfile), warpfile = char(warpfile); end
-        [p,n,e] = fileparts(warpfile);
-        if ~strcmp(e, '.gz'), pigz(warpfile); warpfile = strcat(warpfile, '.gz'); end
-        cmd = sprintf('%s -w %s', cmd, warpfile);
-    end
-    if nargout==0, system(cmd); end
+% ---------------------- Copyright (C) 2015 Bob Spunt ----------------------
+%   Created:  2015-03-24
+%   Email:    spunt@caltech.edu
+% __________________________________________________________________________
+def = { ...
+    'outdir',        [],                  ...
+    'dentype',       'both',                 ...
+    'affmat',        [],                 ...
+    'warpfile',      [],                  ...
+    'aromadir',      [], ...
+     };
+vals = setargs(def, varargin);
+if nargin < 2, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
+if iscell(infile), infile = char(infile); end
+[p,n,e] = fileparts(infile);
+if ~strcmp(e, '.gz'), pigz(infile); infile = strcat(infile, '.gz'); end
+if isempty(outdir)
+    outname = sprintf('icaaroma_%s_%s_%s', n(1:4), dentype, datestr(now,'YYYYmmDD'));
+    outdir = fullfile(p, outname);
+end
+rpfile      = char(files(fullfile(fileparts(infile), 'rp*txt')));
+if isempty(rpfile), disp('Motion Correction file not found!'); return; end
+
+% | - Configure Path
+if isempty(aromadir)
+    aromadir    = fullfile(getenv('HOME'), 'Github', 'thirdparty-fmri', 'ICA-AROMA');
+end
+icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
+if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
+
+% | - Construct Command
+cmd = sprintf('python2 %s -i %s -o %s -mc %s -tr %d -den %s', icaaroma, infile, outdir, rpfile, TR, dentype);
+if ~isempty(affmat)
+    if iscell(affmat), affmat = char(affmat); end
+    cmd = sprintf('%s -a %s', cmd, affmat);
+end
+if ~isempty(warpfile)
+    if iscell(warpfile), warpfile = char(warpfile); end
+    [p,n,e] = fileparts(warpfile);
+    if ~strcmp(e, '.gz'), pigz(warpfile); warpfile = strcat(warpfile, '.gz'); end
+    cmd = sprintf('%s -w %s', cmd, warpfile);
+end
+if nargout==0, system(cmd); end
+
 function argstruct = setargs(defaultargs, varargs)
     if nargin < 1, mfile_showhelp; return; end
     if nargin < 2, varargs = []; end
@@ -84,6 +92,7 @@ function argstruct = setargs(defaultargs, varargs)
     end
     for i = 1:size(defaultargs,1), assignin('caller', defaultargs{i,1}, defaultargs{i,2}); end
     if nargout>0, argstruct = cell2struct(defaultargs(:,2), defaultargs(:,1)); end
+
 function mfile_showhelp(varargin)
     % MFILE_SHOWHELP
     ST = dbstack('-completenames');
