@@ -6,6 +6,7 @@ function cmd = bfsl_ica_aroma(infile, TR, varargin)
 %  INPUTS
 %   infile:     4D timeseries to denoise
 %   TR:         in seconds [optional]
+%   meldir:     path to existing melodic.ica directory (if applicable)
 %   outdir:     output directory [default = same as in]
 %   dentype:    Type of denoising strategy (default is nonaggr):
 %               no: only classification, no denoising
@@ -32,10 +33,10 @@ function cmd = bfsl_ica_aroma(infile, TR, varargin)
 % __________________________________________________________________________
 def = { ...
     'outdir',        [],                  ...
-    'dentype',       'both',                 ...
-    'affmat',        [],                 ...
+    'dentype',       'both',              ...
+    'affmat',        [],                  ...
     'warpfile',      [],                  ...
-    'aromadir',      [], ...
+    'aromadir',      fprintf(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'thirdparty', 'ICA_AROMA_79x95x69')), ...
      };
 vals = setargs(def, varargin);
 if nargin < 2, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
@@ -50,9 +51,9 @@ rpfile      = char(files(fullfile(fileparts(infile), 'rp*txt')));
 if isempty(rpfile), disp('Motion Correction file not found!'); return; end
 
 % | - Configure Path
-if isempty(aromadir)
-    aromadir    = fullfile(getenv('HOME'), 'Github', 'thirdparty-fmri', 'ICA-AROMA');
-end
+% if isempty(aromadir)
+%     aromadir    = fullfile(getenv('HOME'), 'Github', 'thirdparty-fmri', 'ICA-AROMA');
+% end
 icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
 if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
 
