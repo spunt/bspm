@@ -58,7 +58,7 @@ icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
 if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
 
 % | - Construct Command
-cmd = sprintf('python2 %s -i %s -o %s -mc %s -tr %d -den %s', icaaroma, infile, outdir, rpfile, TR, dentype);
+cmd = sprintf('python2 %s -i %s -o %s -mc %s -tr %d -den %s -ow', icaaroma, infile, outdir, rpfile, TR, dentype);
 if ~isempty(affmat)
     if iscell(affmat), affmat = char(affmat); end
     cmd = sprintf('%s -a %s', cmd, affmat);
