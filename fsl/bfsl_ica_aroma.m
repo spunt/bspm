@@ -36,7 +36,7 @@ def = { ...
     'dentype',       'both',              ...
     'affmat',        [],                  ...
     'warpfile',      [],                  ...
-    'aromadir',      fprintf(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'thirdparty', 'ICA_AROMA_79x95x69')), ...
+    'aromadir',      '', ...
      };
 vals = setargs(def, varargin);
 if nargin < 2, mfile_showhelp; fprintf('\t| - VARARGIN DEFAULTS - |\n'); disp(vals); return; end
@@ -51,9 +51,9 @@ rpfile      = char(files(fullfile(fileparts(infile), 'rp*txt')));
 if isempty(rpfile), disp('Motion Correction file not found!'); return; end
 
 % | - Configure Path
-% if isempty(aromadir)
-%     aromadir    = fullfile(getenv('HOME'), 'Github', 'thirdparty-fmri', 'ICA-AROMA');
-% end
+if isempty(aromadir)
+    aromadir = fullfile(fileparts(fileparts(mfilename('fullpath'))), 'thirdparty', 'ICA_AROMA_79x95x69');
+end
 icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
 if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
 
