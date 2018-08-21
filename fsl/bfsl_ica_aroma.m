@@ -51,8 +51,10 @@ rpfile      = char(files(fullfile(fileparts(infile), 'rp*txt')));
 if isempty(rpfile), disp('Motion Correction file not found!'); return; end
 
 % | - Configure Path
+bspmdir = fileparts(fileparts(mfilename('fullpath')));
+addpath(fullfile(bspmdir, 'dependencies'));
 if isempty(aromadir)
-    aromadir = fullfile(fileparts(fileparts(mfilename('fullpath'))), 'thirdparty', 'ICA_AROMA_79x95x69');
+    aromadir = fullfile(bspmdir, 'thirdparty', 'ICA_AROMA_79x95x69');
 end
 icaaroma    = fullfile(aromadir, 'ICA_AROMA.py');
 if ~exist(icaaroma, 'file'), fprintf('\n\nPATH IS INVALID: %s\n', icaaroma); return; end
